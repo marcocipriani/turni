@@ -1,0 +1,244 @@
+{
+  "radice": {
+    "nome": "Dipartimento esempio",
+    "sigla": "DIPES",
+    "dirigente": {
+      "nome": "Renata",
+      "cognome": "Vitali"
+    }
+  },
+  "figlia": {
+    "nome": "Ufficio esempio",
+    "sigla": "UFFES",
+    "dirigente": {
+      "nome": "Serena",
+      "cognome": "Ferraro"
+    }
+  },
+  "stanze": [
+    {
+      "etichetta": "101 · Sala nord",
+      "piano": "Primo piano",
+      "scrivanie": 5
+    },
+    {
+      "etichetta": "102",
+      "piano": "Primo piano",
+      "scrivanie": 2
+    }
+  ],
+  "settoriPresidio": [
+    "Segreteria"
+  ],
+  "organizzatori": [
+    {
+      "nome": "Marco",
+      "cognome": "Fabbri"
+    }
+  ],
+  "persone": [
+    {
+      "nome": "Elena",
+      "cognome": "Marchetti",
+      "settore": "Segreteria",
+      "assenze": [
+        "2026-09-14",
+        "2026-09-22"
+      ]
+    },
+    {
+      "nome": "Sofia",
+      "cognome": "Rinaldi",
+      "settore": "Segreteria",
+      "assenze": [
+        "2026-09-07",
+        "2026-09-14",
+        "2026-09-16",
+        "2026-09-23",
+        "2026-09-30"
+      ]
+    },
+    {
+      "nome": "Valle Tommaso",
+      "cognome": "Di",
+      "settore": "Segreteria",
+      "assenze": []
+    },
+    {
+      "nome": "Nicola",
+      "cognome": "Gatti",
+      "settore": "Segreteria",
+      "assenze": [
+        "2026-09-02",
+        "2026-09-03",
+        "2026-09-04",
+        "2026-09-07",
+        "2026-09-11",
+        "2026-09-14",
+        "2026-09-18",
+        "2026-09-21",
+        "2026-09-25",
+        "2026-09-28"
+      ]
+    },
+    {
+      "nome": "Serena",
+      "cognome": "Ferraro",
+      "settore": "Contabilità",
+      "assenze": []
+    },
+    {
+      "nome": "Chiara",
+      "cognome": "Piras",
+      "settore": "Contabilità",
+      "assenze": []
+    },
+    {
+      "nome": "Bianco Valerio",
+      "cognome": "De",
+      "settore": "Contabilità",
+      "assenze": []
+    },
+    {
+      "nome": "Irene",
+      "cognome": "Nobile",
+      "settore": "Contabilità",
+      "assenze": []
+    },
+    {
+      "nome": "Michela",
+      "cognome": "Sartori",
+      "settore": "Contabilità",
+      "assenze": []
+    },
+    {
+      "nome": "Ada",
+      "cognome": "Marchesi",
+      "settore": "Formazione",
+      "assenze": [
+        "2026-09-01",
+        "2026-09-02",
+        "2026-09-04",
+        "2026-09-07",
+        "2026-09-09",
+        "2026-09-10",
+        "2026-09-11",
+        "2026-09-14",
+        "2026-09-15",
+        "2026-09-16",
+        "2026-09-17",
+        "2026-09-18",
+        "2026-09-21",
+        "2026-09-23",
+        "2026-09-24",
+        "2026-09-25",
+        "2026-09-28",
+        "2026-09-30"
+      ]
+    },
+    {
+      "nome": "Federica",
+      "cognome": "Bellini",
+      "settore": "Formazione",
+      "assenze": [
+        "2026-09-01",
+        "2026-09-02",
+        "2026-09-03",
+        "2026-09-04",
+        "2026-09-07",
+        "2026-09-14",
+        "2026-09-21",
+        "2026-09-28"
+      ]
+    },
+    {
+      "nome": "Angelis Irene",
+      "cognome": "De",
+      "settore": "Formazione",
+      "assenze": []
+    },
+    {
+      "nome": "Nadia",
+      "cognome": "Costa",
+      "settore": "Statistica",
+      "assenze": [
+        "2026-09-02",
+        "2026-09-03",
+        "2026-09-04",
+        "2026-09-08",
+        "2026-09-09",
+        "2026-09-14",
+        "2026-09-15",
+        "2026-09-22",
+        "2026-09-23",
+        "2026-09-28",
+        "2026-09-29",
+        "2026-09-30"
+      ]
+    },
+    {
+      "nome": "Sara",
+      "cognome": "Trevisan",
+      "settore": "Statistica",
+      "assenze": []
+    },
+    {
+      "nome": "Camilla",
+      "cognome": "Riva",
+      "settore": "Statistica",
+      "assenze": []
+    },
+    {
+      "nome": "Ilaria",
+      "cognome": "Orsini",
+      "settore": "Statistica",
+      "assenze": []
+    },
+    {
+      "nome": "Marco",
+      "cognome": "Fabbri",
+      "settore": "Sviluppo",
+      "assenze": [
+        "2026-09-11",
+        "2026-09-14",
+        "2026-09-18"
+      ]
+    },
+    {
+      "nome": "Sara",
+      "cognome": "Guerra",
+      "settore": "Sviluppo",
+      "assenze": [
+        "2026-09-02",
+        "2026-09-04",
+        "2026-09-07",
+        "2026-09-09",
+        "2026-09-14",
+        "2026-09-16",
+        "2026-09-18",
+        "2026-09-21",
+        "2026-09-23",
+        "2026-09-25",
+        "2026-09-28",
+        "2026-09-30"
+      ]
+    },
+    {
+      "nome": "Davide",
+      "cognome": "Meloni",
+      "settore": "Sviluppo",
+      "assenze": []
+    },
+    {
+      "nome": "Giulia",
+      "cognome": "Zanetti",
+      "settore": "Sviluppo",
+      "assenze": [
+        "2026-09-01",
+        "2026-09-02",
+        "2026-09-03",
+        "2026-09-04"
+      ]
+    }
+  ]
+}
