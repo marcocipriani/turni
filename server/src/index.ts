@@ -1,4 +1,5 @@
 import { serve } from '@hono/node-server'
+import { serveStatic } from '@hono/node-server/serve-static'
 import { Hono } from 'hono'
 import { getCookie } from 'hono/cookie'
 import { cors } from 'hono/cors'
@@ -47,6 +48,17 @@ app.route('/api/org', org)
 app.route('/api/assenze', absences)
 app.route('/api/periodi', periods)
 app.route('/api/notifiche', notifications)
+
+// Il frontend compilato viene servito dallo stesso processo: un solo slot
+// applicativo da configurare sull'hosting. In alternativa i file di web/dist
+// possono essere copiati in public_html e serviti dal server web.
+const RADICE_WEB = process.env.WEB_DIST ?? '../web/dist'
+app.use('/assets/*', serveStatic({ root: RADICE_WEB }))
+app.use('/sw.js', serveStatic({ root: RADICE_WEB }))
+app.use('/manifest.webmanifest', serveStatic({ root: RADICE_WEB }))
+
+// Le rotte del client sono gestite da React: tutto ciò che non è API torna l'indice.
+app.get('*', serveStatic({ root: RADICE_WEB, rewriteRequestPath: () => '/index.html' }))
 
 const port = Number(process.env.PORT ?? 8787)
 serve({ fetch: app.fetch, port }, () => console.log(`API su http://localhost:${port}`))
