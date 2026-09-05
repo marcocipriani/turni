@@ -1,0 +1,24 @@
+{
+  "name": "turni",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace server & npm run dev --workspace web && wait",
+    "build": "npm run build --workspace server && npm run build --workspace web",
+    "db:push": "npm run db:push --workspace server",
+    "seed": "npm run seed --workspace server",
+    "test": "npm run test --workspace server"
+  },
+  "allowScripts": {
+    "esbuild@0.18.20": true,
+    "esbuild@0.19.12": true,
+    "esbuild@0.28.2": true,
+    "esbuild@0.21.5": true,
+    "esbuild@0.25.12": true,
+    "fsevents@2.3.3": true
+  }
+}
