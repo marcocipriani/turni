@@ -4,6 +4,8 @@
  *
  *   node scripts/prova-scambio.mjs
  */
+import { UTENTI } from './cdp.mjs'
+
 const BASE = process.env.BASE ?? 'http://localhost:8787'
 const PASSWORD = process.env.SEED_PASSWORD ?? 'turni2026'
 
@@ -28,7 +30,7 @@ async function sessione(email) {
   }
 }
 
-const io = await sessione('elena.pul@turni.test')
+const io = await sessione(UTENTI.dipendente)
 const mio = (await io.get('/mio')).corpo
 const giornata = mio.giorni.find((g) => g.stato === 'presenza')
 if (!giornata) throw new Error('nessuna giornata in sede da scambiare')
