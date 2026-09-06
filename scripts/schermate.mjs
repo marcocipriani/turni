@@ -2,7 +2,7 @@
  * Cattura schermate dell'app in esecuzione, autenticate e nei due temi.
  * Serve a verificare l'aspetto senza aprire un browser a mano.
  *
- *   node scripts/schermate.mjs [--base http://localhost:8787] [--out /tmp/schermate]
+ *   node scripts/schermate.mjs [--base http://localhost:8787] [--out /tmp/schermate] [--mobile]
  */
 import { spawn } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
@@ -15,16 +15,22 @@ const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 const PORTA = 9333
 
 const PAGINE = [
-  ['accesso', '/panoramica', null],
-  ['panoramica', '/panoramica', 'organizzatore'],
-  ['turni-elenco', '/programmazione', 'organizzatore'],
-  ['turni-griglia', '/programmazione/1', 'organizzatore'],
-  ['calendario', '/calendario', 'dipendente'],
+  ['accesso', '/mio', null],
+  ['mio', '/mio', 'dipendente'],
+  ['turni-giorni', '/turni', 'dipendente'],
+  ['turni-griglia', '/turni/1', 'organizzatore'],
   ['assenze', '/assenze', 'dipendente'],
+  ['stampa', '/stampa/giorno', 'organizzatore'],
   ['struttura', '/organizzazione', 'dirigente'],
   ['sistema', '/amministrazione', 'admin'],
   ['notifiche', '/notifiche', 'dipendente'],
 ]
+
+/** Il telefono non è il desktop rimpicciolito: va guardato da telefono. */
+const MOBILE = process.argv.includes('--mobile')
+const SCHERMO = MOBILE
+  ? { width: 390, height: 844, deviceScaleFactor: 3, mobile: true }
+  : { width: 1440, height: 900, deviceScaleFactor: 2, mobile: false }
 
 const UTENTI = {
   organizzatore: 'marco.cip@turni.test',
@@ -83,7 +89,7 @@ try {
     for (const [nome, percorso, come] of PAGINE) {
       const c = await Cdp.apri('about:blank')
       await c.invia('Network.enable')
-      await c.invia('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 2, mobile: false })
+      await c.invia('Emulation.setDeviceMetricsOverride', SCHERMO)
       await c.invia('Emulation.setScriptExecutionDisabled', { value: false })
       await c.invia('Network.setCookie', {
         name: 'turni_session', value: come ? token[come] : 'nessuna',
@@ -97,8 +103,9 @@ try {
       await c.invia('Page.navigate', { url: `${BASE}${percorso}` })
       await attendi(1800)
       const { data } = await c.invia('Page.captureScreenshot', { format: 'png' })
-      writeFileSync(`${OUT}/${nome}-${tema}.png`, Buffer.from(data, 'base64'))
-      console.log(`  ${nome}-${tema}.png`)
+      const suffisso = MOBILE ? `${nome}-mobile-${tema}` : `${nome}-${tema}`
+      writeFileSync(`${OUT}/${suffisso}.png`, Buffer.from(data, 'base64'))
+      console.log(`  ${suffisso}.png`)
       c.chiudi()
     }
   }

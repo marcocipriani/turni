@@ -42,3 +42,5 @@ export const Persona = (p: Props) => <Svg {...p}><circle cx="12" cy="8" r="4" />
 export const Stanza = (p: Props) => <Svg {...p}><path d="M4 21V4a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v17M4 21h16M15 8h4a1 1 0 0 1 1 1v12" /><circle cx="11.5" cy="12.5" r="1" /></Svg>
 export const Info = (p: Props) => <Svg {...p}><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></Svg>
 export const Vuoto = (p: Props) => <Svg {...p}><path d="M3 8.5 12 4l9 4.5-9 4.5Z" /><path d="M3 12.5 12 17l9-4.5M3 16.5 12 21l9-4.5" /></Svg>
+export const Scambio = (p: Props) => <Svg {...p}><path d="M4 8h13l-3.5-3.5M20 16H7l3.5 3.5" /></Svg>
+export const Stampa = (p: Props) => <Svg {...p}><path d="M7 8V3h10v5" /><path d="M7 18H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2" /><rect x="7" y="14" width="10" height="7" rx="1" /></Svg>

@@ -51,7 +51,7 @@ export function tintaDi(id: number, scelta?: number | null): number {
 }
 
 const MISURE = {
-  piccolo: 'size-6 text-2xs',
+  piccolo: 'size-6 text-[9px] leading-none tracking-[-0.02em]',
   medio: 'size-8 text-xs',
   grande: 'size-9 text-xs',
 } as const
@@ -91,13 +91,13 @@ export function FilaAvatar({ persone, massimo = 5, tinte }: {
   const mostrati = persone.slice(0, massimo)
   const restanti = persone.length - mostrati.length
 
+  // Niente sovrapposizione: con le iniziali dentro, i cerchi accavallati si
+  // tagliano le lettere a vicenda e non si legge più nessuno dei due.
   return (
     <span className="flex items-center">
-      <span className="flex -space-x-1.5">
+      <span className="flex gap-0.5">
         {mostrati.map((p) => (
-          <span key={p.id} className="rounded-full ring-2 ring-bg">
-            <Avatar persona={p} tinta={tinte?.get(p.id)} misura="piccolo" />
-          </span>
+          <Avatar key={p.id} persona={p} tinta={tinte?.get(p.id)} misura="piccolo" />
         ))}
       </span>
       {restanti > 0 && <span className="mono ml-1.5 text-2xs text-ink-faint">+{restanti}</span>}
