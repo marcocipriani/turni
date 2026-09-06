@@ -1,0 +1,7 @@
+persona;ruolo;unita;sigla;unitaPadre;settore;presidio;organizzatore;email
+Ferri Anna;admin;;;;;;;amministratore@esempio.it
+Rossi Maria;dirigente;Dipartimento esempio;DIPES;;;;;
+Bianchi Giulia;dirigente;Ufficio esempio;UFFES;Dipartimento esempio;;;;
+Di Marco Luca;dipendente;Ufficio esempio;;;Segreteria;si;si;
+Verdi Anna;dipendente;Ufficio esempio;;;Segreteria;si;;
+De Santis Paolo;dipendente;Ufficio esempio;;;Statistica;;;

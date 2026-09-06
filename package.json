@@ -9,9 +9,16 @@
   "scripts": {
     "dev": "npm run dev --workspace server & npm run dev --workspace web && wait",
     "build": "npm run build --workspace server && npm run build --workspace web",
-    "db:push": "npm run db:push --workspace server",
+    "test": "npm run test --workspace server && npm run test --workspace web",
+    "migra": "npm run migra --workspace server",
     "seed": "npm run seed --workspace server",
-    "test": "npm run test --workspace server && npm run test --workspace web"
+    "avvio": "npm run avvio --workspace server",
+    "verifica": "npm run verifica --workspace server",
+    "carico": "npm run carico --workspace server",
+    "pacchetto": "node scripts/pacchetto.mjs",
+    "schermate": "node scripts/schermate.mjs",
+    "accessibilita": "node scripts/accessibilita.mjs",
+    "tempi": "node scripts/tempi.mjs"
   },
   "allowScripts": {
     "esbuild@0.18.20": true,
