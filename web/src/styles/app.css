@@ -64,6 +64,38 @@ body {
   border-radius: var(--r1);
 }
 
+/* ── Correzioni di contrasto ───────────────────────────────────────
+   DESIGN.md chiede WCAG AA in entrambi i temi. Misurando i token uno per uno
+   — lo fa web/src/contrasto.test.ts, calcolando i rapporti dai file — tre
+   valori non ci arrivano. Si correggono qui: tokens.css è del design system
+   e non si tocca.
+
+     --ok-ink        manca del tutto. --ok come testo su fondo chiaro dà 3.37:1.
+     --warn-ink      3.28:1 come testo in tema scuro. Stesso problema per
+     --danger-ink    3.11:1: tokens.css non li ridefinisce per lo scuro.
+     --border-controllo   il bordo dei campi dà 1.79:1 su entrambi i temi.
+                     Su un campo il bordo è l'unica cosa che ne dichiara i
+                     limiti, quindi vale la soglia 3:1 della 1.4.11. Resta un
+                     token a parte: i bordi decorativi non cambiano. */
+:root {
+  --ok-ink: oklch(0.48 0.10 150);
+  --border-controllo: oklch(0.635 0 0);
+}
+:root[data-theme='dark'] {
+  --ok-ink: oklch(0.72 0.11 150);
+  --warn-ink: oklch(0.62 0.09 80);
+  --danger-ink: oklch(0.63 0.13 25);
+  --border-controllo: oklch(0.505 0 0);
+}
+@theme inline {
+  --color-ok-ink: var(--ok-ink);
+  --color-border-controllo: var(--border-controllo);
+}
+
+/* Il marchio: sfondo e non <img>, così il tema che non serve non si scarica. */
+.marchio { background-image: url('/marchio/marchio.png'); background-size: cover; }
+:root[data-theme='dark'] .marchio { background-image: url('/marchio/marchio-scuro.png'); }
+
 /* Tonalità degli avatar: otto neutri, non otto colori. Il design system riserva
    la croma agli stati, e due colleghi si distinguono benissimo per luminosità.
    Restano tutti ben oltre il rapporto 4.5:1 con l'inchiostro primario. */

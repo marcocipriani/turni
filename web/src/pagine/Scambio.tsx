@@ -211,7 +211,7 @@ export function ModaleScambio({ data, aperta, onChiudi, onFatto }: {
                               ? `Permuta con la sua giornata di ${quando(g.data)}`
                               : g.tipo === 'offro' ? 'Cedi la tua giornata' : 'Chiedi la sua giornata'}
                             className="inline-flex min-h-[34px] cursor-pointer items-center gap-1.5 rounded-r2
-                                       border border-border-strong bg-bg px-2.5 text-sm text-ink
+                                       border border-border-controllo bg-bg px-2.5 text-sm text-ink
                                        hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             <I.Scambio size={14} />

@@ -2,11 +2,13 @@
   "name": "Turni · by Zucchetto",
   "short_name": "Turni",
   "description": "Sai sempre quando sei in sede, e con chi.",
-  "start_url": "/panoramica",
+  "start_url": "/mio",
   "display": "standalone",
   "background_color": "#fbfbfb",
   "theme_color": "#2b2b2b",
   "icons": [
-    { "src": "/marchio/icona-app.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+    { "src": "/marchio/icona-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/marchio/icona-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/marchio/icona-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

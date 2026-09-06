@@ -10,11 +10,11 @@ const BASE = 'inline-flex items-center gap-2 transition-colors duration-[120ms] 
   'disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer'
 
 const VARIANTI: Record<VarianteBottone, string> = {
-  normale: `${BASE} rounded-r2 border border-border-strong bg-bg px-3 py-1.5 text-base text-ink hover:bg-surface-2`,
+  normale: `${BASE} rounded-r2 border border-border-controllo bg-bg px-3 py-1.5 text-base text-ink hover:bg-surface-2`,
   primario: `${BASE} rounded-r2 border border-action bg-action px-3 py-1.5 text-base text-action-ink hover:bg-action-hover`,
-  piccolo: `${BASE} rounded-r2 border border-border-strong bg-bg px-2 py-[3px] text-sm text-ink hover:bg-surface-2`,
+  piccolo: `${BASE} rounded-r2 border border-border-controllo bg-bg px-2 py-[3px] text-sm text-ink hover:bg-surface-2`,
   icona: `${BASE} rounded-r1 p-[5px] text-ink-faint hover:bg-surface-2 hover:text-ink`,
-  distruttivo: `${BASE} rounded-r2 border border-border-strong bg-bg px-3 py-1.5 text-base text-ink hover:bg-danger-wash hover:text-danger-ink hover:border-danger`,
+  distruttivo: `${BASE} rounded-r2 border border-border-controllo bg-bg px-3 py-1.5 text-base text-ink hover:bg-danger-wash hover:text-danger-ink hover:border-danger`,
 }
 
 export function Bottone({ variante = 'normale', className = '', ...resto }:
@@ -32,7 +32,7 @@ export function Segmented<T extends string>({ valore, opzioni, onCambia, etichet
 }) {
   return (
     <div role="radiogroup" aria-label={etichetta}
-         className="inline-flex overflow-hidden rounded-r2 border border-border-strong">
+         className="inline-flex overflow-hidden rounded-r2 border border-border-controllo">
       {opzioni.map((o, i) => (
         <button
           key={o.v} type="button" role="radio" aria-checked={valore === o.v} title={o.titolo}
@@ -54,10 +54,10 @@ export const Chip = ({ children }: { children: ReactNode }) =>
   <span className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-sm text-ink-muted">{children}</span>
 
 export const Badge = ({ children }: { children: ReactNode }) =>
-  <span className="inline-flex items-center rounded-full border border-border-strong px-1.5 py-px text-2xs uppercase tracking-[0.04em] text-ink-muted">{children}</span>
+  <span className="inline-flex items-center rounded-full border border-border-controllo px-1.5 py-px text-2xs uppercase tracking-[0.04em] text-ink-muted">{children}</span>
 
 export function Pill({ tono = 'neutro', children }: { tono?: 'neutro' | 'ok' | 'attesa' | 'errore'; children: ReactNode }) {
-  const colore = { neutro: 'text-ink-muted', ok: 'text-ok', attesa: 'text-warn-ink', errore: 'text-danger-ink' }[tono]
+  const colore = { neutro: 'text-ink-muted', ok: 'text-ok-ink', attesa: 'text-warn-ink', errore: 'text-danger-ink' }[tono]
   const icona = tono === 'ok' ? <Spunta size={13} /> : tono === 'errore' ? <Attenzione size={13} /> : null
   return <span className={`inline-flex items-center gap-1 rounded-full px-1.5 text-sm ${colore}`}>{icona}{children}</span>
 }
@@ -67,7 +67,7 @@ export const Tag = ({ children }: { children: ReactNode }) =>
 
 /** Lo stato non passa mai dal solo colore: pallino più etichetta, sempre. */
 export function Stato({ tono, children }: { tono: 'neutro' | 'ok' | 'attesa' | 'errore'; children: ReactNode }) {
-  const sfondo = { neutro: 'bg-ink-faint', ok: 'bg-ok', attesa: 'bg-warn', errore: 'bg-danger' }[tono]
+  const sfondo = { neutro: 'bg-ink-faint', ok: 'bg-ok', attesa: 'bg-warn-ink', errore: 'bg-danger' }[tono]
   return (
     <span className="inline-flex items-center gap-1.5 text-sm text-ink-muted">
       <span className={`size-2 shrink-0 rounded-full ${sfondo}`} aria-hidden="true" />{children}
@@ -78,8 +78,8 @@ export function Stato({ tono, children }: { tono: 'neutro' | 'ok' | 'attesa' | '
 /* ── Campi ───────────────────────────────────────────────────────── */
 
 export const inputCls =
-  'w-full rounded-r2 border border-border-strong bg-bg px-3 py-1.5 text-base text-ink ' +
-  'placeholder:text-ink-muted outline-none focus:border-border-strong'
+  'w-full rounded-r2 border border-border-controllo bg-bg px-3 py-1.5 text-base text-ink ' +
+  'placeholder:text-ink-muted outline-none focus:border-border-controllo'
 
 export function Campo({ etichetta, aiuto, errore, children }: {
   etichetta: string; aiuto?: string; errore?: string; children: ReactNode
@@ -98,7 +98,7 @@ export function Ricerca({ valore, onCambia, segnaposto, scorciatoia }: {
   valore: string; onCambia: (v: string) => void; segnaposto: string; scorciatoia?: string
 }) {
   return (
-    <div className="flex items-center gap-2 rounded-r2 border border-border-strong bg-surface px-2.5 py-1.5
+    <div className="flex items-center gap-2 rounded-r2 border border-border-controllo bg-surface px-2.5 py-1.5
                     focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75}
            strokeLinecap="round" aria-hidden="true" className="shrink-0 text-ink-faint">
@@ -121,15 +121,15 @@ export function Pannello({ titolo, icona, azioni, piede, tonoPiede = 'neutro', c
   titolo?: string; icona?: ReactNode; azioni?: ReactNode; piede?: ReactNode
   tonoPiede?: 'neutro' | 'ok' | 'attesa' | 'errore'; children: ReactNode
 }) {
-  const colorePiede = { neutro: 'text-ink-muted', ok: 'text-ok', attesa: 'text-warn-ink', errore: 'text-danger-ink' }[tonoPiede]
+  const colorePiede = { neutro: 'text-ink-muted', ok: 'text-ok-ink', attesa: 'text-warn-ink', errore: 'text-danger-ink' }[tonoPiede]
   return (
     <section className="flex flex-col gap-3 rounded-r3 border border-border bg-surface p-4">
       {(titolo || azioni) && (
         <div className="flex flex-wrap items-center justify-between gap-2">
           {titolo && (
-            <h3 className="flex items-center gap-2 text-base font-semibold text-ink">
+            <h2 className="flex items-center gap-2 text-base font-semibold text-ink">
               {icona && <span className="text-ink-muted">{icona}</span>}{titolo}
-            </h3>
+            </h2>
           )}
           {azioni && <div className="flex flex-wrap items-center gap-2">{azioni}</div>}
         </div>
@@ -146,7 +146,7 @@ export function Messaggio({ tono = 'info', children }: { tono?: 'info' | 'errore
   const stile = {
     info: 'border-border text-ink-muted',
     errore: 'border-danger bg-danger-wash text-danger-ink',
-    attenzione: 'border-border-strong text-warn-ink',
+    attenzione: 'border-border-controllo text-warn-ink',
   }[tono]
   const Icona = tono === 'info' ? Info : Attenzione
   return (
@@ -199,7 +199,7 @@ export function Modale({ titolo, aperta, onChiudi, piede, children }: {
   return (
     <dialog
       ref={rif} onClose={onChiudi} onCancel={onChiudi}
-      className="m-auto w-[calc(100vw-32px)] max-w-[720px] rounded-r4 border border-border-strong bg-bg p-0
+      className="m-auto w-[calc(100vw-32px)] max-w-[720px] rounded-r4 border border-border-controllo bg-bg p-0
                  text-ink shadow-overlay backdrop:bg-[oklch(0_0_0/.5)] backdrop:backdrop-blur-[2px]"
     >
       <header className="flex items-center justify-between border-b border-border p-4">

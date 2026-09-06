@@ -261,7 +261,7 @@ export default function Organizzazione() {
                             onClick={() => void prova(() => api.patch(`/org/scrivanie/${d.id}`, { attiva: !d.attiva }))}
                             aria-label={`Scrivania ${d.numero}, ${d.attiva ? 'attiva' : 'disattivata'}`}
                             className={`mono cursor-pointer rounded-r1 border px-2 py-0.5 text-sm disabled:cursor-default
-                              ${d.attiva ? 'border-border-strong bg-surface-2 text-ink' : 'border-border text-ink-faint line-through'}`}
+                              ${d.attiva ? 'border-border-controllo bg-surface-2 text-ink' : 'border-border text-ink-faint line-through'}`}
                           >{d.numero}</button>
                         </li>
                       ))}

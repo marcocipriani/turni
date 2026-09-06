@@ -61,7 +61,7 @@ function Filtri({ attivi, onCambia, conteggi }: {
             className={`inline-flex min-h-[32px] cursor-pointer items-center gap-1.5 rounded-full border px-2.5
                         text-sm transition-colors duration-[120ms] ease-out ${on
               ? 'border-action bg-action text-action-ink'
-              : 'border-border-strong bg-bg text-ink-muted hover:bg-surface-2 hover:text-ink'}`}
+              : 'border-border-controllo bg-bg text-ink-muted hover:bg-surface-2 hover:text-ink'}`}
           >
             {NOMI[f]}
             <span className="mono text-2xs opacity-70">{conteggi[f]}</span>
