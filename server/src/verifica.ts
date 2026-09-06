@@ -90,11 +90,21 @@ async function main() {
   esito(altrui.every((c) => c.causale == null), 'Nessuna causale altrui raggiunge un collega')
 
   /* 7 — l'export non contiene causali */
-  const causali = await db.select().from(schema.absenceReason)
+  // Non si cerca la parola della causale in tutto il file: un settore può
+  // benissimo chiamarsi «Formazione» come una causale, e la ricerca a tappeto
+  // griderebbe al lupo. La proprietà da verificare è più stretta e più giusta:
+  // la colonna dello stato dice solo se una persona è in sede, mai perché no.
   const csv = (await s.get(`/periodi/${periodo.id}/export.csv`)).corpo as string
-  const trovate = causali.filter((c) => csv.includes(c.codice) || csv.toLowerCase().includes(c.etichetta.toLowerCase()))
-  esito(trovate.length === 0, 'L\'export non contiene causali di assenza',
-    trovate.length ? trovate.map((t) => t.codice).join(', ') : '')
+  const righe = csv.replace(/^\ufeff/, '').split(/\r?\n/).filter((r) => r.trim())
+  const intestazione = righe[0]!.split(';').map((c) => c.replace(/"/g, '').trim())
+  const colonnaStato = intestazione.indexOf('stato')
+  const stati = new Set(righe.slice(1)
+    .map((r) => r.split(';')[colonnaStato]?.replace(/"/g, '').trim() ?? ''))
+  const ammessi = new Set(['presenza', 'fuori_sede'])
+  const estranei = [...stati].filter((x) => !ammessi.has(x))
+  esito(colonnaStato >= 0 && estranei.length === 0,
+    'L\'export dice se una persona è in sede, mai perché non c\'è',
+    estranei.length ? estranei.join(', ') : `${stati.size} stati distinti`)
 
   /* 8 — l'amministratore non vede programmazioni */
   const admin = await sessione(`admin@${DOMINIO}`)
