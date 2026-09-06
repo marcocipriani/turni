@@ -1,4 +1,6 @@
-# Turni — programmazione delle presenze
+# Turni · by Zucchetto
+
+*Sai sempre quando sei in sede, e con chi.*
 
 Applicazione web per programmare, per periodi definiti, chi lavora in sede e chi
 in lavoro agile, entro la capienza fisica delle stanze e tenendo conto delle
@@ -6,15 +8,24 @@ assenze dichiarate dagli interessati.
 
 - Design: [`docs/superpowers/specs/2026-09-05-piattaforma-turni-design.md`](docs/superpowers/specs/2026-09-05-piattaforma-turni-design.md)
 - Piano dei lavori: [`docs/superpowers/plans/2026-09-05-fase-1-implementazione.md`](docs/superpowers/plans/2026-09-05-fase-1-implementazione.md)
+- Design system: [`design-system/DESIGN.md`](design-system/DESIGN.md) — normativo.
+  I token si copiano da [`design-system/tokens.css`](design-system/tokens.css) senza modificarne i valori
+- Slot di brand compilato: [`docs/marchio.md`](docs/marchio.md)
 - Materiali di partenza: `handoff-webapp-rotazione-postazioni.md` (motore art.9, fase 3),
   `prototipo-griglia.html` (prototipo della griglia), l'xlsx delle adesioni
 
 ## Come è fatta
 
 ```
-web/     SPA React + Vite + Tailwind, compilata in file statici
+web/     SPA React + Vite + Tailwind v4, compilata in file statici
 server/  API Hono su Node, con Drizzle su MySQL 8 / MariaDB
 ```
+
+L'interfaccia è una **shell a due isole**: rail da 68px sempre visibile,
+pannello da 214px comprimibile, isola di contenuto con header da 52px. Tema
+chiaro, scuro e automatico, persistito. Inter e JetBrains Mono sono
+self-ospitati: nessuna richiesta a un CDN esterno, quindi nessun dato del
+personale che raggiunge terzi.
 
 Il processo Node serve sia l'API sia il frontend compilato, così l'hosting
 richiede un solo slot applicativo. In alternativa il contenuto di `web/dist`
@@ -55,10 +66,31 @@ Accessi generati dal popolamento di prova, tutti con la password indicata in
 ## Verifiche
 
 ```bash
-npm test                        # 27 test di unità: motore di generazione e permessi
+npm test                        # 31 test di unità: motore, permessi, calendario, accessibilità
 npm run verifica -w server      # criteri di accettazione contro un'istanza avviata
+npm run carico -w server        # tempi del motore fino a 1000 persone
 npm run build                   # controllo dei tipi e build di produzione
+node scripts/schermate.mjs      # schermate autenticate nei due temi, via Chrome headless
 ```
+
+### Tempi misurati
+
+Motore di generazione, 21 giornate lavorative:
+
+| Persone | Postazioni | Tempo |
+|---:|---:|---:|
+| 20 | 8 | 12 ms |
+| 100 | 40 | 10 ms |
+| 500 | 240 | 54 ms |
+| 1000 | 480 | 96 ms |
+
+API, media su 20 richieste dopo riscaldamento, con la griglia reale da 19 persone × 20 giornate:
+
+| Rotta | Tempo | Risposta | Compressa |
+|---|---:|---:|---:|
+| `/api/periodi/:id/griglia` | 8,3 ms | 45,7 kB | 2,8 kB |
+| `/api/panoramica` | 5,1 ms | 15,3 kB | 1,3 kB |
+| `/api/periodi/:id/export.csv` | 8,2 ms | 27,6 kB | 2,0 kB |
 
 ## Messa in linea su Hostinger
 
@@ -105,6 +137,6 @@ il punto più fragile. Il controllo dei tipi resta e gira con `npm run build`.
 ## Cosa non c'è ancora
 
 Fase 2: editor di planimetria drag and drop, reportistica di equità, serie
-storiche. Fase 3: motore art.9 con protrazioni e debito orario, fasce orarie
+storiche, virtualizzazione della griglia oltre le 200 righe. Fase 3: motore art.9 con protrazioni e debito orario, fasce orarie
 infragiornaliere, stanze condivise fra unità, SSO istituzionale, Design System
 Italia.
