@@ -190,8 +190,7 @@ Prima versione completa e provata. Rinviato per scelta, non per dimenticanza:
 
 ## Licenza
 
-Da definire. Trattandosi di software per una pubblica amministrazione italiana,
-le [Linee guida su acquisizione e riuso di software per le
-PA](https://docs.italia.it/italia/developers-italia/gl-acquisition-and-reuse-software-for-pa-docs/)
-indicano una licenza aperta — di norma AGPL-3.0 o EUPL-1.2. Finché il file
-`LICENSE` non c'è, valgono i termini predefiniti del diritto d'autore.
+[MIT](LICENSE). Prendi, usa, modifica, rivendi, senza chiedere niente a
+nessuno. Qui dentro non c'è niente di inventato: un motore che riempie una
+griglia rispettando dei vincoli, un modello dei permessi e un po' di cura nel
+non far uscire i dati di nessuno. Se serve a qualcun altro, tanto meglio.

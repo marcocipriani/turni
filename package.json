@@ -30,5 +30,6 @@
   },
   "devDependencies": {
     "axe-core": "^4.13.0"
-  }
+  },
+  "license": "MIT"
 }
