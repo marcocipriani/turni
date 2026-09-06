@@ -1,11 +1,15 @@
 /**
  * Migrazione dello schema, esplicita e idempotente.
  *
- * `drizzle-kit push` non riesce più a leggere lo schema da MariaDB — si ferma
- * su `checkConstraint` durante l'introspezione — e comunque su hosting condiviso
- * serve un passo di rilascio che non dipenda da un attrezzo interattivo.
+ * `drizzle-kit push` non riesce a leggere lo schema da MariaDB — si ferma su
+ * `checkConstraint` durante l'introspezione — e comunque su hosting condiviso
+ * serve un passo di rilascio che non dipenda da un attrezzo interattivo. È
+ * stato tolto dalle dipendenze: un attrezzo rotto in elenco invita a usarlo.
+ *
  * Qui le modifiche sono scritte a mano, applicate solo se mancano, e si possono
- * rieseguire quante volte si vuole.
+ * rieseguire quante volte si vuole. Lo schema in `schema.ts` resta la
+ * descrizione autorevole: questo file la insegue, e le due cose vanno
+ * cambiate insieme.
  *
  *   npm run migra -w server
  */
