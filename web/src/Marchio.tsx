@@ -1,18 +1,19 @@
 /**
- * Slot di brand, punto 1 e 4 del § 14: il marchio è raster senza canale alpha,
- * quindi la tile ritaglia e la variante cambia col tema.
+ * Il marchio, punto 1 del § 14.
  *
- * È uno sfondo e non due <img>: due immagini, una nascosta dal tema, si
- * scaricano comunque entrambe. Uno sfondo su un elemento la cui regola non si
- * applica non si scarica affatto — metà del peso, senza cambiare una riga di
- * resa.
+ * È una maschera, non un'immagine: il segno prende `currentColor` e segue il
+ * tema da sé. Un file solo invece di due, nessuna variante chiara e scura da
+ * tenere allineate, e nessun riquadro bianco da nascondere sotto un bordo.
  */
 export function Marchio({ size = 40, className = '' }: { size?: number; className?: string }) {
   return (
     <span
       aria-hidden="true"
-      className={`marchio block overflow-hidden rounded-r3 border border-border bg-surface ${className}`}
+      className={`marchio block shrink-0 ${className}`}
       style={{ width: size, height: size }}
     />
   )
 }
+
+/** Riga di copyright. È l'unico punto in cui compare il nome della casa. */
+export const COPYRIGHT = `© ${new Date().getFullYear()} Turni from Zucchetto`

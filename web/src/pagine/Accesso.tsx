@@ -1,6 +1,6 @@
 import { type FormEvent, useState } from 'react'
 import { ErroreApi } from '../api'
-import { Marchio } from '../Marchio'
+import { COPYRIGHT, Marchio } from '../Marchio'
 import { useSessione } from '../sessione'
 import { Bottone, Campo, inputCls, Messaggio } from '../ui'
 
@@ -23,11 +23,8 @@ export default function Accesso() {
     <div className="grid h-full place-items-center bg-surface p-2">
       <main className="entra w-full max-w-[420px] rounded-r4 border border-border bg-bg p-8 shadow-float">
         <div className="flex items-center gap-3">
-          <Marchio size={48} />
-          <div>
-            <h1 className="mono text-[22px] font-semibold leading-tight tracking-[-0.02em]">Turni</h1>
-            <p className="text-sm text-ink-faint">by Zucchetto</p>
-          </div>
+          <Marchio size={44} className="text-ink" />
+          <h1 className="mono text-[22px] font-semibold leading-tight tracking-[-0.02em]">Turni</h1>
         </div>
 
         <p className="mt-5 max-w-[38ch] text-base text-ink-muted">
@@ -54,6 +51,8 @@ export default function Accesso() {
           all'amministratore di sistema di reimpostarla: ti darà una password
           provvisoria da cambiare al primo accesso.
         </p>
+
+        <p className="mono mt-6 border-t border-border pt-3 text-2xs text-ink-faint">{COPYRIGHT}</p>
       </main>
     </div>
   )

@@ -92,9 +92,13 @@ body {
   --color-border-controllo: var(--border-controllo);
 }
 
-/* Il marchio: sfondo e non <img>, così il tema che non serve non si scarica. */
-.marchio { background-image: url('/marchio/marchio.png'); background-size: cover; }
-:root[data-theme='dark'] .marchio { background-image: url('/marchio/marchio-scuro.png'); }
+/* Il marchio è una maschera: il segno si colora con currentColor e segue il
+   tema senza una seconda immagine. */
+.marchio {
+  background-color: currentColor;
+  -webkit-mask: url('/marchio/marchio.png') center / contain no-repeat;
+  mask: url('/marchio/marchio.png') center / contain no-repeat;
+}
 
 /* Tonalità degli avatar: otto neutri, non otto colori. Il design system riserva
    la croma agli stati, e due colleghi si distinguono benissimo per luminosità.
