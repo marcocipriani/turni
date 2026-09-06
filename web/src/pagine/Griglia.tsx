@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useRef, useState } from 'react'
+import { Fragment, memo, useMemo, useRef, useState } from 'react'
 import type { Cella, Griglia as DatiGriglia, Persona } from '../api'
 
 const GIORNI_BREVI = ['lun', 'mar', 'mer', 'gio', 'ven', 'sab', 'dom']
@@ -7,11 +7,11 @@ const MESI = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'lug
 
 function pezziData(iso: string) {
   const [y, m, d] = iso.split('-').map(Number) as [number, number, number]
-  const dt = new Date(Date.UTC(y, m - 1, d))
-  const gs = (dt.getUTCDay() + 6) % 7
-  return { giorno: d, meseNome: MESI[m - 1]!, breve: GIORNI_BREVI[gs]!, indiceSettimana: gs }
+  const gs = (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7
+  return { giorno: d, meseNome: MESI[m - 1]!, breve: GIORNI_BREVI[gs]!, lunedi: gs === 0 }
 }
 
+/** Il contratto di accessibilità della griglia: ogni cella si legge da sola. */
 export function descriviCella(p: Persona, iso: string, c: Cella | undefined, stanza: string | null, scrivania: string | null) {
   const { giorno, meseNome, breve } = pezziData(iso)
   const quando = `${breve} ${giorno} ${meseNome}`
@@ -30,8 +30,7 @@ export default function Griglia({ dati, onSeleziona, selezione }: {
   selezione: Selezione
   onSeleziona: (s: Selezione) => void
 }) {
-  const [colonnaFuoco, setColonnaFuoco] = useState(0)
-  const [rigaFuoco, setRigaFuoco] = useState(0)
+  const [fuoco, setFuoco] = useState({ riga: 0, colonna: 0 })
   const tabella = useRef<HTMLTableElement>(null)
 
   const indice = useMemo(() => {
@@ -40,19 +39,11 @@ export default function Griglia({ dati, onSeleziona, selezione }: {
     return m
   }, [dati.celle])
 
-  const stanzaBreve = useMemo(() => {
-    const m = new Map<number, string>()
-    for (const s of dati.stanze) m.set(s.id, s.etichetta.split('·')[0]!.trim())
-    return m
-  }, [dati.stanze])
+  const stanzaBreve = useMemo(
+    () => new Map(dati.stanze.map((s) => [s.id, s.etichetta.split('·')[0]!.trim()])), [dati.stanze])
+  const scrivaniaNumero = useMemo(
+    () => new Map(dati.stanze.flatMap((s) => s.scrivanie.map((d) => [d.id, d.numero] as const))), [dati.stanze])
 
-  const scrivaniaNumero = useMemo(() => {
-    const m = new Map<number, string>()
-    for (const s of dati.stanze) for (const d of s.scrivanie) m.set(d.id, d.numero)
-    return m
-  }, [dati.stanze])
-
-  // Le persone si raggruppano per settore, chi non ne ha in coda.
   const gruppi = useMemo(() => {
     const out: { settore: string | null; sectorId: number | null; presidio: boolean; persone: Persona[] }[] = []
     for (const s of dati.settori) {
@@ -74,10 +65,10 @@ export default function Griglia({ dati, onSeleziona, selezione }: {
   }, [dati.celle])
 
   function muovi(dr: number, dc: number) {
-    const r = Math.max(0, Math.min(righe.length - 1, rigaFuoco + dr))
-    const c = Math.max(0, Math.min(dati.giorni.length - 1, colonnaFuoco + dc))
-    setRigaFuoco(r); setColonnaFuoco(c)
-    const persona = righe[r], giorno = dati.giorni[c]
+    const riga = Math.max(0, Math.min(righe.length - 1, fuoco.riga + dr))
+    const colonna = Math.max(0, Math.min(dati.giorni.length - 1, fuoco.colonna + dc))
+    setFuoco({ riga, colonna })
+    const persona = righe[riga], giorno = dati.giorni[colonna]
     if (persona && giorno) {
       onSeleziona({ userId: persona.id, data: giorno })
       requestAnimationFrame(() => {
@@ -92,29 +83,34 @@ export default function Griglia({ dati, onSeleziona, selezione }: {
     }
     const m = mosse[e.key]
     if (m) { e.preventDefault(); muovi(m[0], m[1]); return }
-    if (e.key === 'Home') { e.preventDefault(); setColonnaFuoco(0); muovi(0, -dati.giorni.length) }
+    if (e.key === 'Home') { e.preventDefault(); muovi(0, -dati.giorni.length) }
     if (e.key === 'End') { e.preventDefault(); muovi(0, dati.giorni.length) }
   }
 
   return (
-    <div className="overflow-x-auto rounded-sm border border-filo bg-white">
-      <table ref={tabella} className="w-full border-separate border-spacing-0 text-[12px]" onKeyDown={tasti}>
-        <caption className="sr-only">
+    <div className="min-h-0 overflow-auto">
+      <table ref={tabella} className="border-separate border-spacing-0" onKeyDown={tasti}>
+        <caption className="solo-lettori-schermo">
           Programmazione dal {dati.periodo.dataInizio} al {dati.periodo.dataFine}.
           Persone in riga, giornate lavorative in colonna. Muoviti con le frecce direzionali.
         </caption>
+
         <thead>
           <tr>
-            <th scope="col" className="sticky left-0 z-20 min-w-[210px] bg-white px-2 py-1.5 text-left font-medium text-grigio">
+            <th scope="col"
+                className="sticky left-0 top-0 z-[3] min-w-[196px] border-b border-r border-border bg-surface
+                           px-2.5 py-1.5 text-left text-xs font-semibold text-ink-muted">
               Persona
             </th>
             {dati.giorni.map((g) => {
-              const { giorno, breve, indiceSettimana } = pezziData(g)
+              const { giorno, breve, lunedi } = pezziData(g)
               return (
                 <th key={g} scope="col"
-                    className={`bg-white px-1 py-1.5 text-center font-normal text-tenue ${indiceSettimana === 0 ? 'border-l-2 border-slate-300' : ''}`}>
-                  <span className="block text-[10px]">{breve}</span>
-                  <span className="block text-[12px] text-grigio">{giorno}</span>
+                    className={`sticky top-0 z-[2] w-[52px] border-b border-r border-border bg-surface px-1 py-1.5
+                                text-center text-xs font-semibold text-ink-muted
+                                ${lunedi ? 'border-l-2 border-l-border-strong' : ''}`}>
+                  <span className="block text-2xs font-normal text-ink-faint">{breve}</span>
+                  <span className="mono block">{giorno}</span>
                 </th>
               )
             })}
@@ -126,12 +122,14 @@ export default function Griglia({ dati, onSeleziona, selezione }: {
             <Fragment key={`gruppo-${gr.sectorId ?? 'nessuno'}`}>
               <tr>
                 <th scope="colgroup" colSpan={dati.giorni.length + 1}
-                    className="sticky left-0 border-y border-filo bg-slate-50 px-2 py-1 text-left text-[12px] font-medium text-az">
-                  {gr.settore ?? 'Senza settore'}
-                  <span className="ml-2 font-normal text-tenue">
+                    className="sticky left-0 border-y border-border bg-surface-2 px-2.5 py-1 text-left">
+                  <span className="mono text-2xs uppercase tracking-[0.06em] text-ink-muted">
+                    {gr.settore ?? 'Senza settore'}
+                  </span>
+                  <span className="ml-2 text-2xs text-ink-faint">
                     {gr.persone.length} {gr.persone.length === 1 ? 'persona' : 'persone'}
-                    {gr.presidio && ' · presidio quotidiano richiesto'}
-                    {gr.settore === null && ' · non concorre ad alcun presidio'}
+                    {gr.presidio && ' · presidio quotidiano'}
+                    {gr.settore === null && ' · non copre presidi'}
                   </span>
                 </th>
               </tr>
@@ -139,47 +137,12 @@ export default function Griglia({ dati, onSeleziona, selezione }: {
               {gr.persone.map((p) => {
                 const rigaIndice = righe.indexOf(p)
                 return (
-                  <tr key={p.id}>
-                    <th scope="row" className="sticky left-0 z-10 border-b border-slate-100 bg-white px-2 py-1 text-left font-normal">
-                      {p.cognome} <span className="text-grigio">{p.nome}</span>
-                      {p.ruolo === 'dirigente' && <span className="ml-1 text-[10px] text-tenue">· dirigente</span>}
-                    </th>
-
-                    {dati.giorni.map((g, ci) => {
-                      const c = indice.get(`${p.id}|${g}`)
-                      const stanza = c?.roomId != null ? stanzaBreve.get(c.roomId) ?? null : null
-                      const scrivania = c?.deskId != null ? scrivaniaNumero.get(c.deskId) ?? null : null
-                      const scelta = selezione?.userId === p.id && selezione.data === g
-                      const primaDellaSettimana = pezziData(g).indiceSettimana === 0
-
-                      const sfondo =
-                        c?.stato === 'presenza' ? 'bg-blue-50 text-az-scuro font-semibold'
-                        : c?.stato === 'assenza' ? 'bg-slate-50 text-slate-400'
-                        : 'text-slate-300'
-
-                      return (
-                        <td key={g} className={`border-b border-slate-100 p-0 ${primaDellaSettimana ? 'border-l-2 border-l-slate-300' : ''}`}>
-                          <button
-                            type="button"
-                            data-cella={`${p.id}|${g}`}
-                            tabIndex={rigaIndice === rigaFuoco && ci === colonnaFuoco ? 0 : -1}
-                            onFocus={() => { setRigaFuoco(rigaIndice); setColonnaFuoco(ci) }}
-                            onClick={() => onSeleziona({ userId: p.id, data: g })}
-                            aria-pressed={scelta}
-                            className={`h-7 w-full px-1 text-[10.5px] tracking-wide ${sfondo}
-                              ${scelta ? 'ring-2 ring-inset ring-az' : ''}`}
-                          >
-                            <span aria-hidden="true">
-                              {c?.stato === 'presenza' ? (scrivania ? `${stanza}/${scrivania}` : stanza ?? 'sede')
-                                : c?.stato === 'assenza' ? '✕' : '–'}
-                              {c?.bloccata && <span className="ml-0.5 text-ambra">▪</span>}
-                            </span>
-                            <span className="sr-only">{descriviCella(p, g, c, stanza, scrivania)}</span>
-                          </button>
-                        </td>
-                      )
-                    })}
-                  </tr>
+                  <RigaPersona
+                    key={p.id} persona={p} giorni={dati.giorni} indice={indice}
+                    stanzaBreve={stanzaBreve} scrivaniaNumero={scrivaniaNumero}
+                    selezione={selezione} rigaIndice={rigaIndice} fuoco={fuoco}
+                    onSeleziona={onSeleziona} onFuoco={setFuoco}
+                  />
                 )
               })}
             </Fragment>
@@ -188,16 +151,19 @@ export default function Griglia({ dati, onSeleziona, selezione }: {
 
         <tfoot>
           <tr>
-            <th scope="row" className="sticky left-0 border-t-2 border-az bg-slate-50 px-2 py-1.5 text-left font-normal text-grigio">
-              Postazioni occupate <span className="text-tenue">su {capienza}</span>
+            <th scope="row"
+                className="sticky bottom-0 left-0 z-[3] border-r border-t border-border-strong bg-surface px-2.5 py-1.5
+                           text-left text-xs font-normal text-ink-muted">
+              Postazioni occupate <span className="mono text-ink-faint">su {capienza}</span>
             </th>
             {dati.giorni.map((g) => {
               const n = occupazione.get(g) ?? 0
-              const sotto = n < capienza
               return (
-                <td key={g} className={`border-t-2 border-az px-1 py-1.5 text-center ${sotto ? 'bg-ambra-fondo text-ambra' : 'bg-slate-50 text-grigio'}`}>
-                  <span aria-hidden="true">{n}</span>
-                  <span className="sr-only">{`${n} di ${capienza} postazioni occupate il ${g}`}</span>
+                <td key={g}
+                    className={`sticky bottom-0 z-[1] border-r border-t border-border-strong bg-surface px-1 py-1.5
+                                text-center text-ink-muted`}>
+                  <span className="mono text-xs" aria-hidden="true">{n}</span>
+                  <span className="solo-lettori-schermo">{`${n} di ${capienza} postazioni occupate il ${g}`}</span>
                 </td>
               )
             })}
@@ -208,14 +174,82 @@ export default function Griglia({ dati, onSeleziona, selezione }: {
   )
 }
 
+/** Memoizzata: con 500 persone la selezione di una cella non ridisegna tutto. */
+const RigaPersona = memo(function RigaPersona({
+  persona: p, giorni, indice, stanzaBreve, scrivaniaNumero, selezione, rigaIndice, fuoco, onSeleziona, onFuoco,
+}: {
+  persona: Persona
+  giorni: string[]
+  indice: Map<string, Cella>
+  stanzaBreve: Map<number, string>
+  scrivaniaNumero: Map<number, string>
+  selezione: Selezione
+  rigaIndice: number
+  fuoco: { riga: number; colonna: number }
+  onSeleziona: (s: Selezione) => void
+  onFuoco: (f: { riga: number; colonna: number }) => void
+}) {
+  const dispari = rigaIndice % 2 === 1
+  return (
+    <tr className="h-[30px]">
+      <th scope="row"
+          className={`sticky left-0 z-[1] h-[30px] border-b border-r border-border px-2.5 text-left text-[12.5px]
+                      font-normal ${dispari ? 'bg-[color-mix(in_oklch,var(--surface)_50%,var(--bg))]' : 'bg-bg'}`}>
+        <span className="block max-w-[178px] truncate">
+          {p.cognome} <span className="text-ink-muted">{p.nome}</span>
+          {p.ruolo === 'dirigente' && <span className="ml-1 text-2xs text-ink-faint">dirig.</span>}
+        </span>
+      </th>
+
+      {giorni.map((g, ci) => {
+        const c = indice.get(`${p.id}|${g}`)
+        const stanza = c?.roomId != null ? stanzaBreve.get(c.roomId) ?? null : null
+        const scrivania = c?.deskId != null ? scrivaniaNumero.get(c.deskId) ?? null : null
+        const scelta = selezione?.userId === p.id && selezione.data === g
+        const { lunedi } = pezziData(g)
+
+        const testo =
+          c?.stato === 'presenza' ? 'font-semibold text-ink'
+          : c?.stato === 'assenza' ? 'text-ink-faint'
+          : 'text-ink-faint/60'
+
+        return (
+          <td key={g}
+              className={`h-[30px] border-b border-r border-border p-0
+                          ${lunedi ? 'border-l-2 border-l-border-strong' : ''}
+                          ${dispari ? 'bg-[color-mix(in_oklch,var(--surface)_50%,var(--bg))]' : 'bg-bg'}`}
+              style={scelta ? { boxShadow: 'inset 2px 0 0 var(--ink)' } : undefined}>
+            <button
+              type="button"
+              data-cella={`${p.id}|${g}`}
+              tabIndex={rigaIndice === fuoco.riga && ci === fuoco.colonna ? 0 : -1}
+              onFocus={() => onFuoco({ riga: rigaIndice, colonna: ci })}
+              onClick={() => onSeleziona({ userId: p.id, data: g })}
+              aria-pressed={scelta}
+              className={`h-[30px] w-full cursor-pointer px-1 text-center text-[12.5px] leading-none
+                          transition-colors duration-[120ms] ease-out hover:bg-surface-2 ${testo}`}
+            >
+              <span className="mono" aria-hidden="true">
+                {c?.stato === 'presenza' ? (scrivania ? `${stanza}/${scrivania}` : stanza ?? '•')
+                  : c?.stato === 'assenza' ? '×' : '–'}
+              </span>
+              {c?.bloccata && <span className="ml-0.5 text-ink-faint" aria-hidden="true">▪</span>}
+              <span className="solo-lettori-schermo">{descriviCella(p, g, c, stanza, scrivania)}</span>
+            </button>
+          </td>
+        )
+      })}
+    </tr>
+  )
+})
+
 export function Legenda() {
   return (
-    <ul className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-[11px] text-grigio">
-      <li><span className="mr-1.5 inline-block rounded-sm bg-blue-50 px-1.5 font-semibold text-az-scuro">101</span>
-        presenza in sede, con stanza ed eventuale scrivania</li>
-      <li><span className="mr-1.5 text-slate-300">–</span> lavoro agile</li>
-      <li><span className="mr-1.5 text-slate-400">✕</span> assenza dichiarata</li>
-      <li><span className="mr-1.5 text-ambra">▪</span> cella bloccata: la generazione non la tocca</li>
+    <ul className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-ink-faint">
+      <li><span className="mono mr-1.5 font-semibold text-ink">101/3</span>presenza: stanza e scrivania</li>
+      <li><span className="mono mr-1.5">–</span>lavoro agile</li>
+      <li><span className="mono mr-1.5">×</span>assenza dichiarata</li>
+      <li><span className="mr-1.5 text-ink-faint">▪</span>cella bloccata: la generazione non la tocca</li>
     </ul>
   )
 }

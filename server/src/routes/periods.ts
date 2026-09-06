@@ -236,9 +236,10 @@ periods.get('/:id/griglia', async (c) => {
   if (!puoLeggereUnita(alb, a, p.unitId)) throw vietato()
   const ctx = await contesto(p, alb)
 
+  const perChiave = new Map(ctx.celle.map((x) => [`${x.userId}|${x.data}`, x]))
   const celle = ctx.persone.flatMap((u) =>
     ctx.giorni.map((g) => {
-      const c0 = ctx.celle.find((x) => x.userId === u.id && x.data === g)
+      const c0 = perChiave.get(`${u.id}|${g}`)
       const causale = ctx.indisponibili.get(`${u.id}|${g}`) ?? null
       const grezza = {
         userId: u.id, data: g,
@@ -507,16 +508,23 @@ periods.get('/mio-calendario', async (c) => {
   const celle = await db.select().from(schema.assignment).where(
     and(inArray(schema.assignment.periodId, periodi.map((p) => p.id)), eq(schema.assignment.userId, a.id)),
   )
-  const stanze = await db.select().from(schema.room)
-  const scrivanie = await db.select().from(schema.desk)
-  const assenze = await giorniIndisponibili([a.id], '1900-01-01', '2999-12-31')
+  // L'intervallo delle assenze si limita a quello dei periodi trovati.
+  const p0 = periodi.reduce((m, p) => (p.dataInizio < m ? p.dataInizio : m), periodi[0]!.dataInizio)
+  const p1 = periodi.reduce((m, p) => (p.dataFine > m ? p.dataFine : m), periodi[0]!.dataFine)
+  const idStanze = [...new Set(celle.map((x) => x.roomId).filter((n): n is number => n != null))]
+  const idScrivanie = [...new Set(celle.map((x) => x.deskId).filter((n): n is number => n != null))]
+  const stanze = idStanze.length ? await db.select().from(schema.room).where(inArray(schema.room.id, idStanze)) : []
+  const scrivanie = idScrivanie.length ? await db.select().from(schema.desk).where(inArray(schema.desk.id, idScrivanie)) : []
+  const stanzePerId = new Map(stanze.map((s) => [s.id, s.etichetta]))
+  const scrivaniePerId = new Map(scrivanie.map((d) => [d.id, d.numero]))
+  const assenze = await giorniIndisponibili([a.id], p0, p1)
 
   return c.json({
     giornate: celle.map((x) => ({
       data: x.data,
       stato: assenze.has(`${a.id}|${x.data}`) ? 'assenza' : x.stato,
-      stanza: stanze.find((s) => s.id === x.roomId)?.etichetta ?? null,
-      scrivania: scrivanie.find((d) => d.id === x.deskId)?.numero ?? null,
+      stanza: x.roomId != null ? stanzePerId.get(x.roomId) ?? null : null,
+      scrivania: x.deskId != null ? scrivaniePerId.get(x.deskId) ?? null : null,
       causale: assenze.get(`${a.id}|${x.data}`) ?? null,
     })).sort((x, y) => x.data.localeCompare(y.data)),
   })
@@ -533,8 +541,13 @@ periods.get('/:id/giornata/:data', async (c) => {
   const celle = await db.select().from(schema.assignment).where(
     and(eq(schema.assignment.periodId, p.id), eq(schema.assignment.data, data), eq(schema.assignment.stato, 'presenza')),
   )
-  const stanze = await db.select().from(schema.room)
-  const scrivanie = await db.select().from(schema.desk)
+  const idStanze = [...new Set(celle.map((x) => x.roomId).filter((n): n is number => n != null))]
+  const idScrivanie = [...new Set(celle.map((x) => x.deskId).filter((n): n is number => n != null))]
+  const stanze = idStanze.length ? await db.select().from(schema.room).where(inArray(schema.room.id, idStanze)) : []
+  const scrivanie = idScrivanie.length ? await db.select().from(schema.desk).where(inArray(schema.desk.id, idScrivanie)) : []
+  const perId = <T extends { id: number }>(righe: T[]) => new Map(righe.map((r) => [r.id, r]))
+  const stanzePerId = perId(stanze), scrivaniePerId = perId(scrivanie)
+  const personePerId = perId(persone)
   const assenti = await giorniIndisponibili(persone.map((u) => u.id), data, data)
 
   return c.json({
@@ -542,11 +555,11 @@ periods.get('/:id/giornata/:data', async (c) => {
     presenti: celle
       .filter((x) => !assenti.has(`${x.userId}|${data}`))
       .map((x) => {
-        const u = persone.find((y) => y.id === x.userId)
+        const u = personePerId.get(x.userId)
         return {
           userId: x.userId, nome: u?.nome ?? '', cognome: u?.cognome ?? '',
-          stanza: stanze.find((s) => s.id === x.roomId)?.etichetta ?? null,
-          scrivania: scrivanie.find((d) => d.id === x.deskId)?.numero ?? null,
+          stanza: x.roomId != null ? stanzePerId.get(x.roomId)?.etichetta ?? null : null,
+          scrivania: x.deskId != null ? scrivaniePerId.get(x.deskId)?.numero ?? null : null,
         }
       })
       .sort((x, y) => x.cognome.localeCompare(y.cognome, 'it')),
@@ -560,15 +573,19 @@ periods.get('/:id/export.csv', async (c) => {
   if (!puoLeggereUnita(alb, a, p.unitId)) throw vietato()
 
   const ctx = await contesto(p, alb)
-  const nomeStanza = (id: number | null) => ctx.stanzeRighe.find((s) => s.id === id)?.etichetta ?? ''
-  const nomeScrivania = (id: number | null) => ctx.scrivanie.find((d) => d.id === id)?.numero ?? ''
-  const nomeSettore = (id: number | null) => ctx.settori.find((s) => s.id === id)?.nome ?? ''
+  const stanzePerId = new Map(ctx.stanzeRighe.map((s) => [s.id, s.etichetta]))
+  const scrivaniePerId = new Map(ctx.scrivanie.map((d) => [d.id, d.numero]))
+  const settoriPerId = new Map(ctx.settori.map((s) => [s.id, s.nome]))
+  const cellePerChiave = new Map(ctx.celle.map((x) => [`${x.userId}|${x.data}`, x]))
+  const nomeStanza = (id: number | null) => (id == null ? '' : stanzePerId.get(id) ?? '')
+  const nomeScrivania = (id: number | null) => (id == null ? '' : scrivaniePerId.get(id) ?? '')
+  const nomeSettore = (id: number | null) => (id == null ? '' : settoriPerId.get(id) ?? '')
 
   const virgolette = (v: string) => `"${v.replace(/"/g, '""')}"`
   const righe = [['cognome', 'nome', 'settore', 'data', 'stato', 'stanza', 'scrivania'].join(';')]
   for (const u of ctx.persone) {
     for (const g of ctx.giorni) {
-      const cella = ctx.celle.find((x) => x.userId === u.id && x.data === g)
+      const cella = cellePerChiave.get(`${u.id}|${g}`)
       // Un'assenza esce come "fuori sede": la causale non lascia il sistema.
       const stato = ctx.indisponibili.has(`${u.id}|${g}`) ? 'fuori_sede' : cella?.stato ?? 'smart'
       righe.push([

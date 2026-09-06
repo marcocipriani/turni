@@ -1,9 +1,12 @@
 {
-  "name": "Turni · programmazione delle presenze",
+  "name": "Turni · by Zucchetto",
   "short_name": "Turni",
-  "start_url": "/",
+  "description": "Sai sempre quando sei in sede, e con chi.",
+  "start_url": "/panoramica",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#0066CC",
-  "icons": []
+  "background_color": "#fbfbfb",
+  "theme_color": "#2b2b2b",
+  "icons": [
+    { "src": "/marchio/icona-app.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
 }

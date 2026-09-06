@@ -206,27 +206,30 @@ export function generate(input: GenerateInput): GenerateResult {
     )
 
     const wd = weekday(d)
-    const punteggio = (p: typeof ordinate[number]) => {
+    // Il punteggio si calcola una volta per giornata e si ordina una volta sola.
+    // Il termine di presidio non compare qui: i settori scoperti sono già stati
+    // serviti sopra, quindi durante il riempimento l'ordine non cambia più.
+    // Riordinare a ogni posto assegnato costava O(posti · n log n) per giornata.
+    const punteggi = new Map<number, number>()
+    for (const p of candidati) {
       const restanti = (quote.get(p.userId) ?? 0) - conteggio.get(p.userId)!
       const urgenza = restanti / Math.max(1, giorni.length - i)
       const ultimo = ultimaPresenza.get(p.userId)
       const ritardo = ultimo === undefined ? 1.5 : Math.min(3, (i - ultimo) / (passo.get(p.userId) || 1))
       const pref = p.giorniPreferiti.includes(wd) ? 0.15 : p.giorniDaEvitare.includes(wd) ? -0.25 : 0
-      const copre = p.sectorId != null && presidio.has(p.sectorId) && !settoriCoperti.has(p.sectorId) ? 10 : 0
-      return copre + urgenza * 2 + ritardo * 0.5 + pref
+      punteggi.set(p.userId, urgenza * 2 + ritardo * 0.5 + pref)
     }
 
-    // Il presidio va ricalcolato dopo ogni scelta: chi copre un settore ancora
-    // scoperto ha la precedenza su chiunque altro.
-    while (capienzaResidua > 0) {
-      const rimasti = candidati.filter((p) => !scelte.has(key(p.userId, d)))
-      if (rimasti.length === 0) break
-      rimasti.sort((a, b) => {
-        const diff = punteggio(b) - punteggio(a)
-        if (Math.abs(diff) > 1e-9) return diff
-        return a.cognome.localeCompare(b.cognome, 'it') || a.userId - b.userId
-      })
-      metti(rimasti[0]!)
+    const inOrdine = candidati.slice().sort((a, b) => {
+      const diff = (punteggi.get(b.userId) ?? 0) - (punteggi.get(a.userId) ?? 0)
+      if (Math.abs(diff) > 1e-9) return diff
+      return a.cognome.localeCompare(b.cognome, 'it') || a.userId - b.userId
+    })
+
+    for (const p of inOrdine) {
+      if (capienzaResidua <= 0) break
+      if (scelte.has(key(p.userId, d))) continue   // già collocata dal presidio
+      metti(p)
     }
 
     for (const p of ordinate) if (!scelte.has(key(p.userId, d))) scelte.set(key(p.userId, d), 'smart')

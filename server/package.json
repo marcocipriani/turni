@@ -10,7 +10,8 @@
     "seed": "tsx src/seed/run.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "verifica": "tsx src/verifica.ts"
+    "verifica": "tsx src/verifica.ts",
+    "carico": "tsx src/carico.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",
