@@ -14,6 +14,17 @@ assenze dichiarate dagli interessati.
 - Materiali di partenza: `handoff-webapp-rotazione-postazioni.md` (motore art.9, fase 3),
   `prototipo-griglia.html` (prototipo della griglia), l'xlsx delle adesioni
 
+## Com'è
+
+| | |
+|---|---|
+| Panoramica, tema chiaro | ![](docs/schermate/panoramica-light.png) |
+| Griglia dei turni, tema scuro | ![](docs/schermate/turni-griglia-dark.png) |
+
+Le schermate si rigenerano con `node scripts/schermate.mjs` contro un'istanza
+avviata: pilota Chrome headless, accede come i vari ruoli e cattura ogni pagina
+nei due temi.
+
 ## Come è fatta
 
 ```
