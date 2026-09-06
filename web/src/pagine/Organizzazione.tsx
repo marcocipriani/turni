@@ -1,16 +1,20 @@
 import { type FormEvent, useCallback, useEffect, useState } from 'react'
 import { api, ErroreApi, type Persona, type Settore, type StanzaVista, type Unita } from '../api'
-import { Avviso, Bottone, Campo, classiInput, Etichetta, Riquadro, Vuoto } from '../componenti'
+import * as I from '../icone'
 import { useSessione } from '../sessione'
+import { Badge, Bottone, Campo, inputCls, Messaggio, Pannello, Scheletro, Tag } from '../ui'
+import { Vista } from '../Vista'
 
 type Delegato = { userId: number; nome: string; cognome: string }
-type DettaglioUnita = Unita & { figlie: Unita[]; dirigente: { id: number; nome: string; cognome: string } | null; radiceId: number }
+type Dettaglio = Unita & {
+  figlie: Unita[]; dirigente: { id: number; nome: string; cognome: string } | null; radiceId: number
+}
 
 export default function Organizzazione() {
   const { utente } = useSessione()
   const unitId = utente?.unitId ?? null
 
-  const [unita, setUnita] = useState<DettaglioUnita | null>(null)
+  const [unita, setUnita] = useState<Dettaglio | null>(null)
   const [persone, setPersone] = useState<Persona[]>([])
   const [settori, setSettori] = useState<Settore[]>([])
   const [delegati, setDelegati] = useState<Delegato[]>([])
@@ -20,7 +24,7 @@ export default function Organizzazione() {
   const ricarica = useCallback(async () => {
     if (unitId == null) return
     const [u, p, s, o, st] = await Promise.all([
-      api.get<DettaglioUnita>(`/org/unita/${unitId}`),
+      api.get<Dettaglio>(`/org/unita/${unitId}`),
       api.get<Persona[]>(`/org/unita/${unitId}/persone`),
       api.get<Settore[]>(`/org/unita/${unitId}/settori`),
       api.get<Delegato[]>(`/org/unita/${unitId}/organizzatori`),
@@ -34,227 +38,259 @@ export default function Organizzazione() {
   async function prova(fn: () => Promise<unknown>) {
     setErrore(null)
     try { await fn(); await ricarica() }
-    catch (e) { setErrore(e instanceof ErroreApi ? e.message : 'Operazione non riuscita') }
+    catch (e) { setErrore(e instanceof ErroreApi ? e.message : 'Operazione non riuscita.') }
   }
 
-  if (unitId == null || !unita) return <Vuoto>Caricamento…</Vuoto>
+  if (unitId == null || !unita) {
+    return <Vista titolo="Struttura" icona={<I.Organizzazione size={17} />} caricando><Scheletro righe={5} /></Vista>
+  }
   const proprietariaStanze = unita.radiceId === unita.id
 
   return (
-    <>
-      {errore && <div className="mb-4"><Avviso tipo="errore">{errore}</Avviso></div>}
+    <Vista
+      titolo={unita.nome} icona={<I.Organizzazione size={17} />}
+      aiuto={unita.sigla ?? undefined}
+      meta={<>
+        <span className="mono">{persone.length} persone</span>
+        <span aria-hidden="true">·</span>
+        <span className="mono">{unita.figlie.length} unità figlie</span>
+      </>}
+    >
+      <div className="flex max-w-[980px] flex-col gap-6">
+        {errore && <Messaggio tono="errore">{errore}</Messaggio>}
 
-      <Riquadro titolo={unita.nome} descrizione={`${unita.sigla ?? ''} · ${persone.length} persone programmate · ${unita.figlie.length} unità figlie`}>
-        <form
-          onSubmit={(e: FormEvent) => {
-            e.preventDefault()
-            const f = new FormData(e.currentTarget as HTMLFormElement)
-            const leggi = (k: string) => { const v = f.get(k) as string; return v === '' ? null : Number(v) }
-            void prova(() => api.patch(`/org/unita/${unitId}/limiti`, {
-              smartMinSettimana: leggi('min'), smartMaxSettimana: leggi('max'),
-            }))
-          }}
-          className="grid gap-3 rounded-sm border border-filo bg-white p-4 sm:grid-cols-3"
-        >
-          <Campo etichetta="Minimo di giornate in agile a settimana" aiuto="Vuoto = nessun limite">
-            <input name="min" type="number" min={0} max={5} className={classiInput} defaultValue={unita.smartMinSettimana ?? ''} />
-          </Campo>
-          <Campo etichetta="Massimo di giornate in agile a settimana" aiuto="Vuoto = nessun limite">
-            <input name="max" type="number" min={0} max={5} className={classiInput} defaultValue={unita.smartMaxSettimana ?? ''} />
-          </Campo>
-          <div className="flex items-end"><Bottone type="submit" variante="primario">Salva i limiti</Bottone></div>
-        </form>
-      </Riquadro>
+        <section id="limiti">
+          <Pannello titolo="Limiti di lavoro agile" icona={<I.Calendario size={18} />}
+                    piede="Vuoto significa nessun limite. Ogni nuovo periodo eredita questi valori e ne conserva una copia.">
+            <form
+              onSubmit={(e: FormEvent<HTMLFormElement>) => {
+                e.preventDefault()
+                const f = new FormData(e.currentTarget)
+                const leggi = (k: string) => { const v = f.get(k) as string; return v === '' ? null : Number(v) }
+                void prova(() => api.patch(`/org/unita/${unitId}/limiti`, {
+                  smartMinSettimana: leggi('min'), smartMaxSettimana: leggi('max'),
+                }))
+              }}
+              className="grid items-end gap-3 sm:grid-cols-[1fr_1fr_auto]"
+            >
+              <Campo etichetta="Minimo di giornate in agile a settimana">
+                <input name="min" type="number" min={0} max={5} className={inputCls} defaultValue={unita.smartMinSettimana ?? ''} />
+              </Campo>
+              <Campo etichetta="Massimo di giornate in agile a settimana">
+                <input name="max" type="number" min={0} max={5} className={inputCls} defaultValue={unita.smartMaxSettimana ?? ''} />
+              </Campo>
+              <Bottone type="submit" variante="primario">Salva</Bottone>
+            </form>
+          </Pannello>
+        </section>
 
-      <Riquadro
-        titolo="Settori"
-        descrizione="Un settore raggruppa le righe della griglia e può richiedere almeno una presenza al giorno."
-      >
-        <form
-          onSubmit={(e: FormEvent) => {
-            e.preventDefault()
-            const f = new FormData(e.currentTarget as HTMLFormElement)
-            void prova(() => api.post(`/org/unita/${unitId}/settori`, {
-              nome: f.get('nome'), richiedePresidio: f.get('presidio') === 'on', ordine: settori.length,
-            }))
-            ;(e.currentTarget as HTMLFormElement).reset()
-          }}
-          className="mb-4 flex flex-wrap items-end gap-3 rounded-sm border border-filo bg-white p-4"
-        >
-          <div className="min-w-[220px] flex-1"><Campo etichetta="Nuovo settore"><input name="nome" className={classiInput} required /></Campo></div>
-          <label className="flex items-center gap-2 pb-1.5 text-[13px]"><input type="checkbox" name="presidio" /> Richiede presidio</label>
-          <Bottone type="submit">Aggiungi</Bottone>
-        </form>
+        <section id="settori">
+          <Pannello titolo="Settori" icona={<I.Organizzazione size={18} />}
+                    piede="Un settore con presidio richiede almeno una presenza in ogni giornata lavorativa.">
+            <form
+              onSubmit={(e: FormEvent<HTMLFormElement>) => {
+                e.preventDefault()
+                const form = e.currentTarget
+                const f = new FormData(form)
+                void prova(() => api.post(`/org/unita/${unitId}/settori`, {
+                  nome: f.get('nome'), richiedePresidio: f.get('presidio') === 'on', ordine: settori.length,
+                }))
+                form.reset()
+              }}
+              className="flex flex-wrap items-end gap-3"
+            >
+              <div className="min-w-[220px] flex-1"><Campo etichetta="Nuovo settore"><input name="nome" className={inputCls} required /></Campo></div>
+              <label className="flex cursor-pointer items-center gap-2 pb-2 text-base">
+                <input type="checkbox" name="presidio" /> Richiede presidio
+              </label>
+              <div className="pb-0.5"><Bottone type="submit">Aggiungi</Bottone></div>
+            </form>
 
-        {settori.length === 0 ? <Vuoto>Nessun settore.</Vuoto> : (
-          <ul className="divide-y divide-filo rounded-sm border border-filo bg-white">
-            {settori.map((s) => (
-              <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
-                <span className="text-[13px]">
-                  {s.nome}
-                  <span className="ml-2 text-tenue">{persone.filter((p) => p.sectorId === s.id).length} persone</span>
-                </span>
-                <div className="flex items-center gap-2">
-                  {s.richiedePresidio && <Etichetta tono="attesa">presidio</Etichetta>}
-                  <Bottone onClick={() => void prova(() => api.patch(`/org/settori/${s.id}`, { richiedePresidio: !s.richiedePresidio }))}>
-                    {s.richiedePresidio ? 'Togli presidio' : 'Imponi presidio'}
-                  </Bottone>
-                  <Bottone variante="pericolo" onClick={() => void prova(() => api.del(`/org/settori/${s.id}`))}>Elimina</Bottone>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Riquadro>
+            {settori.length === 0 ? <p className="text-base text-ink-faint">Nessun settore.</p> : (
+              <ul className="divide-y divide-border overflow-hidden rounded-r2 border border-border bg-bg">
+                {settori.map((s) => (
+                  <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+                    <span className="text-base">
+                      {s.nome}
+                      <span className="mono ml-2 text-sm text-ink-faint">
+                        {persone.filter((p) => p.sectorId === s.id).length}
+                      </span>
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {s.richiedePresidio && <Badge>presidio</Badge>}
+                      <Bottone variante="piccolo"
+                               onClick={() => void prova(() => api.patch(`/org/settori/${s.id}`, { richiedePresidio: !s.richiedePresidio }))}>
+                        {s.richiedePresidio ? 'Togli presidio' : 'Imponi presidio'}
+                      </Bottone>
+                      <Bottone variante="piccolo" onClick={() => void prova(() => api.del(`/org/settori/${s.id}`))}>Elimina</Bottone>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Pannello>
+        </section>
 
-      <Riquadro titolo="Persone e settori" descrizione="Chi non ha settore è programmabile ma non copre alcun presidio.">
-        <ul className="divide-y divide-filo rounded-sm border border-filo bg-white">
-          {persone.map((p) => (
-            <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-2">
-              <span className="text-[13px]">
-                {p.cognome} <span className="text-grigio">{p.nome}</span>
-                {p.ruolo === 'dirigente' && <span className="ml-2 text-[11px] text-tenue">dirigente di unità figlia</span>}
-              </span>
-              {p.ruolo === 'dipendente' && (
-                <select
-                  className={`${classiInput} max-w-[240px]`}
-                  aria-label={`Settore di ${p.cognome} ${p.nome}`}
-                  value={p.sectorId ?? ''}
-                  onChange={(e) => void prova(() => api.post(`/org/unita/${unitId}/assegna-settore`, {
-                    userId: p.id, sectorId: e.target.value ? Number(e.target.value) : null,
-                  }))}
-                >
-                  <option value="">Senza settore</option>
-                  {settori.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
-                </select>
-              )}
-            </li>
-          ))}
-        </ul>
-      </Riquadro>
-
-      <Riquadro titolo="Organizzatori" descrizione="Programmi comunque tu di diritto: la delega serve ad affiancarti.">
-        <div className="mb-4 flex flex-wrap items-end gap-3 rounded-sm border border-filo bg-white p-4">
-          <div className="min-w-[240px] flex-1">
-            <Campo etichetta="Delega un dipendente">
-              <select id="nuovoDelegato" className={classiInput} defaultValue="">
-                <option value="" disabled>Scegli una persona</option>
-                {persone.filter((p) => p.ruolo === 'dipendente' && !delegati.some((d) => d.userId === p.id))
-                  .map((p) => <option key={p.id} value={p.id}>{p.cognome} {p.nome}</option>)}
-              </select>
-            </Campo>
-          </div>
-          <Bottone onClick={() => {
-            const el = document.getElementById('nuovoDelegato') as HTMLSelectElement | null
-            if (el?.value) void prova(() => api.post(`/org/unita/${unitId}/organizzatori`, { userId: Number(el.value) }))
-          }}>Nomina</Bottone>
-        </div>
-
-        {delegati.length === 0 ? <Vuoto>Nessun organizzatore delegato.</Vuoto> : (
-          <ul className="divide-y divide-filo rounded-sm border border-filo bg-white">
-            {delegati.map((d) => (
-              <li key={d.userId} className="flex items-center justify-between px-4 py-2 text-[13px]">
-                <span>{d.cognome} <span className="text-grigio">{d.nome}</span></span>
-                <Bottone variante="pericolo" onClick={() => void prova(() => api.del(`/org/unita/${unitId}/organizzatori/${d.userId}`))}>
-                  Revoca
-                </Bottone>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Riquadro>
-
-      <Riquadro
-        titolo="Stanze e scrivanie"
-        descrizione={proprietariaStanze
-          ? 'La capienza di una stanza è il numero di scrivanie attive.'
-          : 'Le stanze appartengono all\'unità radice: le gestisce il suo dirigente.'}
-      >
-        {proprietariaStanze && (
-          <form
-            onSubmit={(e: FormEvent) => {
-              e.preventDefault()
-              const f = new FormData(e.currentTarget as HTMLFormElement)
-              void prova(() => api.post('/org/stanze', {
-                unitId, etichetta: f.get('etichetta'), piano: f.get('piano') || undefined,
-                scrivanie: Number(f.get('scrivanie')),
-              }))
-              ;(e.currentTarget as HTMLFormElement).reset()
-            }}
-            className="mb-4 grid gap-3 rounded-sm border border-filo bg-white p-4 sm:grid-cols-4"
-          >
-            <Campo etichetta="Etichetta"><input name="etichetta" className={classiInput} required placeholder="101" /></Campo>
-            <Campo etichetta="Piano"><input name="piano" className={classiInput} placeholder="Primo piano" /></Campo>
-            <Campo etichetta="Scrivanie"><input name="scrivanie" type="number" min={1} max={200} defaultValue={4} className={classiInput} required /></Campo>
-            <div className="flex items-end"><Bottone type="submit" variante="primario">Crea la stanza</Bottone></div>
-          </form>
-        )}
-
-        {stanze.length === 0 ? <Vuoto>Nessuna stanza.</Vuoto> : (
-          <ul className="grid gap-3 sm:grid-cols-2">
-            {stanze.map((s) => (
-              <li key={s.id} className="rounded-sm border border-filo bg-white p-4">
-                <p className="text-[13px] font-medium">{s.etichetta}</p>
-                <p className="text-[11px] text-tenue">{s.piano ?? 'piano non indicato'} · capienza {s.capienza}</p>
-                <ul className="mt-2 flex flex-wrap gap-1.5">
-                  {s.scrivanie.map((d) => (
-                    <li key={d.id}>
-                      <button
-                        onClick={() => proprietariaStanze && void prova(() => api.patch(`/org/scrivanie/${d.id}`, { attiva: !d.attiva }))}
-                        aria-label={`Scrivania ${d.numero}, ${d.attiva ? 'attiva' : 'disattivata'}`}
-                        className={`rounded-sm border px-2 py-1 text-[11px] ${d.attiva ? 'border-az/40 bg-blue-50 text-az-scuro' : 'border-filo bg-slate-50 text-tenue line-through'}`}
-                      >
-                        {d.numero}
-                      </button>
-                    </li>
-                  ))}
-                  {proprietariaStanze && (
-                    <li>
-                      <Bottone onClick={() => void prova(() => api.post(`/org/stanze/${s.id}/scrivanie`, {
-                        numero: String(s.scrivanie.length + 1),
-                      }))}>+ scrivania</Bottone>
-                    </li>
+        <section id="persone">
+          <Pannello titolo="Persone e settori" icona={<I.Persona size={18} />}
+                    piede="Chi non ha settore è programmabile, ma non copre nessun presidio.">
+            <ul className="divide-y divide-border overflow-hidden rounded-r2 border border-border bg-bg">
+              {persone.map((p) => (
+                <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 px-3 py-1.5">
+                  <span className="text-base">
+                    {p.cognome} <span className="text-ink-muted">{p.nome}</span>
+                    {p.ruolo === 'dirigente' && <span className="ml-2 text-2xs text-ink-faint">dirigente di unità figlia</span>}
+                  </span>
+                  {p.ruolo === 'dipendente' && (
+                    <select className={`${inputCls} max-w-[240px] py-1`} aria-label={`Settore di ${p.cognome} ${p.nome}`}
+                            value={p.sectorId ?? ''}
+                            onChange={(e) => void prova(() => api.post(`/org/unita/${unitId}/assegna-settore`, {
+                              userId: p.id, sectorId: e.target.value ? Number(e.target.value) : null,
+                            }))}>
+                      <option value="">Senza settore</option>
+                      {settori.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
+                    </select>
                   )}
-                </ul>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Riquadro>
-
-      <Riquadro titolo="Unità figlie" descrizione="Il dirigente di un'unità figlia è programmato in questa unità, al posto della sua.">
-        <form
-          onSubmit={(e: FormEvent) => {
-            e.preventDefault()
-            const f = new FormData(e.currentTarget as HTMLFormElement)
-            void prova(() => api.post('/org/unita', {
-              parentId: unitId, nome: f.get('nome'), sigla: f.get('sigla') || undefined,
-              dirigenteUserId: Number(f.get('dirigente')),
-            }))
-          }}
-          className="mb-4 grid gap-3 rounded-sm border border-filo bg-white p-4 sm:grid-cols-4"
-        >
-          <Campo etichetta="Nome"><input name="nome" className={classiInput} required /></Campo>
-          <Campo etichetta="Sigla"><input name="sigla" className={classiInput} /></Campo>
-          <Campo etichetta="Chi la comanda" aiuto="Diventa dirigente e passa nella nuova unità">
-            <select name="dirigente" className={classiInput} required defaultValue="">
-              <option value="" disabled>Scegli</option>
-              {persone.filter((p) => p.ruolo === 'dipendente').map((p) => (
-                <option key={p.id} value={p.id}>{p.cognome} {p.nome}</option>
+                </li>
               ))}
-            </select>
-          </Campo>
-          <div className="flex items-end"><Bottone type="submit">Crea l'unità</Bottone></div>
-        </form>
+            </ul>
+          </Pannello>
+        </section>
 
-        {unita.figlie.length === 0 ? <Vuoto>Nessuna unità figlia.</Vuoto> : (
-          <ul className="divide-y divide-filo rounded-sm border border-filo bg-white">
-            {unita.figlie.map((f) => (
-              <li key={f.id} className="px-4 py-2 text-[13px]">{f.nome} <span className="text-tenue">{f.sigla}</span></li>
-            ))}
-          </ul>
-        )}
-      </Riquadro>
-    </>
+        <section id="organizzatori">
+          <Pannello titolo="Organizzatori" icona={<I.Bacchetta size={18} />}
+                    piede="Programmi comunque tu, di diritto. La delega serve ad affiancarti.">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="min-w-[240px] flex-1">
+                <Campo etichetta="Delega un dipendente">
+                  <select id="nuovoDelegato" className={inputCls} defaultValue="">
+                    <option value="" disabled>Scegli una persona</option>
+                    {persone.filter((p) => p.ruolo === 'dipendente' && !delegati.some((d) => d.userId === p.id))
+                      .map((p) => <option key={p.id} value={p.id}>{p.cognome} {p.nome}</option>)}
+                  </select>
+                </Campo>
+              </div>
+              <div className="pb-0.5">
+                <Bottone onClick={() => {
+                  const el = document.getElementById('nuovoDelegato') as HTMLSelectElement | null
+                  if (el?.value) void prova(() => api.post(`/org/unita/${unitId}/organizzatori`, { userId: Number(el.value) }))
+                }}>Nomina</Bottone>
+              </div>
+            </div>
+
+            {delegati.length === 0 ? <p className="text-base text-ink-faint">Nessun organizzatore delegato.</p> : (
+              <ul className="divide-y divide-border overflow-hidden rounded-r2 border border-border bg-bg">
+                {delegati.map((d) => (
+                  <li key={d.userId} className="flex items-center justify-between px-3 py-2 text-base">
+                    <span>{d.cognome} <span className="text-ink-muted">{d.nome}</span></span>
+                    <Bottone variante="piccolo"
+                             onClick={() => void prova(() => api.del(`/org/unita/${unitId}/organizzatori/${d.userId}`))}>Revoca</Bottone>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Pannello>
+        </section>
+
+        <section id="stanze">
+          <Pannello titolo="Stanze e scrivanie" icona={<I.Stanza size={18} />}
+                    piede={proprietariaStanze
+                      ? 'La capienza di una stanza è il numero di scrivanie attive.'
+                      : "Le stanze appartengono all'unità radice: le gestisce il suo dirigente."}>
+            {proprietariaStanze && (
+              <form
+                onSubmit={(e: FormEvent<HTMLFormElement>) => {
+                  e.preventDefault()
+                  const form = e.currentTarget
+                  const f = new FormData(form)
+                  void prova(() => api.post('/org/stanze', {
+                    unitId, etichetta: f.get('etichetta'), piano: f.get('piano') || undefined,
+                    scrivanie: Number(f.get('scrivanie')),
+                  }))
+                  form.reset()
+                }}
+                className="grid items-end gap-3 sm:grid-cols-[1fr_1fr_120px_auto]"
+              >
+                <Campo etichetta="Etichetta"><input name="etichetta" className={inputCls} required placeholder="101" /></Campo>
+                <Campo etichetta="Piano"><input name="piano" className={inputCls} placeholder="Primo piano" /></Campo>
+                <Campo etichetta="Scrivanie"><input name="scrivanie" type="number" min={1} max={200} defaultValue={4} className={inputCls} required /></Campo>
+                <Bottone type="submit" variante="primario">Crea</Bottone>
+              </form>
+            )}
+
+            {stanze.length === 0 ? <p className="text-base text-ink-faint">Nessuna stanza.</p> : (
+              <ul className="grid gap-3 sm:grid-cols-2">
+                {stanze.map((s) => (
+                  <li key={s.id} className="rounded-r2 border border-border bg-bg p-3">
+                    <p className="text-base font-medium">{s.etichetta}</p>
+                    <p className="mono text-sm text-ink-faint">{s.piano ?? 'piano non indicato'} · capienza {s.capienza}</p>
+                    <ul className="mt-2 flex flex-wrap gap-1.5">
+                      {s.scrivanie.map((d) => (
+                        <li key={d.id}>
+                          <button
+                            disabled={!proprietariaStanze}
+                            onClick={() => void prova(() => api.patch(`/org/scrivanie/${d.id}`, { attiva: !d.attiva }))}
+                            aria-label={`Scrivania ${d.numero}, ${d.attiva ? 'attiva' : 'disattivata'}`}
+                            className={`mono cursor-pointer rounded-r1 border px-2 py-0.5 text-sm disabled:cursor-default
+                              ${d.attiva ? 'border-border-strong bg-surface-2 text-ink' : 'border-border text-ink-faint line-through'}`}
+                          >{d.numero}</button>
+                        </li>
+                      ))}
+                      {proprietariaStanze && (
+                        <li>
+                          <Bottone variante="piccolo"
+                                   onClick={() => void prova(() => api.post(`/org/stanze/${s.id}/scrivanie`, { numero: String(s.scrivanie.length + 1) }))}>
+                            <I.Piu size={13} />scrivania
+                          </Bottone>
+                        </li>
+                      )}
+                    </ul>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Pannello>
+        </section>
+
+        <section id="figlie">
+          <Pannello titolo="Unità figlie" icona={<I.Organizzazione size={18} />}
+                    piede="Il dirigente di un'unità figlia viene programmato qui, al posto di tutta la sua unità.">
+            <form
+              onSubmit={(e: FormEvent<HTMLFormElement>) => {
+                e.preventDefault()
+                const f = new FormData(e.currentTarget)
+                void prova(() => api.post('/org/unita', {
+                  parentId: unitId, nome: f.get('nome'), sigla: f.get('sigla') || undefined,
+                  dirigenteUserId: Number(f.get('dirigente')),
+                }))
+              }}
+              className="grid items-end gap-3 sm:grid-cols-[1.4fr_.6fr_1.2fr_auto]"
+            >
+              <Campo etichetta="Nome"><input name="nome" className={inputCls} required /></Campo>
+              <Campo etichetta="Sigla"><input name="sigla" className={inputCls} /></Campo>
+              <Campo etichetta="Chi la comanda">
+                <select name="dirigente" className={inputCls} required defaultValue="">
+                  <option value="" disabled>Scegli</option>
+                  {persone.filter((p) => p.ruolo === 'dipendente').map((p) => (
+                    <option key={p.id} value={p.id}>{p.cognome} {p.nome}</option>
+                  ))}
+                </select>
+              </Campo>
+              <Bottone type="submit">Crea</Bottone>
+            </form>
+
+            {unita.figlie.length === 0 ? <p className="text-base text-ink-faint">Nessuna unità figlia.</p> : (
+              <ul className="divide-y divide-border overflow-hidden rounded-r2 border border-border bg-bg">
+                {unita.figlie.map((f) => (
+                  <li key={f.id} className="flex items-center justify-between px-3 py-2 text-base">
+                    {f.nome} {f.sigla && <Tag>{f.sigla}</Tag>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Pannello>
+        </section>
+      </div>
+    </Vista>
   )
 }

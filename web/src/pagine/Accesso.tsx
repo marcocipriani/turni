@@ -1,7 +1,8 @@
 import { type FormEvent, useState } from 'react'
 import { ErroreApi } from '../api'
-import { Avviso, Bottone, Campo, classiInput } from '../componenti'
+import { Marchio } from '../Marchio'
 import { useSessione } from '../sessione'
+import { Bottone, Campo, inputCls, Messaggio } from '../ui'
 
 export default function Accesso() {
   const { entra } = useSessione()
@@ -10,45 +11,50 @@ export default function Accesso() {
   const [errore, setErrore] = useState<string | null>(null)
   const [inCorso, setInCorso] = useState(false)
 
-  async function invia(e: FormEvent) {
+  async function invia(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setErrore(null); setInCorso(true)
-    try {
-      await entra(email, password)
-    } catch (e) {
-      setErrore(e instanceof ErroreApi ? e.message : 'Accesso non riuscito')
-    } finally {
-      setInCorso(false)
-    }
+    try { await entra(email, password) }
+    catch (e) { setErrore(e instanceof ErroreApi ? e.message : 'Accesso non riuscito') }
+    finally { setInCorso(false) }
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
-      <h1 className="text-2xl font-light">Programmazione delle presenze</h1>
-      <p className="mt-1 text-xs tracking-wide text-tenue">Accedi con le tue credenziali</p>
+    <div className="grid h-full place-items-center bg-surface p-2">
+      <main className="entra w-full max-w-[420px] rounded-r4 border border-border bg-bg p-8 shadow-float">
+        <div className="flex items-center gap-3">
+          <Marchio size={48} />
+          <div>
+            <h1 className="mono text-[22px] font-semibold leading-tight tracking-[-0.02em]">Turni</h1>
+            <p className="text-sm text-ink-faint">by Zucchetto</p>
+          </div>
+        </div>
 
-      <form onSubmit={invia} className="mt-8 space-y-4 rounded-sm border border-filo bg-white p-6">
-        {errore && <Avviso tipo="errore">{errore}</Avviso>}
-        <Campo etichetta="Indirizzo di posta">
-          <input
-            className={classiInput} type="email" autoComplete="username" required
-            value={email} onChange={(e) => setEmail(e.target.value)}
-          />
-        </Campo>
-        <Campo etichetta="Password">
-          <input
-            className={classiInput} type="password" autoComplete="current-password" required
-            value={password} onChange={(e) => setPassword(e.target.value)}
-          />
-        </Campo>
-        <Bottone type="submit" variante="primario" disabled={inCorso} className="w-full justify-center">
-          {inCorso ? 'Accesso in corso…' : 'Entra'}
-        </Bottone>
-        <p className="text-[11px] leading-relaxed text-tenue">
-          Password dimenticata? L'applicazione non invia messaggi di posta: chiedi
-          all'amministratore di sistema di reimpostarla.
+        <p className="mt-5 max-w-[38ch] text-base text-ink-muted">
+          Sai sempre quando sei in sede, e con chi. Accedi per vedere la tua programmazione.
         </p>
-      </form>
-    </main>
+
+        <form onSubmit={invia} className="mt-6 flex flex-col gap-4">
+          {errore && <Messaggio tono="errore">{errore}</Messaggio>}
+          <Campo etichetta="Indirizzo di posta">
+            <input className={inputCls} type="email" autoComplete="username" required
+                   value={email} onChange={(e) => setEmail(e.target.value)} />
+          </Campo>
+          <Campo etichetta="Password">
+            <input className={inputCls} type="password" autoComplete="current-password" required
+                   value={password} onChange={(e) => setPassword(e.target.value)} />
+          </Campo>
+          <Bottone type="submit" variante="primario" disabled={inCorso} className="justify-center">
+            {inCorso ? 'Accesso in corso…' : 'Entra'}
+          </Bottone>
+        </form>
+
+        <p className="mt-5 max-w-[46ch] text-sm text-ink-faint">
+          Password dimenticata? Turni non manda messaggi di posta. Chiedi
+          all'amministratore di sistema di reimpostarla: ti darà una password
+          provvisoria da cambiare al primo accesso.
+        </p>
+      </main>
+    </div>
   )
 }

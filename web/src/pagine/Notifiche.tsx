@@ -1,91 +1,70 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api, type Notifica } from '../api'
-import { Bottone } from '../componenti'
+import * as I from '../icone'
+import { Bottone, Messaggio, Scheletro, StatoVuoto } from '../ui'
+import { Vista } from '../Vista'
 
-/** Iscrive il browser alle notifiche push. Fallisce in silenzio dove non è supportato. */
-async function iscriviPush(): Promise<string | null> {
+/** Iscrizione push: fallisce in modo leggibile dove non è supportata. */
+async function iscriviPush(): Promise<string> {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
     return 'Questo browser non supporta le notifiche push.'
   }
   const { chiave } = await api.get<{ chiave: string | null }>('/notifiche/push/chiave')
-  if (!chiave) return 'Le notifiche push non sono configurate sul server (chiavi VAPID assenti).'
-
-  const permesso = await Notification.requestPermission()
-  if (permesso !== 'granted') return 'Permesso negato dal browser.'
+  if (!chiave) return 'Le notifiche push non sono configurate sul server: mancano le chiavi VAPID.'
+  if ((await Notification.requestPermission()) !== 'granted') return 'Permesso negato dal browser.'
 
   const reg = await navigator.serviceWorker.register('/sw.js')
-  const sub = await reg.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: chiave,
-  })
+  const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chiave })
   const j = sub.toJSON() as { endpoint?: string; keys?: { p256dh: string; auth: string } }
   await api.post('/notifiche/push/iscrivi', {
     endpoint: j.endpoint, keys: j.keys, dispositivo: navigator.userAgent.slice(0, 200),
   })
-  return null
+  return 'Fatto. Le notifiche arriveranno anche a scheda chiusa.'
 }
 
-export function Campanella() {
-  const [dati, setDati] = useState<{ notifiche: Notifica[]; daLeggere: number }>({ notifiche: [], daLeggere: 0 })
-  const [aperto, setAperto] = useState(false)
-  const [messaggioPush, setMessaggioPush] = useState<string | null>(null)
-  const riferimento = useRef<HTMLDivElement>(null)
+const quando = (iso: string) => new Date(iso).toLocaleString('it-IT', {
+  day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+})
+
+export default function Notifiche() {
+  const [dati, setDati] = useState<{ notifiche: Notifica[]; daLeggere: number } | null>(null)
+  const [messaggio, setMessaggio] = useState<string | null>(null)
 
   useEffect(() => {
-    const carica = () => void api.get<typeof dati>('/notifiche').then(setDati).catch(() => {})
-    carica()
-    const t = setInterval(carica, 60_000)
-    return () => clearInterval(t)
+    void api.get<{ notifiche: Notifica[]; daLeggere: number }>('/notifiche').then(async (d) => {
+      setDati(d)
+      if (d.daLeggere > 0) await api.post('/notifiche/lette')
+    })
   }, [])
 
-  useEffect(() => {
-    if (!aperto) return
-    const fuori = (e: MouseEvent) => {
-      if (riferimento.current && !riferimento.current.contains(e.target as Node)) setAperto(false)
-    }
-    document.addEventListener('mousedown', fuori)
-    return () => document.removeEventListener('mousedown', fuori)
-  }, [aperto])
-
-  async function apri() {
-    const prossimo = !aperto
-    setAperto(prossimo)
-    if (prossimo && dati.daLeggere > 0) {
-      await api.post('/notifiche/lette')
-      setDati((d) => ({ ...d, daLeggere: 0 }))
-    }
-  }
-
   return (
-    <div className="relative" ref={riferimento}>
-      <button
-        onClick={() => void apri()}
-        aria-expanded={aperto}
-        aria-label={dati.daLeggere > 0 ? `Notifiche, ${dati.daLeggere} da leggere` : 'Notifiche'}
-        className="rounded-sm border border-filo bg-white px-3 py-1.5 text-[13px] text-az hover:border-az"
-      >
-        Notifiche{dati.daLeggere > 0 && <span className="ml-1.5 rounded-full bg-az px-1.5 py-0.5 text-[11px] text-white">{dati.daLeggere}</span>}
-      </button>
-
-      {aperto && (
-        <div className="absolute right-0 z-30 mt-1 max-h-[70vh] w-96 overflow-y-auto rounded-sm border border-filo bg-white shadow-lg">
-          <div className="flex items-center justify-between border-b border-filo px-3 py-2">
-            <span className="text-xs font-medium text-grigio">Centro notifiche</span>
-            <Bottone onClick={() => void iscriviPush().then(setMessaggioPush)}>Attiva push</Bottone>
-          </div>
-          {messaggioPush && <p className="border-b border-filo px-3 py-2 text-[11px] text-ambra">{messaggioPush}</p>}
-          {dati.notifiche.length === 0 && <p className="px-3 py-6 text-center text-[13px] text-tenue">Nessuna notifica.</p>}
-          <ul>
+    <Vista
+      titolo="Notifiche" icona={<I.Campana size={17} />} aiuto="Turni non manda messaggi di posta"
+      azioni={<Bottone onClick={() => void iscriviPush().then(setMessaggio)}>Attiva le push</Bottone>}
+    >
+      <div className="flex max-w-[70ch] flex-col gap-4">
+        {messaggio && <Messaggio>{messaggio}</Messaggio>}
+        {!dati && <Scheletro righe={4} />}
+        {dati?.notifiche.length === 0 && (
+          <StatoVuoto testo="Nessuna notifica. Qui arrivano le pubblicazioni, le revisioni e le assenze che toccano una giornata già programmata." />
+        )}
+        {dati && dati.notifiche.length > 0 && (
+          <ul className="divide-y divide-border overflow-hidden rounded-r3 border border-border bg-surface">
             {dati.notifiche.map((n) => (
-              <li key={n.id} className="border-b border-filo px-3 py-2.5 last:border-0">
-                <p className="text-[13px] font-medium">{n.titolo}</p>
-                <p className="mt-0.5 text-[12px] leading-snug text-grigio">{n.corpo}</p>
-                <p className="mt-1 text-[11px] text-tenue">{new Date(n.creatoIl).toLocaleString('it-IT')}</p>
+              <li key={n.id} className="flex gap-3 px-4 py-3">
+                <span className={`mt-1.5 size-2 shrink-0 rounded-full ${n.lettaIl ? 'bg-ink-faint' : 'bg-warn'}`} aria-hidden="true" />
+                <div className="min-w-0">
+                  <p className="text-base font-medium text-ink">
+                    {n.titolo}{!n.lettaIl && <span className="solo-lettori-schermo"> (non letta)</span>}
+                  </p>
+                  <p className="mt-0.5 text-sm text-ink-muted">{n.corpo}</p>
+                  <p className="mono mt-1 text-2xs text-ink-faint">{quando(n.creatoIl)}</p>
+                </div>
               </li>
             ))}
           </ul>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </Vista>
   )
 }

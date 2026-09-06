@@ -1,0 +1,143 @@
+/* =============================================================================
+   Design tokens — fonte di verità del design system.
+   Palette neutra monocromatica in OKLCH, light + dark, accenti solo di stato.
+   Vedi DESIGN.md. Funziona come CSS puro e come config Tailwind v4.
+   ========================================================================== */
+
+:root {
+  /* ---- Neutri (light) --------------------------------------------------- */
+  --bg: oklch(0.985 0 0);            /* fondo delle isole/superfici attive   */
+  --surface: oklch(0.965 0 0);       /* fondo dell'app, dietro le isole      */
+  --surface-2: oklch(0.935 0 0);     /* hover, riempimenti, zebra            */
+  --border: oklch(0.885 0 0);        /* bordo standard                       */
+  --border-strong: oklch(0.80 0 0);  /* bordo di controlli e overlay         */
+  --ink: oklch(0.20 0 0);            /* testo primario                       */
+  --ink-muted: oklch(0.43 0 0);      /* testo secondario                     */
+  --ink-faint: oklch(0.50 0 0);      /* testo terziario (AA anche a 11px)    */
+
+  /* ---- Azione (inchiostro pieno: il primario NON è colorato) ------------- */
+  --action: oklch(0.20 0 0);
+  --action-hover: oklch(0.30 0 0);
+  --action-ink: oklch(0.985 0 0);
+
+  /* ---- Accenti di stato (bassa croma, identici nei due temi) ------------- */
+  --ok: oklch(0.62 0.08 150);
+  --warn: oklch(0.70 0.09 80);
+  --warn-ink: oklch(0.52 0.10 80);   /* variante leggibile come testo        */
+  --danger: oklch(0.58 0.13 25);
+  --danger-ink: oklch(0.52 0.13 25);
+  --danger-wash: oklch(0.58 0.13 25 / 0.10);
+  --focus: oklch(0.60 0.10 250);
+
+  /* ---- Tipografia ------------------------------------------------------- */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+  /* ---- Spazi (scala 4px) ------------------------------------------------ */
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 20px; --s6: 24px; --s8: 32px;
+
+  /* ---- Raggi: la firma geometrica --------------------------------------- */
+  --r1: 6px;   /* dettaglio compatto: icon-button, tag, code inline          */
+  --r2: 8px;   /* controlli: button, input, select, voce di menu             */
+  --r3: 12px;  /* card e pannelli                                            */
+  --r4: 16px;  /* isole della shell, modali, overlay                         */
+  /* pill/badge: 999px */
+
+  /* ---- Ombre: funzionali, mai decorative -------------------------------- */
+  --shadow-float: 0 1px 2px oklch(0 0 0 / 0.05), 0 6px 18px oklch(0 0 0 / 0.06);
+  --shadow-overlay: 0 10px 34px oklch(0 0 0 / 0.22), 0 2px 8px oklch(0 0 0 / 0.12);
+
+  /* ---- z-scale ---------------------------------------------------------- */
+  --z-dropdown: 100; --z-sticky: 200; --z-backdrop: 300;
+  --z-modal: 400; --z-toast: 500; --z-tooltip: 600;
+
+  /* ---- Motion ----------------------------------------------------------- */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --t-fast: 120ms; --t-base: 180ms;
+
+  /* ---- Misure di shell --------------------------------------------------- */
+  --rail-w: 68px;      /* rail sempre visibile                               */
+  --panel-w: 214px;    /* pannello comprimibile                              */
+  --topbar-h: 52px;    /* header della vista                                 */
+  --drawer-w: 380px;   /* dettaglio contestuale a destra                     */
+  --row-h: 30px;       /* riga di griglia virtualizzata                      */
+}
+
+:root[data-theme='dark'] {
+  --bg: oklch(0.16 0 0);
+  --surface: oklch(0.195 0 0);
+  --surface-2: oklch(0.235 0 0);
+  --border: oklch(0.285 0 0);
+  --border-strong: oklch(0.36 0 0);
+  --ink: oklch(0.95 0 0);
+  --ink-muted: oklch(0.70 0 0);
+  --ink-faint: oklch(0.62 0 0);
+
+  /* L'azione si inverte: inchiostro chiaro su testo scuro. Resta monocroma. */
+  --action: oklch(0.95 0 0);
+  --action-hover: oklch(0.86 0 0);
+  --action-ink: oklch(0.17 0 0);
+
+  --danger-wash: oklch(0.58 0.13 25 / 0.16);
+  --shadow-float: 0 1px 2px oklch(0 0 0 / 0.3), 0 6px 18px oklch(0 0 0 / 0.35);
+  --shadow-overlay: 0 10px 34px oklch(0 0 0 / 0.5), 0 2px 8px oklch(0 0 0 / 0.4);
+}
+
+/* Transizione morbida al solo cambio di tema: si attiva aggiungendo .theming
+   sull'elemento root per la durata dello swap, poi la si toglie. Senza questo
+   ogni hover pagherebbe una transizione su color/background di tutto l'albero. */
+:root.theming, :root.theming * {
+  transition: background-color var(--t-base) var(--ease-out),
+              border-color var(--t-base) var(--ease-out),
+              color var(--t-base) var(--ease-out);
+}
+
+/* =============================================================================
+   Tailwind v4 — mappatura dei token in utility.
+   `inline` fa sì che le utility puntino alle var (che cambiano col tema)
+   invece di congelarne il valore risolto al momento della build.
+   Rimuovere questo blocco se non si usa Tailwind: il resto è CSS puro.
+   ========================================================================== */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+  --color-action: var(--action);
+  --color-action-hover: var(--action-hover);
+  --color-action-ink: var(--action-ink);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-warn-ink: var(--warn-ink);
+  --color-danger: var(--danger);
+  --color-danger-ink: var(--danger-ink);
+  --color-danger-wash: var(--danger-wash);
+  --color-focus: var(--focus);
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+
+  --radius-r1: var(--r1);
+  --radius-r2: var(--r2);
+  --radius-r3: var(--r3);
+  --radius-r4: var(--r4);
+
+  --shadow-float: var(--shadow-float);
+  --shadow-overlay: var(--shadow-overlay);
+
+  --ease-out: var(--ease-out);
+
+  /* Scala tipografica compatta: nessun display hero. */
+  --text-2xs: 10px;
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+}
