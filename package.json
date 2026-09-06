@@ -13,6 +13,7 @@
     "migra": "npm run migra --workspace server",
     "seed": "npm run seed --workspace server",
     "avvio": "npm run avvio --workspace server",
+    "importa": "npm run importa --workspace server",
     "verifica": "npm run verifica --workspace server",
     "carico": "npm run carico --workspace server"
   },

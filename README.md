@@ -175,12 +175,17 @@ punto in cui ci si arena.
 
 Sul server: `npm install --omit=dev`, il `.env`, `npm run migra`, e
 `npm run avvio -- persone.csv` la prima volta — che crea le utenze reali e
-stampa una volta sola una password diversa per ciascuno.
+stampa una volta sola una password diversa per ciascuno. Il resto delle
+tabelle si carica con `npm run importa`, a partire dai
+[modelli](docs/modelli/).
 
 ## Documentazione
 
 - [Manuale d'uso](docs/MANUALE.md) — per tutti, con le parti dedicate a
   dirigenti, organizzatori e amministratore.
+- [Modelli di caricamento](docs/modelli/) — sei file CSV, uno per tabella:
+  persone, stanze, settori, assenze, causali, giornate non lavorative. Si
+  aprono con un foglio di calcolo, e `--prova` li verifica senza scrivere.
 
 ## Stato
 

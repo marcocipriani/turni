@@ -12,7 +12,8 @@
     "verifica": "tsx src/verifica.ts",
     "carico": "tsx src/carico.ts",
     "migra": "tsx src/db/migra.ts",
-    "avvio": "tsx src/avvio.ts"
+    "avvio": "tsx src/avvio.ts",
+    "importa": "tsx src/importa.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",

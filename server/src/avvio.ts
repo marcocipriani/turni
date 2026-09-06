@@ -9,6 +9,9 @@
  *   npm run avvio -w server -- persone.csv --dominio comune.it
  *   npm run avvio -w server -- nuovi.csv --aggiungi
  *
+ * Le altre tabelle — stanze, settori, assenze, causali, giornate non
+ * lavorative — si caricano con `importa`. I modelli stanno in docs/modelli/.
+ *
  * Il formato è un CSV con punto e virgola, una riga di intestazione e queste
  * colonne (l'ordine non conta, le facoltative si possono omettere):
  *
@@ -31,6 +34,7 @@ import { readFileSync } from 'node:fs'
 import { eq, sql } from 'drizzle-orm'
 import { db, pool, schema } from './db/index'
 import { italianHolidays } from './lib/dates'
+import { leggiCsv, si } from './lib/csv'
 import { dividiNome, siglaCognome } from './lib/nomi'
 import { hashPassword } from './lib/password'
 
@@ -65,22 +69,6 @@ const passwordCasuale = () =>
 const senzaAccenti = (s: string) =>
   s.normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z]/g, '').toLowerCase()
 
-const si = (v: string | undefined) => ['si', 'sì', 'x', 'true', '1'].includes((v ?? '').trim().toLowerCase())
-
-/** CSV con punto e virgola. Niente librerie: virgolette e righe multiple non servono qui. */
-function leggiCsv(testo: string): Record<string, string>[] {
-  const righe = testo.replace(/^﻿/, '').split(/\r?\n/).filter((r) => r.trim())
-  if (righe.length < 2) throw new Error('Il file non contiene righe oltre all\'intestazione.')
-  const intestazione = righe[0]!.split(';').map((c) => c.trim())
-  return righe.slice(1).map((r, i) => {
-    const celle = r.split(';')
-    if (celle.length > intestazione.length) {
-      throw new Error(`Riga ${i + 2}: più colonne dell'intestazione. Il separatore è il punto e virgola.`)
-    }
-    return Object.fromEntries(intestazione.map((c, j) => [c, (celle[j] ?? '').trim()]))
-  })
-}
-
 async function main() {
   if (!FILE) {
     console.error(`
@@ -89,7 +77,7 @@ Serve un file CSV.
   npm run avvio -w server -- persone.csv --dominio comune.it
 
 Colonne: persona;ruolo;unita;sigla;unitaPadre;settore;presidio;organizzatore;email
-Un esempio pronto sta in server/src/seed/persone.esempio.csv
+Il modello, con le colonne spiegate, sta in docs/modelli/
 `)
     process.exit(1)
   }
