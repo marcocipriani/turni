@@ -94,27 +94,6 @@ export function Campo({ etichetta, aiuto, errore, children }: {
   )
 }
 
-export function Ricerca({ valore, onCambia, segnaposto, scorciatoia }: {
-  valore: string; onCambia: (v: string) => void; segnaposto: string; scorciatoia?: string
-}) {
-  return (
-    <div className="flex items-center gap-2 rounded-r2 border border-border-controllo bg-surface px-2.5 py-1.5
-                    focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75}
-           strokeLinecap="round" aria-hidden="true" className="shrink-0 text-ink-faint">
-        <circle cx="11" cy="11" r="7" /><path d="m20 20-3.6-3.6" />
-      </svg>
-      <input
-        value={valore} onChange={(e) => onCambia(e.target.value)} placeholder={segnaposto} aria-label={segnaposto}
-        className="min-w-0 flex-1 bg-transparent text-base text-ink outline-none placeholder:text-ink-muted"
-      />
-      {scorciatoia && (
-        <kbd className="mono rounded-r1 border border-border px-1 text-2xs text-ink-faint">{scorciatoia}</kbd>
-      )}
-    </div>
-  )
-}
-
 /* ── Pannello ────────────────────────────────────────────────────── */
 
 export function Pannello({ titolo, icona, azioni, piede, tonoPiede = 'neutro', children }: {

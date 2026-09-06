@@ -1,56 +1,118 @@
-# Turni · by Zucchetto
+<h1 align="center">Turni</h1>
 
-*Sai sempre quando sei in sede, e con chi.*
+<p align="center">
+  <em>Sai sempre quando sei in sede, e con chi.</em>
+</p>
 
-Applicazione web per programmare, per periodi definiti, chi lavora in sede e chi
-in lavoro agile, entro la capienza fisica delle stanze e tenendo conto delle
-assenze dichiarate dagli interessati.
+<p align="center">
+  Programmazione dei turni fra sede e lavoro agile per uffici pubblici:<br>
+  entro le scrivanie che esistono davvero, senza mai rivelare perché un collega non c'è.
+</p>
 
-- Design: [`docs/superpowers/specs/2026-09-05-piattaforma-turni-design.md`](docs/superpowers/specs/2026-09-05-piattaforma-turni-design.md)
-- Piano dei lavori: [`docs/superpowers/plans/2026-09-05-fase-1-implementazione.md`](docs/superpowers/plans/2026-09-05-fase-1-implementazione.md)
-- Design system: [`design-system/DESIGN.md`](design-system/DESIGN.md) — normativo.
-  I token si copiano da [`design-system/tokens.css`](design-system/tokens.css) senza modificarne i valori
-- Slot di brand compilato: [`docs/marchio.md`](docs/marchio.md)
-- Materiali di partenza: `handoff-webapp-rotazione-postazioni.md` (motore art.9, fase 3),
-  `prototipo-griglia.html` (prototipo della griglia), l'xlsx delle adesioni
+<p align="center">
+  <img src="docs/schermate/mio-mobile-light.png" width="240" alt="La pagina Mio, da telefono">
+  &nbsp;&nbsp;
+  <img src="docs/schermate/mio-mobile-dark.png" width="240" alt="La pagina Mio, tema scuro">
+</p>
 
-## Com'è
+![La griglia dei turni](docs/schermate/turni-griglia-dark.png)
+
+---
+
+## Il problema
+
+Un ufficio con più persone che scrivanie deve decidere, ogni settimana, chi
+viene e chi resta a casa. Si fa con un foglio di calcolo, finché non ci si
+accorge che il foglio non sa quante scrivanie ci sono, non sa chi è in ferie,
+non impedisce a un intero settore di sparire lo stesso giorno, e soprattutto
+mostra a tutti la causale dell'assenza di ciascuno.
+
+Turni fa quel lavoro sapendo tutte e quattro le cose.
+
+## Cosa fa
+
+- **Programma per periodi** — una settimana, un mese, quattro settimane. Bozza,
+  approvazione del dirigente, pubblicazione, versioni conservate per intero.
+- **Genera una proposta** e la lascia correggere. Le celle bloccate a mano
+  sopravvivono a ogni rigenerazione.
+- **Non supera mai la capienza**: la capienza di una stanza è il numero di
+  scrivanie attive, non un numero scritto da qualche parte che qualcuno deve
+  ricordarsi di aggiornare.
+- **Copre i settori a presidio** prima di distribuire il resto.
+- **Assenze dichiarate dagli interessati**, anche ricorrenti, anche su
+  programmazioni già pubblicate. Il calendario pubblicato non si riscrive da
+  solo: chi organizza viene avvisato.
+- **Scambio di turni fra colleghi** senza passare da nessuna approvazione, ma
+  solo dove i conti tornano: presidio, postazioni, limiti di lavoro agile.
+- **Stampa** su carta o PDF: griglia del periodo, giorno per giorno, calendario
+  personale, occupazione delle stanze.
+- **Notifiche** in applicazione e push del browser. Nessuna posta elettronica.
+
+## Privacy per costruzione
+
+Non è una sezione di conformità: sono scelte che hanno cambiato il codice.
+
+**Il cognome non esiste per esteso.** Viene troncato a tre caratteri *prima*
+dell'inserimento in archivio — `Di Marco` diventa `DiM` — e lo stesso vale per
+gli indirizzi generati. A video compare la sola sigla; il nome si aggiunge solo
+alle sigle che collidono in quella schermata. Un test verifica che nessun
+cognome in archivio superi i tre caratteri: la minimizzazione non regge su una
+convenzione, regge su un controllo.
+
+**Un collega non distingue un assente da chi lavora da casa.** Il mascheramento
+avviene in un punto solo del server, prima della serializzazione, e nessuna
+causale attraversa quella funzione senza titolo. Anche l'export CSV lo rispetta.
+
+**Le esclusioni non si spiegano.** Quando cerchi qualcuno con cui scambiare un
+turno, chi non compare non compare e basta: assenza, postazioni esaurite,
+presidio, limiti settimanali e proposte già aperte escludono allo stesso modo.
+Una motivazione racconterebbe di terzi ciò che non ti riguarda.
+
+**L'amministratore di sistema non vede nessuna programmazione.** Censisce unità
+e utenti. Non è una limitazione dell'interfaccia: le rotte rispondono 403.
+
+## Misurato, non sperato
 
 | | |
 |---|---|
-| Mio, da telefono | ![](docs/schermate/mio-mobile-light.png) |
-| Griglia dei turni, tema scuro | ![](docs/schermate/turni-griglia-dark.png) |
+| Accessibilità | **nessuna violazione WCAG 2.1 AA** — axe-core su 9 pagine × 2 temi × 2 schermi |
+| Contrasto dei token | calcolato dai file CSS in entrambi i temi, non valutato a occhio |
+| Rotte API | mediana **3–10 ms**, la più pesante 51 kB → **2,7 kB** compressi |
+| Motore, 1000 persone | **81 ms** per 21 giornate lavorative |
+| Pagina, 4G scarsa | primo testo **390 ms**, elemento più grande **880 ms**, scarti di impaginazione **0.000** |
+| Peso di una pagina | **63 kB** |
 
-Le schermate si rigenerano con `node scripts/schermate.mjs` contro un'istanza
-avviata: pilota Chrome headless, accede come i vari ruoli e cattura ogni pagina
-nei due temi. Con `--mobile` le riprende da telefono.
+Gli strumenti che producono questi numeri stanno in `scripts/` e si rieseguono
+in qualunque momento: `npm run accessibilita`, `npm run tempi`, `npm run carico`.
 
-## Come è fatta
+## Com'è fatta
 
 ```
-web/     SPA React + Vite + Tailwind v4, compilata in file statici
-server/  API Hono su Node, con Drizzle su MySQL 8 / MariaDB
+web/       SPA React 19 + Vite + Tailwind v4, compilata in file statici
+server/    API Hono su Node, Drizzle ORM su MySQL 8 / MariaDB
+scripts/   strumenti di misura e di rilascio, senza dipendenze
 ```
 
-L'interfaccia ha **una sola barra di navigazione**: rail da 68px a sinistra da
-tablet in su, barra in basso sul telefono, stesse destinazioni. L'isola di
-contenuto ha un header da 52px, che sul telefono porta anche campanella e menu
-utente. Tema chiaro, scuro e automatico, persistito. Inter e JetBrains Mono sono
-self-ospitati: nessuna richiesta a un CDN esterno, quindi nessun dato del
-personale che raggiunge terzi.
+Un processo solo serve l'API e il frontend compilato: sull'hosting serve un
+solo slot applicativo. Il server esegue TypeScript direttamente con `tsx`, così
+nel percorso di rilascio non c'è una compilazione che può fallire.
 
-Tre destinazioni per tutti — **Mio**, **Turni**, **Assenze** — più *Struttura*
-per il dirigente. L'amministratore di sistema ha il solo *Sistema*: censisce
-unità e utenti e non vede nessuna programmazione.
+Alcune scelte che meritano una riga:
 
-I cognomi sono troncati a tre caratteri **dentro l'archivio**, non a video: nel
-database il cognome per esteso non esiste. Il nome si aggiunge alle sole sigle
-che collidono nell'insieme visibile.
+- **La capienza non è un campo**, è il conteggio delle scrivanie attive.
+- **Un'unità ha un dirigente solo**, e a garantirlo è un indice unico su una
+  colonna generata, non un controllo nel codice.
+- **Una giornata in scambio non entra in un secondo scambio**: stesso trucco,
+  due colonne generate che si spengono da sole quando la proposta si chiude.
+- **Il motore è deterministico**: stessi ingressi, stesso risultato. Rigenerare
+  non rimescola le carte.
+- **Niente CDN, niente caratteri remoti, niente analitica.** La politica dei
+  contenuti può dirlo perché è vero: nessun dato del personale raggiunge terzi.
 
-Il processo Node serve sia l'API sia il frontend compilato, così l'hosting
-richiede un solo slot applicativo. In alternativa il contenuto di `web/dist`
-può essere copiato in `public_html` e servito dal server web, lasciando al
-processo Node la sola API.
+L'interfaccia segue un design system a **isole neutre**: palette monocromatica
+in OKLCH, il colore riservato agli stati, rail a sinistra da tablet in su e
+barra in basso sul telefono. Sta in [`design-system/`](design-system/), e
+[`tokens.css`](design-system/tokens.css) si copia senza modificarne i valori.
 
 ## Avvio in locale
 
@@ -59,106 +121,77 @@ processo Node la sola API.
 mysql -u root -e "CREATE DATABASE turni CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
 
 # 2. configurazione
-cp .env.example .env      # e compila DATABASE_URL e SEED_PASSWORD
+cp .env.example .env      # compila DATABASE_URL e SEED_PASSWORD
 
 # 3. dipendenze e schema
 npm install
-npm run migra -w server
+npm run migra
 
-# 4. dati di prova
+# 4. dati di prova e un periodo pubblicato da guardare
 npm run seed
+node scripts/demo.mjs
 
-# 5. sviluppo: API su 8787, interfaccia su 5173 con proxy verso l'API
+# 5. API su 8787, interfaccia su 5173 con proxy verso l'API
 npm run dev
 ```
 
-Accessi generati dal popolamento di prova, tutti con la password indicata in
-`SEED_PASSWORD`:
+Le utenze di prova hanno tutte la password indicata in `SEED_PASSWORD`, e nomi
+inventati: `admin@turni.test` per l'amministratore, `marco.fab@turni.test` per
+l'organizzatore, `serena.fer@turni.test` per il dirigente, ogni altra
+`nome.sig@turni.test` per i dipendenti.
 
-| Ruolo | Utenza |
-|---|---|
-| Amministratore di sistema | `admin@turni.test` |
-| Dirigente del Dipartimento | `renata.san@turni.test` |
-| Dirigente UFFES | `serena.gio@turni.test` |
-| Organizzatore delegato | `marco.cip@turni.test` |
-| Dipendente | ogni altra `nome.sig@turni.test` |
+Il popolamento di prova **si rifiuta di girare** con `NODE_ENV=production`, e
+anche se trova in archivio un solo indirizzo fuori dal dominio di prova.
 
 ## Verifiche
 
 ```bash
-npm test                        # 64 test di unità: motore, permessi, scambi, nomi, calendario, accessibilità
-npm run verifica -w server      # criteri di accettazione contro un'istanza avviata
-npm run carico -w server        # tempi del motore fino a 1000 persone
-npm run build                   # controllo dei tipi e build di produzione
-node scripts/schermate.mjs      # schermate autenticate nei due temi, via Chrome headless
-node scripts/demo.mjs           # genera e pubblica un periodo, per avere dati da guardare
-node scripts/prova-scambio.mjs  # giro completo di uno scambio contro l'istanza avviata
+npm test               # 113 test: motore, permessi, scambi, nomi, contrasti, accessibilità
+npm run verifica       # 12 criteri di accettazione contro un'istanza avviata
+npm run accessibilita  # axe-core, 36 combinazioni di pagina, tema e schermo
+npm run tempi          # tempi delle rotte e caricamento delle pagine, anche su 4G scarsa
+npm run carico         # motore fino a 1000 persone
+npm run schermate      # schermate autenticate nei due temi (--mobile per il telefono)
+npm run build          # controllo dei tipi e build di produzione
 ```
 
-### Tempi misurati
+Le verifiche che parlano con un browser pilotano Chrome headless dal protocollo
+di sviluppo, senza Puppeteer né Playwright: [`scripts/cdp.mjs`](scripts/cdp.mjs),
+un file, zero dipendenze.
 
-Motore di generazione, 21 giornate lavorative:
+## Rilascio
 
-| Persone | Postazioni | Tempo |
-|---:|---:|---:|
-| 20 | 8 | 12 ms |
-| 100 | 40 | 10 ms |
-| 500 | 240 | 54 ms |
-| 1000 | 480 | 96 ms |
+```bash
+npm run pacchetto
+```
 
-API, media su 20 richieste dopo riscaldamento, con la griglia reale da 19 persone × 20 giornate:
+Produce `rilascio/turni-<versione>-<data>.tar.gz`, circa 1,4 MB: server,
+frontend già compilato, configurazione da riempire. Fuori restano test,
+popolamento di prova, strumenti di misura e ogni traccia di dati del personale.
 
-| Rotta | Tempo | Risposta | Compressa |
-|---|---:|---:|---:|
-| `/api/periodi/:id/griglia` | 8,3 ms | 45,7 kB | 2,8 kB |
-| `/api/panoramica` | 5,1 ms | 15,3 kB | 1,3 kB |
-| `/api/periodi/:id/export.csv` | 8,2 ms | 27,6 kB | 2,0 kB |
+Sul server: `npm install --omit=dev`, il `.env`, `npm run migra`, e
+`npm run avvio -- persone.csv` la prima volta — che crea le utenze reali e
+stampa una volta sola una password diversa per ciascuno.
 
-## Messa in linea su Hostinger
+## Documentazione
 
-Il piano Business esegue applicazioni Node e include MySQL.
+- [Manuale d'uso](docs/MANUALE.md) — per tutti, con le parti dedicate a
+  dirigenti, organizzatori e amministratore.
 
-1. **Database** — crea database e utente da hPanel, poi riporta le credenziali in `DATABASE_URL`.
-2. **Applicazione Node** — in hPanel, *Avanzate → Node.js*: crea l'app puntando alla
-   cartella del repository, comando di avvio `npm start --workspace server`.
-3. **Variabili d'ambiente** — imposta `DATABASE_URL`, `SESSION_COOKIE`, `NODE_ENV=production`
-   e le due chiavi VAPID. Non impostare `SEED_PASSWORD` in produzione.
-4. **Frontend** — esegui `npm run build` in locale e carica `web/dist`. Se il processo
-   Node serve anche i file statici, basta che la cartella esista accanto al server.
-5. **Schema** — `npm run migra -w server` una volta sola, verso il database di produzione.
-6. **Chiavi push** — generale con
-   `node -e "console.log(require('web-push').generateVAPIDKeys())"` e conservale
-   fuori dal repository.
+## Stato
 
-### Prima di caricare dati reali
+Prima versione completa e provata. Rinviato per scelta, non per dimenticanza:
 
-L'ambiente di prova usa una password unica per tutte le utenze. Prima che entri
-un solo dato vero vanno soddisfatte tutte queste condizioni:
+- editor grafico delle planimetrie con trascinamento
+- virtualizzazione della griglia oltre le 200 righe — sopra quella soglia il
+  collo di bottiglia è il DOM, non più il server
+- fasce orarie infragiornaliere e stanze condivise fra unità
+- accesso con identità istituzionale e importazione dal sistema del personale
 
-- la password condivisa è revocata e ogni utenza ha credenziali proprie;
-- `password_da_cambiare` è attivo su tutte le utenze;
-- l'ambiente non è raggiungibile dalla rete pubblica, oppure è protetto da un
-  ulteriore livello di autenticazione;
-- le utenze di prova sono eliminate, non soltanto disattivate.
+## Licenza
 
-Il popolamento di prova si rifiuta di girare con `NODE_ENV=production` e si
-ferma se trova nel database utenze con indirizzi diversi da quello di test.
-
-## Scostamenti dalla spec, e perché
-
-**Hash delle password con `scrypt` di `node:crypto` invece di argon2id.**
-Argon2 richiede una compilazione nativa che l'hosting condiviso può non
-completare. `scrypt` è nella libreria standard, non ha dipendenze e resta un KDF
-adeguato. Il modulo `server/src/lib/password.ts` è isolato: cambiare KDF
-significa sostituire quel solo file.
-
-**Il server gira con `tsx` invece di essere compilato con `tsc`.**
-Toglie un passo di build dal percorso di rilascio, che sull'hosting condiviso è
-il punto più fragile. Il controllo dei tipi resta e gira con `npm run build`.
-
-## Cosa non c'è ancora
-
-Fase 2: editor di planimetria drag and drop, reportistica di equità, serie
-storiche, virtualizzazione della griglia oltre le 200 righe. Fase 3: motore art.9 con protrazioni e debito orario, fasce orarie
-infragiornaliere, stanze condivise fra unità, SSO istituzionale, Design System
-Italia.
+Da definire. Trattandosi di software per una pubblica amministrazione italiana,
+le [Linee guida su acquisizione e riuso di software per le
+PA](https://docs.italia.it/italia/developers-italia/gl-acquisition-and-reuse-software-for-pa-docs/)
+indicano una licenza aperta — di norma AGPL-3.0 o EUPL-1.2. Finché il file
+`LICENSE` non c'è, valgono i termini predefiniti del diritto d'autore.

@@ -17,9 +17,9 @@ export const SCHERMI = {
 
 /** Le utenze dell'ambiente di prova, per ruolo. */
 export const UTENTI = {
-  organizzatore: 'marco.cip@turni.test',
-  dirigente: 'serena.gio@turni.test',
-  dipendente: 'elena.pul@turni.test',
+  organizzatore: 'marco.fab@turni.test',
+  dirigente: 'serena.fer@turni.test',
+  dipendente: 'elena.mar@turni.test',
   admin: 'admin@turni.test',
 }
 

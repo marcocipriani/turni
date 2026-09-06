@@ -4,6 +4,8 @@
  *
  *   node scripts/demo.mjs [--base http://localhost:8787] [--settimane 4]
  */
+import { UTENTI } from './cdp.mjs'
+
 const arg = (n, d) => { const i = process.argv.indexOf(`--${n}`); return i > 0 ? process.argv[i + 1] : d }
 const BASE = arg('base', 'http://localhost:8787')
 const SETTIMANE = Number(arg('settimane', 4))
@@ -36,8 +38,8 @@ function lunedi() {
   return d
 }
 
-const org = await sessione(arg('organizzatore', 'marco.cip@turni.test'))
-const dir = await sessione(arg('dirigente', 'serena.gio@turni.test'))
+const org = await sessione(arg('organizzatore', UTENTI.organizzatore))
+const dir = await sessione(arg('dirigente', UTENTI.dirigente))
 
 const io = await org.get('/auth/me')
 const unitId = io.organizzatoreDi[0] ?? io.unitId

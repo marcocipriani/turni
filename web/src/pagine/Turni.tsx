@@ -134,6 +134,14 @@ export default function Turni() {
             <Comando variante="primario" titolo="Nuovo periodo" icona={<I.Piu size={15} />}
                      onClick={() => setNuovoAperto(true)}>Nuovo</Comando>
           )}
+          {inGriglia && p && (
+            <a href={`/api/periodi/${p.id}/export.csv`} title="Scarica il periodo in CSV"
+               aria-label="Scarica il periodo in CSV"
+               className="inline-flex cursor-pointer items-center gap-2 rounded-r1 p-[5px] text-ink-faint
+                          transition-colors duration-[120ms] ease-out hover:bg-surface-2 hover:text-ink">
+              <I.Scarica size={17} />
+            </a>
+          )}
           <Bottone variante="icona" title="Stampa" aria-label="Stampa"
                    onClick={() => navigate(inGriglia && p ? `/stampa/periodo?id=${p.id}` : '/stampa/giorno')}>
             <I.Stampa size={17} />

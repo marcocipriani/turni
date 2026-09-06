@@ -2,7 +2,12 @@ node_modules/
 dist/
 .env
 .env.*
+!.env.example
 .DS_Store
 web/dist/
 *.tsbuildinfo
 rilascio/
+
+# Note di lavoro, materiali di partenza con dati reali, istruzioni di rilascio
+# con le credenziali. Non escono da questa macchina.
+_note/
