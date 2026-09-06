@@ -25,7 +25,7 @@ export const attore = (c: Context<Env>) => c.get('attore')
 export const albero = (c: Context<Env>) => c.get('albero')
 
 export class HttpError extends Error {
-  constructor(public status: 400 | 401 | 403 | 404 | 409 | 422, message: string) {
+  constructor(public status: 400 | 401 | 403 | 404 | 409 | 413 | 422 | 429, message: string) {
     super(message)
   }
 }

@@ -6,13 +6,13 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc --noEmit -p tsconfig.json",
     "start": "tsx src/index.ts",
-    "db:push": "drizzle-kit push",
     "seed": "tsx src/seed/run.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "verifica": "tsx src/verifica.ts",
     "carico": "tsx src/carico.ts",
-    "migra": "tsx src/db/migra.ts"
+    "migra": "tsx src/db/migra.ts",
+    "avvio": "tsx src/avvio.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",
