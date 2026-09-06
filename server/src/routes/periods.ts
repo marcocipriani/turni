@@ -600,8 +600,11 @@ periods.get('/:id/export.csv', async (c) => {
   for (const u of ctx.persone) {
     for (const g of ctx.giorni) {
       const cella = cellePerChiave.get(`${u.id}|${g}`)
-      // Un'assenza esce come "fuori sede": la causale non lascia il sistema.
-      const stato = ctx.indisponibili.has(`${u.id}|${g}`) ? 'fuori_sede' : cella?.stato ?? 'smart'
+      // L'export dice se una persona è in sede, e nient'altro. Distinguere
+      // «assenza» da «lavoro agile» — anche solo con due parole diverse e
+      // nessuna causale — direbbe a chiunque apra il file chi era assente.
+      const inSede = cella?.stato === 'presenza' && !ctx.indisponibili.has(`${u.id}|${g}`)
+      const stato = inSede ? 'presenza' : 'fuori_sede'
       righe.push([
         u.cognome, u.nome, nomeSettore(u.sectorId), g, stato,
         stato === 'presenza' ? nomeStanza(cella?.roomId ?? null) : '',
