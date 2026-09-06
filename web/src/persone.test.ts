@@ -5,21 +5,21 @@ const p = (id: number, nome: string, cognome: string) => ({ id, nome, cognome })
 
 describe('etichette', () => {
   it('usa la sola sigla quando non c\'è ambiguità', () => {
-    const e = etichette([p(1, 'Elena', 'Pul'), p(2, 'Marco', 'Cip')])
-    expect(e.get(1)).toBe('Pul')
-    expect(e.get(2)).toBe('Cip')
+    const e = etichette([p(1, 'Elena', 'Mar'), p(2, 'Marco', 'Fab')])
+    expect(e.get(1)).toBe('Mar')
+    expect(e.get(2)).toBe('Fab')
   })
 
   it('aggiunge il nome alle sole sigle che collidono', () => {
-    const e = etichette([p(1, 'Camilla', 'Pan'), p(2, 'Davide', 'Pan'), p(3, 'Elena', 'Pul')])
-    expect(e.get(1)).toBe('Pan Camilla')
-    expect(e.get(2)).toBe('Pan Davide')
-    expect(e.get(3)).toBe('Pul')
+    const e = etichette([p(1, 'Elena', 'Mar'), p(2, 'Ada', 'Mar'), p(3, 'Marco', 'Fab')])
+    expect(e.get(1)).toBe('Mar Elena')
+    expect(e.get(2)).toBe('Mar Ada')
+    expect(e.get(3)).toBe('Fab')
   })
 
   it('dipende dall\'insieme visibile, non dall\'archivio', () => {
-    // Da sola, Camilla resta «Pan»: non c'è nessuno da cui distinguerla.
-    expect(etichette([p(1, 'Camilla', 'Pan')]).get(1)).toBe('Pan')
+    // Da sola, Elena resta «Mar»: non c'è nessuno da cui distinguerla.
+    expect(etichette([p(1, 'Elena', 'Mar')]).get(1)).toBe('Mar')
   })
 })
 
