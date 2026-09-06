@@ -50,10 +50,10 @@ export function dividiNome(completo: string): { cognome: string; nome: string } 
  * Sigla del cognome: spazi e apostrofi via, primi tre caratteri, maiuscola
  * iniziale su ogni parola conservata.
  *
- *   'Della Valle' → 'DiF'   'De Angelis' → 'DeM'   'Marchetti' → 'Pul'
+ *   'Della Valle' → 'Del'   'De Angelis' → 'DeA'   'Marchetti' → 'Mar'
  *
- * Tre caratteri fanno collidere i cognomi vicini — Riva e Meloni danno
- * entrambi 'Pan'. È voluto: la disambiguazione la fa il nome, a video.
+ * Tre caratteri fanno collidere i cognomi vicini — Marchetti e Marchesi
+ * danno entrambi 'Mar'. È voluto: la disambiguazione la fa il nome, a video.
  */
 export function siglaCognome(cognome: string): string {
   const compatto = cognome.replace(/[\s'’]/g, '')

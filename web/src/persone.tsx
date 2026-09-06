@@ -1,9 +1,9 @@
 /**
  * Come si scrive una persona a video.
  *
- * Nell'archivio il cognome è già troncato a tre caratteri: «Pul», «DiF», «DeM».
- * Nelle liste basta quello. Quando due sigle visibili coincidono — «Riva»
- * e «Meloni» danno entrambe «Pan» — quelle due righe, e solo quelle, portano
+ * Nell'archivio il cognome è già troncato a tre caratteri: «Mar», «Del», «DeA».
+ * Nelle liste basta quello. Quando due sigle visibili coincidono — «Marchetti»
+ * e «Marchesi» danno entrambe «Mar» — quelle due righe, e solo quelle, portano
  * anche il nome.
  */
 
@@ -12,7 +12,7 @@ export type Anagrafica = { id: number; nome: string; cognome: string }
 /**
  * Etichetta breve per ogni persona dell'insieme visibile.
  * La disambiguazione dipende da chi è in lista: la stessa persona può leggersi
- * «Pan» in una schermata e «Pan Camilla» in un'altra, ed è il comportamento
+ * «Mar» in una schermata e «Mar Elena» in un'altra, ed è il comportamento
  * giusto — il nome compare dove serve a distinguere, non ovunque per abitudine.
  */
 export function etichette(persone: Anagrafica[]): Map<number, string> {

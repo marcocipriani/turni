@@ -31,9 +31,9 @@ describe('dividiNome', () => {
 
 describe('siglaCognome', () => {
   it('toglie spazi e apostrofi, poi tronca a tre', () => {
-    expect(siglaCognome('Della Valle')).toBe('DiF')
-    expect(siglaCognome('De Angelis')).toBe('DeM')
-    expect(siglaCognome('Marchetti')).toBe('Pul')
+    expect(siglaCognome('Della Valle')).toBe('Del')
+    expect(siglaCognome('De Angelis')).toBe('DeA')
+    expect(siglaCognome('Marchetti')).toBe('Mar')
     expect(siglaCognome("D'Angelo")).toBe('DAn')
   })
 
