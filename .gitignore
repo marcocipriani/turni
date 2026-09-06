@@ -8,6 +8,7 @@ web/dist/
 *.tsbuildinfo
 rilascio/
 
-# Note di lavoro, materiali di partenza con dati reali, istruzioni di rilascio
-# con le credenziali. Non escono da questa macchina.
-_note/
+# Tutto ciò che non serve a far girare l'applicazione: strumenti di sviluppo e
+# di rilascio, design system di riferimento, materiali di partenza con dati
+# reali, istruzioni e credenziali. Non esce da questa macchina.
+private/
