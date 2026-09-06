@@ -16,7 +16,15 @@ type Dati = {
   persone: { persona: string; settore: string; assenze: string[] }[]
 }
 
-const dati: Dati = JSON.parse(readFileSync(fileURLToPath(new URL('./dati.json', import.meta.url)), 'utf8'))
+/**
+ * L'archivio di prova versionato ha nomi inventati. Chi lavora su un ambiente
+ * proprio può puntare SEED_DATI a un file con i nomi veri, che resta fuori dal
+ * repository: i dati del personale non hanno motivo di entrarci.
+ */
+const PERCORSO_DATI = process.env.SEED_DATI
+  ? new URL(process.env.SEED_DATI, `file://${process.cwd()}/`)
+  : new URL('./dati.json', import.meta.url)
+const dati: Dati = JSON.parse(readFileSync(fileURLToPath(PERCORSO_DATI), 'utf8'))
 
 const DOMINIO = process.env.SEED_EMAIL_DOMAIN ?? 'turni.test'
 const PASSWORD = process.env.SEED_PASSWORD
