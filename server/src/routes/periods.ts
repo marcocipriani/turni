@@ -153,9 +153,16 @@ function validazioni(ctx: Contesto, p: typeof schema.period.$inferSelect) {
 periods.get('/', async (c) => {
   const unitId = Number(c.req.query('unitId'))
   if (!Number.isInteger(unitId)) throw new HttpError(422, 'Unità non indicata')
-  if (!puoLeggereUnita(c.get('albero'), c.get('attore'), unitId)) throw vietato()
+  const a = c.get('attore')
+  if (!puoLeggereUnita(c.get('albero'), a, unitId)) throw vietato()
+  // Chi non programma vede solo il pubblicato: una bozza è un ragionamento in
+  // corso, non una comunicazione, e leggerla come tale fa più danno che bene.
+  const soloPubblicati = !puoProgrammare(a, unitId)
   return c.json(await db.select().from(schema.period)
-    .where(eq(schema.period.unitId, unitId)).orderBy(desc(schema.period.dataInizio)))
+    .where(soloPubblicati
+      ? and(eq(schema.period.unitId, unitId), eq(schema.period.stato, 'pubblicato'))
+      : eq(schema.period.unitId, unitId))
+    .orderBy(desc(schema.period.dataInizio)))
 })
 
 periods.post('/', async (c) => {
@@ -234,6 +241,10 @@ periods.get('/:id/griglia', async (c) => {
   const p = await caricaPeriodo(Number(c.req.param('id')))
   const a = c.get('attore'), alb = c.get('albero')
   if (!puoLeggereUnita(alb, a, p.unitId)) throw vietato()
+  // Una bozza si apre solo a chi la sta costruendo, anche puntandola per id.
+  if (p.stato !== 'pubblicato' && !puoProgrammare(a, p.unitId)) {
+    throw vietato('Questa programmazione non è ancora pubblicata')
+  }
   const ctx = await contesto(p, alb)
 
   const perChiave = new Map(ctx.celle.map((x) => [`${x.userId}|${x.data}`, x]))

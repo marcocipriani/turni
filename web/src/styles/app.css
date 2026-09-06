@@ -81,6 +81,35 @@ body {
 select { background-color: var(--bg); color: var(--ink); }
 select option { background-color: var(--bg); color: var(--ink); }
 
+/* ── Carta ─────────────────────────────────────────────────────────
+   La stampa non è la schermata in bianco e nero: è un documento. Sparisce
+   tutta la struttura dell'app — rail, barra in basso, isole, ombre — e resta
+   il contenuto, su fondo bianco, con i bordi che l'inchiostro sa rendere.
+   I token si ridefiniscono qui e solo qui: tokens.css non si tocca. */
+@media print {
+  :root, :root[data-theme='dark'] {
+    --bg: #fff; --surface: #fff; --surface-2: #f2f2f2;
+    --border: #bbb; --border-strong: #888;
+    --ink: #000; --ink-muted: #333; --ink-faint: #555;
+    --action: #000; --action-ink: #fff; --focus: #666;
+    --shadow-float: none; --shadow-overlay: none;
+  }
+  /* La shell è tutta struttura: sulla carta resta solo il documento.
+     Le altezze fisse e gli overflow nascosti servono a far scorrere le isole
+     dentro la finestra; su carta taglierebbero il contenuto alla prima pagina. */
+  nav, .non-stampare { display: none !important; }
+  html, body, #root { height: auto !important; overflow: visible !important; background: #fff; }
+  #root > div { display: block !important; height: auto !important; padding: 0 !important;
+                gap: 0 !important; overflow: visible !important; }
+  #contenuto { display: block !important; height: auto !important; min-height: 0 !important;
+               border: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
+  #contenuto * { overflow: visible !important; max-height: none !important; }
+  table { border-collapse: collapse; page-break-inside: auto; }
+  thead { display: table-header-group; }
+  tr { page-break-inside: avoid; }
+  a[href]::after { content: ''; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: .01ms !important;

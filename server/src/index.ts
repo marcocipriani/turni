@@ -8,6 +8,7 @@ import { caricaAlbero, caricaAttore, type Env, HttpError } from './context'
 import { absences } from './routes/absences'
 import { auth, utenteDaToken } from './routes/auth'
 import { admin } from './routes/admin'
+import { mio } from './routes/mio'
 import { notifications } from './routes/notifications'
 import { org } from './routes/org'
 import { overview } from './routes/overview'
@@ -52,6 +53,7 @@ app.route('/api/assenze', absences)
 app.route('/api/periodi', periods)
 app.route('/api/notifiche', notifications)
 app.route('/api/panoramica', overview)
+app.route('/api/mio', mio)
 
 // Il frontend compilato viene servito dallo stesso processo: un solo slot
 // applicativo da configurare sull'hosting. In alternativa i file di web/dist

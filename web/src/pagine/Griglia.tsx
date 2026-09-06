@@ -1,5 +1,6 @@
 import { Fragment, memo, useMemo, useRef, useState } from 'react'
 import type { Cella, Griglia as DatiGriglia, Persona } from '../api'
+import { etichette } from '../persone'
 
 const GIORNI_BREVI = ['lun', 'mar', 'mer', 'gio', 'ven', 'sab', 'dom']
 const MESI = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio',
@@ -56,6 +57,9 @@ export default function Griglia({ dati, onSeleziona, selezione }: {
   }, [dati.persone, dati.settori])
 
   const righe = useMemo(() => gruppi.flatMap((g) => g.persone), [gruppi])
+  // Il cognome è già una sigla di tre lettere: il nome compare solo dove serve
+  // a distinguere due sigle uguali.
+  const nomi = useMemo(() => etichette(dati.persone), [dati.persone])
   const capienza = dati.stanze.reduce((s, r) => s + r.capienza, 0)
 
   const occupazione = useMemo(() => {
@@ -98,8 +102,8 @@ export default function Griglia({ dati, onSeleziona, selezione }: {
         <thead>
           <tr>
             <th scope="col"
-                className="sticky left-0 top-0 z-[3] min-w-[196px] border-b border-r border-border bg-surface
-                           px-2.5 py-1.5 text-left text-xs font-semibold text-ink-muted">
+                className="sticky left-0 top-0 z-[3] min-w-[112px] border-b border-r border-border bg-surface
+                           px-2.5 py-1.5 text-left text-xs font-semibold text-ink-muted md:min-w-[168px]">
               Persona
             </th>
             {dati.giorni.map((g) => {
@@ -138,7 +142,8 @@ export default function Griglia({ dati, onSeleziona, selezione }: {
                 const rigaIndice = righe.indexOf(p)
                 return (
                   <RigaPersona
-                    key={p.id} persona={p} giorni={dati.giorni} indice={indice}
+                    key={p.id} persona={p} etichetta={nomi.get(p.id) ?? p.cognome}
+                    giorni={dati.giorni} indice={indice}
                     stanzaBreve={stanzaBreve} scrivaniaNumero={scrivaniaNumero}
                     selezione={selezione} rigaIndice={rigaIndice} fuoco={fuoco}
                     onSeleziona={onSeleziona} onFuoco={setFuoco}
@@ -176,9 +181,11 @@ export default function Griglia({ dati, onSeleziona, selezione }: {
 
 /** Memoizzata: con 500 persone la selezione di una cella non ridisegna tutto. */
 const RigaPersona = memo(function RigaPersona({
-  persona: p, giorni, indice, stanzaBreve, scrivaniaNumero, selezione, rigaIndice, fuoco, onSeleziona, onFuoco,
+  persona: p, etichetta, giorni, indice, stanzaBreve, scrivaniaNumero, selezione, rigaIndice, fuoco,
+  onSeleziona, onFuoco,
 }: {
   persona: Persona
+  etichetta: string
   giorni: string[]
   indice: Map<string, Cella>
   stanzaBreve: Map<number, string>
@@ -195,8 +202,8 @@ const RigaPersona = memo(function RigaPersona({
       <th scope="row"
           className={`sticky left-0 z-[1] h-[30px] border-b border-r border-border px-2.5 text-left text-[12.5px]
                       font-normal ${dispari ? 'bg-[color-mix(in_oklch,var(--surface)_50%,var(--bg))]' : 'bg-bg'}`}>
-        <span className="block max-w-[178px] truncate">
-          {p.cognome} <span className="text-ink-muted">{p.nome}</span>
+        <span className="block max-w-[96px] truncate md:max-w-[150px]">
+          {etichetta}
           {p.ruolo === 'dirigente' && <span className="ml-1 text-2xs text-ink-faint">dirig.</span>}
         </span>
       </th>

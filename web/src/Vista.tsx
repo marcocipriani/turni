@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { ControlliGlobali } from './navigazione'
 import { BarraCarico } from './ui'
 
 /**
@@ -19,7 +20,7 @@ export function Vista({ titolo, icona, aiuto, meta, azioni, caricando, denso, ch
 }) {
   return (
     <>
-      <header className="relative flex min-w-0 items-center justify-between gap-4 border-b border-border px-4">
+      <header className="non-stampare relative flex min-w-0 items-center justify-between gap-4 border-b border-border px-4">
         <div className="flex min-w-0 items-center gap-2.5">
           {icona && (
             <span className="grid size-[30px] shrink-0 place-items-center rounded-r2 border border-border bg-surface text-ink-muted">
@@ -32,13 +33,15 @@ export function Vista({ titolo, icona, aiuto, meta, azioni, caricando, denso, ch
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-3">
-          {meta && <div className="hidden items-center gap-3 text-sm text-ink-faint md:flex">{meta}</div>}
+          {meta && <div className="hidden items-center gap-3 text-sm text-ink-faint lg:flex">{meta}</div>}
           {azioni && <div className="flex items-center gap-2">{azioni}</div>}
+          {/* Sul telefono non c'è rail: campanella e menu utente vivono qui. */}
+          <ControlliGlobali />
         </div>
         {caricando && <div className="absolute inset-x-0 bottom-0"><BarraCarico /></div>}
       </header>
 
-      <div className={`entra min-h-0 overflow-auto ${denso ? '' : 'p-6'}`}>{children}</div>
+      <div className={`entra min-h-0 overflow-auto ${denso ? '' : 'p-4 md:p-6'}`}>{children}</div>
     </>
   )
 }
@@ -46,7 +49,7 @@ export function Vista({ titolo, icona, aiuto, meta, azioni, caricando, denso, ch
 /** Manipolazione della vista: tab, filtri, conteggi. Mai import o export. */
 export function Toolbar({ children }: { children: ReactNode }) {
   return (
-    <div className="sticky top-0 z-[200] flex flex-wrap items-center gap-2 border-b border-border bg-bg px-4 py-2">
+    <div className="non-stampare sticky top-0 z-[200] flex flex-wrap items-center gap-2 border-b border-border bg-bg px-4 py-2">
       {children}
     </div>
   )

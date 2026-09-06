@@ -1,0 +1,208 @@
+/**
+ * I pezzi che ruotano attorno a un periodo: stato, esito della generazione,
+ * editor di una cella, creazione di un nuovo periodo. Stanno fuori da Turni.tsx
+ * perché quello deve restare leggibile come mappa della pagina.
+ */
+import { type FormEvent, useEffect, useState } from 'react'
+import { api, ErroreApi, type Griglia as DatiGriglia, type Periodo } from '../api'
+import { Badge, Bottone, Campo, inputCls, Messaggio, Modale, Pill } from '../ui'
+
+export type EsitoGenerazione = {
+  quote: { userId: number; quota: number; assegnate: number }[]
+  sottoQuota: { userId: number; mancanti: number; motivo: string; persona: string }[]
+  presidiScoperti: { sectorId: number; data: string; settore: string }[]
+}
+
+const oggi = () => new Date().toISOString().slice(0, 10)
+
+export function StatoPeriodo({ periodo }: { periodo: Periodo }) {
+  if (periodo.stato === 'pubblicato') return <Pill tono="ok">Pubblicato</Pill>
+  if (periodo.stato === 'in_approvazione') return <Pill tono="attesa">In approvazione</Pill>
+  return <Badge>bozza</Badge>
+}
+
+export function EsitoProposta({ esito }: { esito: EsitoGenerazione }) {
+  const scoperti = [...new Set(esito.presidiScoperti.map((x) => x.settore))]
+  return (
+    <Messaggio tono={esito.sottoQuota.length || scoperti.length ? 'attenzione' : 'info'}>
+      <p>Proposta generata su {esito.quote.length} persone.</p>
+      {esito.sottoQuota.length > 0 && (
+        <p className="mt-0.5">
+          Sotto quota: {esito.sottoQuota.map((s) => `${s.persona} (−${s.mancanti})`).join(', ')}.
+        </p>
+      )}
+      {scoperti.length > 0 && (
+        <p className="mt-0.5">Presidio scoperto in {esito.presidiScoperti.length} giornate: {scoperti.join(', ')}.</p>
+      )}
+    </Messaggio>
+  )
+}
+
+export function EditorCella({ dati, selezione, abilitato, onSalvato }: {
+  dati: DatiGriglia
+  selezione: { userId: number; data: string }
+  abilitato: boolean
+  onSalvato: () => void
+}) {
+  const cella = dati.celle.find((c) => c.userId === selezione.userId && c.data === selezione.data)
+  const persona = dati.persone.find((p) => p.id === selezione.userId)
+  const [stato, setStato] = useState<'presenza' | 'smart'>('smart')
+  const [roomId, setRoomId] = useState<number | null>(null)
+  const [deskId, setDeskId] = useState<number | null>(null)
+  const [bloccata, setBloccata] = useState(false)
+  const [motivazione, setMotivazione] = useState('')
+  const [errore, setErrore] = useState<string | null>(null)
+
+  useEffect(() => {
+    setStato(cella?.stato === 'presenza' ? 'presenza' : 'smart')
+    setRoomId(cella?.roomId ?? dati.stanze[0]?.id ?? null)
+    setDeskId(cella?.deskId ?? null)
+    setBloccata(cella?.bloccata ?? false)
+    setMotivazione(''); setErrore(null)
+  }, [selezione.userId, selezione.data, cella?.stato, cella?.roomId, cella?.deskId, cella?.bloccata, dati.stanze])
+
+  if (!persona) return null
+  const pubblicato = dati.periodo.stato === 'pubblicato'
+  const stanza = dati.stanze.find((s) => s.id === roomId)
+
+  async function salva(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setErrore(null)
+    try {
+      await api.put(`/periodi/${dati.periodo.id}/cella`, {
+        userId: selezione.userId, data: selezione.data, stato,
+        roomId: stato === 'presenza' ? roomId : null,
+        deskId: stato === 'presenza' && dati.periodo.assegnaScrivanie ? deskId : null,
+        bloccata, motivazione: motivazione.trim() || undefined,
+      })
+      onSalvato()
+    } catch (e) { setErrore(e instanceof ErroreApi ? e.message : 'Salvataggio non riuscito.') }
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <p className="text-md font-semibold">{persona.cognome} {persona.nome}</p>
+        <p className="mono text-xs text-ink-faint">{selezione.data}</p>
+      </div>
+
+      {cella?.stato === 'assenza' && (
+        <Messaggio tono="attenzione">
+          Assenza dichiarata{cella.causale ? ` · ${cella.causale}` : ''}. Finché resta, la giornata non è programmabile.
+        </Messaggio>
+      )}
+
+      {!abilitato ? (
+        <p className="text-base text-ink-faint">Non hai i permessi per modificare questa programmazione.</p>
+      ) : (
+        <form onSubmit={salva} className="flex flex-col gap-4">
+          {errore && <Messaggio tono="errore">{errore}</Messaggio>}
+
+          <fieldset>
+            <legend className="mb-1.5 text-xs font-medium text-ink-muted">Stato della giornata</legend>
+            <div className="flex flex-col gap-1.5">
+              {([['presenza', 'In sede'], ['smart', 'Lavoro agile']] as const).map(([v, t]) => (
+                <label key={v} className="flex cursor-pointer items-center gap-2 text-base">
+                  <input type="radio" name="stato" value={v} checked={stato === v} onChange={() => setStato(v)} />
+                  {t}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
+          {stato === 'presenza' && (
+            <>
+              <Campo etichetta="Stanza">
+                <select className={inputCls} value={roomId ?? ''}
+                        onChange={(e) => { setRoomId(Number(e.target.value)); setDeskId(null) }}>
+                  {dati.stanze.map((s) => <option key={s.id} value={s.id}>{s.etichetta} · {s.capienza} posti</option>)}
+                </select>
+              </Campo>
+              {dati.periodo.assegnaScrivanie && (
+                <Campo etichetta="Scrivania">
+                  <select className={inputCls} value={deskId ?? ''}
+                          onChange={(e) => setDeskId(e.target.value ? Number(e.target.value) : null)}>
+                    <option value="">Nessuna</option>
+                    {(stanza?.scrivanie ?? []).map((d) => <option key={d.id} value={d.id}>Scrivania {d.numero}</option>)}
+                  </select>
+                </Campo>
+              )}
+            </>
+          )}
+
+          <label className="flex cursor-pointer items-start gap-2 text-base">
+            <input type="checkbox" className="mt-1" checked={bloccata} onChange={(e) => setBloccata(e.target.checked)} />
+            <span>
+              Blocca la cella
+              <span className="block text-sm text-ink-faint">La generazione non la tocca più.</span>
+            </span>
+          </label>
+
+          {pubblicato && (
+            <Campo etichetta="Motivazione" aiuto="Il periodo è pubblicato: la modifica apre una nuova versione da riapprovare.">
+              <textarea className={`${inputCls} min-h-[56px] resize-y`} rows={3} required
+                        value={motivazione} onChange={(e) => setMotivazione(e.target.value)} />
+            </Campo>
+          )}
+
+          <Bottone type="submit" variante="primario" className="justify-center">Salva</Bottone>
+        </form>
+      )}
+    </div>
+  )
+}
+
+export function NuovoPeriodo({ aperto, onChiudi, unitId, periodi, onCreato }: {
+  aperto: boolean; onChiudi: () => void; unitId: number; periodi: Periodo[]; onCreato: (id: number) => void
+}) {
+  const [dataInizio, setDataInizio] = useState(oggi())
+  const [dataFine, setDataFine] = useState(oggi())
+  const [assegnaScrivanie, setAssegnaScrivanie] = useState(false)
+  const [copiaDaId, setCopiaDaId] = useState('')
+  const [errore, setErrore] = useState<string | null>(null)
+
+  async function crea(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setErrore(null)
+    try {
+      const r = await api.post<{ id: number }>('/periodi', {
+        unitId, dataInizio, dataFine, assegnaScrivanie, copiaDaId: copiaDaId ? Number(copiaDaId) : null,
+      })
+      onCreato(r.id)
+    } catch (e) { setErrore(e instanceof ErroreApi ? e.message : 'Creazione non riuscita.') }
+  }
+
+  return (
+    <Modale titolo="Nuovo periodo" aperta={aperto} onChiudi={onChiudi}
+            piede={<><Bottone onClick={onChiudi}>Annulla</Bottone>
+                     <Bottone variante="primario" onClick={() => document.getElementById('form-periodo')?.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }))}>Crea</Bottone></>}>
+      <form id="form-periodo" onSubmit={crea} className="flex flex-col gap-4">
+        {errore && <Messaggio tono="errore">{errore}</Messaggio>}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Campo etichetta="Dal">
+            <input type="date" className={inputCls} value={dataInizio} required
+                   onChange={(e) => { setDataInizio(e.target.value); if (dataFine < e.target.value) setDataFine(e.target.value) }} />
+          </Campo>
+          <Campo etichetta="Al">
+            <input type="date" className={inputCls} value={dataFine} min={dataInizio} required
+                   onChange={(e) => setDataFine(e.target.value)} />
+          </Campo>
+        </div>
+        <Campo etichetta="Parti da" aiuto="Copiare un periodo pubblicato ne ricalca il ritmo, saltando le nuove assenze.">
+          <select className={inputCls} value={copiaDaId} onChange={(e) => setCopiaDaId(e.target.value)}>
+            <option value="">Periodo vuoto</option>
+            {periodi.filter((p) => p.stato === 'pubblicato').map((p) => (
+              <option key={p.id} value={p.id}>{p.dataInizio} → {p.dataFine}</option>
+            ))}
+          </select>
+        </Campo>
+        <label className="flex cursor-pointer items-start gap-2 text-base">
+          <input type="checkbox" className="mt-1" checked={assegnaScrivanie} onChange={(e) => setAssegnaScrivanie(e.target.checked)} />
+          <span>Assegna le scrivanie
+            <span className="block text-sm text-ink-faint">Altrimenti si assegna solo la stanza.</span>
+          </span>
+        </label>
+      </form>
+    </Modale>
+  )
+}
