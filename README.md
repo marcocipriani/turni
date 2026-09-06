@@ -18,12 +18,12 @@ assenze dichiarate dagli interessati.
 
 | | |
 |---|---|
-| Panoramica, tema chiaro | ![](docs/schermate/panoramica-light.png) |
+| Mio, da telefono | ![](docs/schermate/mio-mobile-light.png) |
 | Griglia dei turni, tema scuro | ![](docs/schermate/turni-griglia-dark.png) |
 
 Le schermate si rigenerano con `node scripts/schermate.mjs` contro un'istanza
 avviata: pilota Chrome headless, accede come i vari ruoli e cattura ogni pagina
-nei due temi.
+nei due temi. Con `--mobile` le riprende da telefono.
 
 ## Come è fatta
 
@@ -32,11 +32,20 @@ web/     SPA React + Vite + Tailwind v4, compilata in file statici
 server/  API Hono su Node, con Drizzle su MySQL 8 / MariaDB
 ```
 
-L'interfaccia è una **shell a due isole**: rail da 68px sempre visibile,
-pannello da 214px comprimibile, isola di contenuto con header da 52px. Tema
-chiaro, scuro e automatico, persistito. Inter e JetBrains Mono sono
+L'interfaccia ha **una sola barra di navigazione**: rail da 68px a sinistra da
+tablet in su, barra in basso sul telefono, stesse destinazioni. L'isola di
+contenuto ha un header da 52px, che sul telefono porta anche campanella e menu
+utente. Tema chiaro, scuro e automatico, persistito. Inter e JetBrains Mono sono
 self-ospitati: nessuna richiesta a un CDN esterno, quindi nessun dato del
 personale che raggiunge terzi.
+
+Tre destinazioni per tutti — **Mio**, **Turni**, **Assenze** — più *Struttura*
+per il dirigente. L'amministratore di sistema ha il solo *Sistema*: censisce
+unità e utenti e non vede nessuna programmazione.
+
+I cognomi sono troncati a tre caratteri **dentro l'archivio**, non a video: nel
+database il cognome per esteso non esiste. Il nome si aggiunge alle sole sigle
+che collidono nell'insieme visibile.
 
 Il processo Node serve sia l'API sia il frontend compilato, così l'hosting
 richiede un solo slot applicativo. In alternativa il contenuto di `web/dist`
@@ -54,7 +63,7 @@ cp .env.example .env      # e compila DATABASE_URL e SEED_PASSWORD
 
 # 3. dipendenze e schema
 npm install
-npm run db:push
+npm run migra -w server
 
 # 4. dati di prova
 npm run seed
@@ -77,11 +86,13 @@ Accessi generati dal popolamento di prova, tutti con la password indicata in
 ## Verifiche
 
 ```bash
-npm test                        # 31 test di unità: motore, permessi, calendario, accessibilità
+npm test                        # 64 test di unità: motore, permessi, scambi, nomi, calendario, accessibilità
 npm run verifica -w server      # criteri di accettazione contro un'istanza avviata
 npm run carico -w server        # tempi del motore fino a 1000 persone
 npm run build                   # controllo dei tipi e build di produzione
 node scripts/schermate.mjs      # schermate autenticate nei due temi, via Chrome headless
+node scripts/demo.mjs           # genera e pubblica un periodo, per avere dati da guardare
+node scripts/prova-scambio.mjs  # giro completo di uno scambio contro l'istanza avviata
 ```
 
 ### Tempi misurati
@@ -114,7 +125,7 @@ Il piano Business esegue applicazioni Node e include MySQL.
    e le due chiavi VAPID. Non impostare `SEED_PASSWORD` in produzione.
 4. **Frontend** — esegui `npm run build` in locale e carica `web/dist`. Se il processo
    Node serve anche i file statici, basta che la cartella esista accanto al server.
-5. **Schema** — `npm run db:push` una volta sola, verso il database di produzione.
+5. **Schema** — `npm run migra -w server` una volta sola, verso il database di produzione.
 6. **Chiavi push** — generale con
    `node -e "console.log(require('web-push').generateVAPIDKeys())"` e conservale
    fuori dal repository.
