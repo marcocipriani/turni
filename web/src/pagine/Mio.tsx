@@ -171,6 +171,7 @@ function Riga({ g, stanze, aperto, onApri, scambiabile, onScambia }: {
   scambiabile: boolean; onScambia: () => void
 }) {
   const stanza = g.roomId != null ? stanze.get(g.roomId) ?? null : null
+  const nomeStanza = stanza ? stanza.split('·').slice(1).join('·').trim() : ''
   const { giorno, mese, breve } = pezziData(g.data)
   const oggi = g.data === oggiISO()
   const espandibile = g.colleghi.length > 0
@@ -193,7 +194,9 @@ function Riga({ g, stanze, aperto, onApri, scambiabile, onScambia }: {
             <p className="mono truncate text-base">
               {stanza ? codiceStanza(stanza) : 'da assegnare'}
               {g.scrivania && <span className="text-ink-muted"> · scriv. {g.scrivania}</span>}
-              {stanza && <span className="hidden text-ink-faint lg:inline"> · {stanza.split('·').slice(1).join('·').trim()}</span>}
+              {/* La stanza può non avere un nome oltre al codice: senza questo
+                  controllo resterebbe un punto separatore che non separa niente. */}
+              {nomeStanza && <span className="hidden text-ink-faint lg:inline"> · {nomeStanza}</span>}
             </p>
           )}
           {g.stato === 'smart' && <p className="text-base text-ink-muted">Lavoro agile</p>}

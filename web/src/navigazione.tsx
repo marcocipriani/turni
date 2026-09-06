@@ -10,7 +10,7 @@ import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { api, type Utente } from './api'
 import * as I from './icone'
-import { Marchio } from './Marchio'
+import { COPYRIGHT, Marchio } from './Marchio'
 import { useSessione } from './sessione'
 import { applicaTema, type Tema, temaSalvato } from './tema'
 import { Segmented, Stato } from './ui'
@@ -195,6 +195,8 @@ function MenuUtente({ ancoraggio }: { ancoraggio: 'rail' | 'header' }) {
             <Stato tono="ok">Connesso</Stato>
             <span className="mono text-2xs text-ink-faint">v 0.3.0</span>
           </div>
+
+          <p className="mono border-b border-border px-2 py-1.5 text-2xs text-ink-faint">{COPYRIGHT}</p>
 
           <div className="flex items-center justify-between gap-2 px-2 py-2">
             <span className="text-sm text-ink-muted">Tema</span>
