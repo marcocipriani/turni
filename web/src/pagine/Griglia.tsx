@@ -21,7 +21,9 @@ export function descriviCella(p: Persona, iso: string, c: Cella | undefined, sta
   if (c.stato === 'assenza') return `${chi}, ${quando}, assenza dichiarata${c.causale ? `, causale ${c.causale}` : ''}`
   if (c.stato === 'smart') return `${chi}, ${quando}, lavoro agile`
   const dove = [stanza && `stanza ${stanza}`, scrivania && `scrivania ${scrivania}`].filter(Boolean).join(', ')
-  return `${chi}, ${quando}, presenza${dove ? `, ${dove}` : ''}${c.bloccata ? ', cella bloccata' : ''}`
+  const blocco = c.daScambio ? ', cella bloccata da uno scambio fra colleghi'
+    : c.bloccata ? ', cella bloccata' : ''
+  return `${chi}, ${quando}, presenza${dove ? `, ${dove}` : ''}${blocco}`
 }
 
 type Selezione = { userId: number; data: string } | null
@@ -240,7 +242,9 @@ const RigaPersona = memo(function RigaPersona({
                 {c?.stato === 'presenza' ? (scrivania ? `${stanza}/${scrivania}` : stanza ?? '•')
                   : c?.stato === 'assenza' ? '×' : '–'}
               </span>
-              {c?.bloccata && <span className="ml-0.5 text-ink-faint" aria-hidden="true">▪</span>}
+              {c?.bloccata && (
+                <span className="ml-0.5 text-ink-faint" aria-hidden="true">{c.daScambio ? '⇄' : '▪'}</span>
+              )}
               <span className="solo-lettori-schermo">{descriviCella(p, g, c, stanza, scrivania)}</span>
             </button>
           </td>
@@ -257,6 +261,7 @@ export function Legenda() {
       <li><span className="mono mr-1.5">–</span>lavoro agile</li>
       <li><span className="mono mr-1.5">×</span>assenza dichiarata</li>
       <li><span className="mr-1.5 text-ink-faint">▪</span>cella bloccata: la generazione non la tocca</li>
+      <li><span className="mr-1.5 text-ink-faint">⇄</span>scambio fra colleghi</li>
     </ul>
   )
 }

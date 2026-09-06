@@ -84,6 +84,35 @@ export default function Organizzazione() {
           </Pannello>
         </section>
 
+        <section id="scambio">
+          <Pannello titolo="Scambio dei turni" icona={<I.Scambio size={18} />}
+                    piede="Lo scambio non passa da nessuna approvazione: vale l'accordo fra due persone, entro i vincoli di presidio, postazioni e lavoro agile. Le giornate scambiate restano bloccate in griglia.">
+            <form
+              onSubmit={(e: FormEvent<HTMLFormElement>) => {
+                e.preventDefault()
+                const f = new FormData(e.currentTarget)
+                void prova(() => api.patch(`/org/unita/${unitId}/scambio`, {
+                  scambioAttivo: f.get('attivo') === 'on',
+                  scambioOraLimite: String(f.get('ora') || '10:00'),
+                }))
+              }}
+              className="grid items-end gap-3 sm:grid-cols-[1fr_1fr_auto]"
+            >
+              <label className="flex cursor-pointer items-start gap-2 text-base">
+                <input name="attivo" type="checkbox" className="mt-1" defaultChecked={unita.scambioAttivo} />
+                <span>Consenti lo scambio fra colleghi
+                  <span className="block text-sm text-ink-faint">Attivo salvo diversa scelta.</span>
+                </span>
+              </label>
+              <Campo etichetta="Ultima ora utile per la giornata di oggi"
+                     aiuto="Dopo quest'ora la giornata in corso non si tocca più.">
+                <input name="ora" type="time" className={inputCls} defaultValue={unita.scambioOraLimite} />
+              </Campo>
+              <Bottone type="submit" variante="primario">Salva</Bottone>
+            </form>
+          </Pannello>
+        </section>
+
         <section id="settori">
           <Pannello titolo="Settori" icona={<I.Organizzazione size={18} />}
                     piede="Un settore con presidio richiede almeno una presenza in ogni giornata lavorativa.">

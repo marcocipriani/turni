@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
 import * as I from '../icone'
 import { Avatar, etichette, FilaAvatar } from '../persone'
-import { Messaggio, Scheletro, StatoVuoto, Tag } from '../ui'
+import { Bottone, Messaggio, Scheletro, StatoVuoto, Tag } from '../ui'
 import { Toolbar, Vista } from '../Vista'
+import { ModaleScambio, type Proposta, Scambi } from './Scambio'
 
 export type Collega = {
   userId: number; nome: string; cognome: string
@@ -73,15 +74,22 @@ function Filtri({ attivi, onCambia, conteggi }: {
 
 /* ── Pagina ───────────────────────────────────────────────────────── */
 
+type ElencoScambi = { inArrivo: Proposta[]; inUscita: Proposta[]; conclusi: Proposta[] }
+
 export default function Mio() {
   const [dati, setDati] = useState<DatiMio | null>(null)
+  const [scambi, setScambi] = useState<ElencoScambi | null>(null)
   const [errore, setErrore] = useState<string | null>(null)
   const [attivi, setAttivi] = useState<Set<Filtro>>(new Set<Filtro>(['presenza']))
   const [aperto, setAperto] = useState<string | null>(null)
+  const [daScambiare, setDaScambiare] = useState<string | null>(null)
 
-  useEffect(() => {
+  const carica = useCallback(() => {
     void api.get<DatiMio>('/mio').then(setDati).catch((e) => setErrore(e.message))
+    void api.get<ElencoScambi>('/scambi').then(setScambi).catch(() => {})
   }, [])
+
+  useEffect(carica, [carica])
 
   const conteggi = useMemo(() => {
     const c: Record<Filtro, number> = { presenza: 0, smart: 0, assenza: 0 }
@@ -115,8 +123,10 @@ export default function Mio() {
         <Filtri attivi={attivi} onCambia={alterna} conteggi={conteggi} />
       </Toolbar>
 
-      <div className="p-4 md:p-6">
+      <div className="flex flex-col gap-6 p-4 md:p-6">
         {errore && <Messaggio tono="errore">{errore}</Messaggio>}
+
+        {scambi && <Scambi elenco={scambi} onCambiato={carica} />}
 
         {!dati && !errore && <Scheletro righe={6} />}
 
@@ -135,6 +145,8 @@ export default function Mio() {
             {visibili.map((g) => (
               <Riga
                 key={g.data} g={g} stanze={stanzaPerId}
+                scambiabile={Boolean(dati?.scambio?.attivo) && g.data >= oggiISO() && g.stato !== 'assenza'}
+                onScambia={() => setDaScambiare(g.data)}
                 aperto={aperto === g.data}
                 onApri={() => setAperto((v) => v === g.data ? null : g.data)}
               />
@@ -142,15 +154,21 @@ export default function Mio() {
           </ul>
         )}
       </div>
+
+      <ModaleScambio
+        data={daScambiare} aperta={daScambiare != null}
+        onChiudi={() => setDaScambiare(null)} onFatto={carica}
+      />
     </Vista>
   )
 }
 
 /* ── Riga: una giornata. Nessuna card: la cronologia è una lista sola ── */
 
-function Riga({ g, stanze, aperto, onApri }: {
+function Riga({ g, stanze, aperto, onApri, scambiabile, onScambia }: {
   g: GiornoMio; stanze: Map<number, string>
   aperto: boolean; onApri: () => void
+  scambiabile: boolean; onScambia: () => void
 }) {
   const stanza = g.roomId != null ? stanze.get(g.roomId) ?? null : null
   const { giorno, mese, breve } = pezziData(g.data)
@@ -162,7 +180,9 @@ function Riga({ g, stanze, aperto, onApri }: {
 
   return (
     <li className={oggi ? 'shadow-[inset_2px_0_0_var(--ink)]' : ''}>
-      <div className="flex min-h-[52px] items-center gap-3 px-3 py-2 md:px-4">
+      {/* Sul telefono i volti vanno a capo: schiacciati sulla stessa riga
+          rubavano spazio alla stanza, che è l'informazione che serve. */}
+      <div className="flex min-h-[52px] flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 md:flex-nowrap md:px-4">
         <div className="w-[52px] shrink-0">
           <p className="mono text-md font-semibold leading-none">{giorno}</p>
           <p className="text-2xs uppercase tracking-[0.04em] text-ink-faint">{breve} {mese}</p>
@@ -185,15 +205,22 @@ function Riga({ g, stanze, aperto, onApri }: {
           {oggi && <p className="text-2xs uppercase tracking-[0.04em] text-ink-faint">oggi</p>}
         </div>
 
+        {scambiabile && (
+          <Bottone variante="icona" title="Scambia questa giornata"
+                   aria-label={`Scambia la giornata del ${g.data}`} onClick={onScambia}>
+            <I.Scambio size={17} />
+          </Bottone>
+        )}
+
         {espandibile && (
           <button
             type="button" onClick={onApri} aria-expanded={aperto}
-            className="flex min-h-[36px] cursor-pointer items-center gap-2 rounded-r2 px-1.5 hover:bg-surface-2"
+            className="order-last flex min-h-[36px] w-full cursor-pointer items-center gap-2 rounded-r2 px-1.5
+                       hover:bg-surface-2 md:order-none md:w-auto"
             aria-label={aperto ? 'Nascondi chi c\'è' : `Mostra chi c'è: ${g.colleghi.length} persone`}
           >
-            <FilaAvatar massimo={4}
-                        persone={g.colleghi.map((c) => ({ id: c.userId, nome: c.nome, cognome: c.cognome }))} />
-            <span className={`text-ink-faint transition-transform duration-[120ms] ease-out ${aperto ? 'rotate-90' : ''}`}>
+            <FilaAvatar persone={g.colleghi.map((c) => ({ id: c.userId, nome: c.nome, cognome: c.cognome }))} />
+            <span className={`ml-auto text-ink-faint transition-transform duration-[120ms] ease-out ${aperto ? 'rotate-90' : ''}`}>
               <I.Freccia size={14} />
             </span>
           </button>
