@@ -82,16 +82,23 @@ e utenti. Non è una limitazione dell'interfaccia: le rotte rispondono 403.
 | Pagina, 4G scarsa | primo testo **390 ms**, elemento più grande **880 ms**, scarti di impaginazione **0.000** |
 | Peso di una pagina | **63 kB** |
 
-Gli strumenti che producono questi numeri stanno in `scripts/` e si rieseguono
-in qualunque momento: `npm run accessibilita`, `npm run tempi`, `npm run carico`.
+Ogni riga è prodotta da uno strumento che si riesegue, non da una stima:
+axe-core su Chrome headless, i tempi misurati sulle rotte vere, il motore
+lanciato su archivi sintetici fino a mille persone. `npm run carico` sta nel
+repository; il resto della strumentazione vive fuori, insieme al materiale di
+rilascio.
 
 ## Com'è fatta
 
 ```
-web/       SPA React 19 + Vite + Tailwind v4, compilata in file statici
-server/    API Hono su Node, Drizzle ORM su MySQL 8 / MariaDB
-scripts/   strumenti di misura e di rilascio, senza dipendenze
+web/     SPA React 19 + Vite + Tailwind v4, compilata in file statici
+server/  API Hono su Node, Drizzle ORM su MySQL 8 / MariaDB
+docs/    manuale d'uso
 ```
+
+Nella radice c'è solo quello che serve a far girare l'applicazione. Strumenti
+di misura, materiale di rilascio e design system di riferimento stanno fuori
+dal repository.
 
 Un processo solo serve l'API e il frontend compilato: sull'hosting serve un
 solo slot applicativo. Il server esegue TypeScript direttamente con `tsx`, così
@@ -111,8 +118,10 @@ Alcune scelte che meritano una riga:
 
 L'interfaccia segue un design system a **isole neutre**: palette monocromatica
 in OKLCH, il colore riservato agli stati, rail a sinistra da tablet in su e
-barra in basso sul telefono. Sta in [`design-system/`](design-system/), e
-[`tokens.css`](design-system/tokens.css) si copia senza modificarne i valori.
+barra in basso sul telefono. I token stanno in
+[`web/src/styles/tokens.css`](web/src/styles/tokens.css); le correzioni di
+contrasto che il design system non copriva stanno in
+[`app.css`](web/src/styles/app.css), con la misura accanto.
 
 ## Avvio in locale
 
@@ -127,9 +136,8 @@ cp .env.example .env      # compila DATABASE_URL e SEED_PASSWORD
 npm install
 npm run migra
 
-# 4. dati di prova e un periodo pubblicato da guardare
+# 4. dati di prova
 npm run seed
-node scripts/demo.mjs
 
 # 5. API su 8787, interfaccia su 5173 con proxy verso l'API
 npm run dev
@@ -146,28 +154,24 @@ anche se trova in archivio un solo indirizzo fuori dal dominio di prova.
 ## Verifiche
 
 ```bash
-npm test               # 113 test: motore, permessi, scambi, nomi, contrasti, accessibilità
-npm run verifica       # 12 criteri di accettazione contro un'istanza avviata
-npm run accessibilita  # axe-core, 36 combinazioni di pagina, tema e schermo
-npm run tempi          # tempi delle rotte e caricamento delle pagine, anche su 4G scarsa
-npm run carico         # motore fino a 1000 persone
-npm run schermate      # schermate autenticate nei due temi (--mobile per il telefono)
-npm run build          # controllo dei tipi e build di produzione
+npm test          # 113 test: motore, permessi, scambi, nomi, contrasti, accessibilità
+npm run verifica  # 12 criteri di accettazione contro un'istanza avviata
+npm run carico    # motore fino a 1000 persone
+npm run build     # controllo dei tipi e build di produzione
 ```
 
-Le verifiche che parlano con un browser pilotano Chrome headless dal protocollo
-di sviluppo, senza Puppeteer né Playwright: [`scripts/cdp.mjs`](scripts/cdp.mjs),
-un file, zero dipendenze.
+Le verifiche che parlano con un browser — accessibilità, tempi di
+caricamento, schermate — pilotano Chrome headless dal protocollo di sviluppo,
+senza Puppeteer né Playwright: un file, zero dipendenze. Stanno fuori dal
+repository con il resto della strumentazione.
 
 ## Rilascio
 
-```bash
-npm run pacchetto
-```
-
-Produce `rilascio/turni-<versione>-<data>.tar.gz`, circa 1,4 MB: server,
-frontend già compilato, configurazione da riempire. Fuori restano test,
-popolamento di prova, strumenti di misura e ogni traccia di dati del personale.
+Il rilascio è un archivio di circa 1 MB: server, frontend già compilato,
+configurazione da riempire. Fuori restano test, popolamento di prova,
+strumenti di misura e ogni traccia di dati del personale. Il frontend si
+compila prima, non sul server: su un piano condiviso la compilazione è il
+punto in cui ci si arena.
 
 Sul server: `npm install --omit=dev`, il `.env`, `npm run migra`, e
 `npm run avvio -- persone.csv` la prima volta — che crea le utenze reali e

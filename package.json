@@ -14,11 +14,7 @@
     "seed": "npm run seed --workspace server",
     "avvio": "npm run avvio --workspace server",
     "verifica": "npm run verifica --workspace server",
-    "carico": "npm run carico --workspace server",
-    "pacchetto": "node scripts/pacchetto.mjs",
-    "schermate": "node scripts/schermate.mjs",
-    "accessibilita": "node scripts/accessibilita.mjs",
-    "tempi": "node scripts/tempi.mjs"
+    "carico": "npm run carico --workspace server"
   },
   "allowScripts": {
     "esbuild@0.18.20": true,
