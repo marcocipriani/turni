@@ -139,7 +139,7 @@ function Campanella() {
     >
       <I.Campana size={18} />
       {daLeggere > 0 && (
-        <span className="absolute right-1 top-1 size-2 rounded-full bg-warn" aria-hidden="true" />
+        <span className="absolute right-1 top-1 size-2 rounded-full bg-warn-ink" aria-hidden="true" />
       )}
     </NavLink>
   )
@@ -176,7 +176,7 @@ function MenuUtente({ ancoraggio }: { ancoraggio: 'rail' | 'header' }) {
       <button
         onClick={() => setAperto((v) => !v)} aria-expanded={aperto} aria-haspopup="menu"
         aria-label={`Menu di ${utente.nome} ${utente.cognome}`}
-        className="mono grid size-9 cursor-pointer place-items-center rounded-full border border-border-strong
+        className="mono grid size-9 cursor-pointer place-items-center rounded-full border border-border-controllo
                    bg-surface text-xs font-semibold text-ink-muted hover:bg-surface-2 hover:text-ink"
       >
         {iniziali}
@@ -184,7 +184,7 @@ function MenuUtente({ ancoraggio }: { ancoraggio: 'rail' | 'header' }) {
 
       {aperto && (
         <div role="menu"
-             className={`entra-overlay absolute z-[400] w-[248px] rounded-r3 border border-border-strong
+             className={`entra-overlay absolute z-[400] w-[248px] rounded-r3 border border-border-controllo
                          bg-bg p-2 shadow-overlay ${posto}`}>
           <div className="border-b border-border px-2 pb-2">
             <p className="truncate text-base font-semibold">{utente.nome} {utente.cognome}</p>

@@ -73,7 +73,9 @@ export function Giorni({ settimane, onCaricato }: {
     <div className="flex flex-col gap-6 p-4 md:p-6">
       <section id="giorni" className="flex flex-col gap-2">
         <h2 className="mono text-2xs uppercase tracking-[0.06em] text-ink-faint">Prossimi giorni</h2>
-        <div className="overflow-x-auto rounded-r3 border border-border bg-surface">
+        {/* Regione che scorre: senza fuoco propria non si raggiunge da tastiera. */}
+        <div tabIndex={0} role="region" aria-label="Giornate, in orizzontale"
+             className="overflow-x-auto rounded-r3 border border-border bg-surface">
           <div className="flex min-w-max">
             {feriali.map((g) => (
               <ColonnaGiorno

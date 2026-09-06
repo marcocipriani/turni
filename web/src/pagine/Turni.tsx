@@ -143,7 +143,7 @@ export default function Turni() {
     >
       <Toolbar>
         <div role="radiogroup" aria-label="Come guardare i turni"
-             className="inline-flex overflow-hidden rounded-r2 border border-border-strong">
+             className="inline-flex overflow-hidden rounded-r2 border border-border-controllo">
           <BottoneVista attivo={!inGriglia} onClick={() => navigate('/turni')}>Giorni</BottoneVista>
           <BottoneVista
             attivo={inGriglia}
@@ -157,7 +157,7 @@ export default function Turni() {
             <span className="solo-lettori-schermo">Periodo</span>
             <select
               value={id ?? ''} onChange={(e) => navigate(`/turni/${e.target.value}`)}
-              className="min-h-[32px] cursor-pointer rounded-r2 border border-border-strong bg-bg px-2 text-sm text-ink"
+              className="min-h-[32px] cursor-pointer rounded-r2 border border-border-controllo bg-bg px-2 text-sm text-ink"
             >
               {(periodi ?? []).map((x) => (
                 <option key={x.id} value={x.id}>{etichettaPeriodo(x)}</option>
@@ -166,7 +166,7 @@ export default function Turni() {
           </label>
         ) : (
           <div role="radiogroup" aria-label="Quante settimane mostrare"
-               className="inline-flex overflow-hidden rounded-r2 border border-border-strong">
+               className="inline-flex overflow-hidden rounded-r2 border border-border-controllo">
             {[2, 4].map((n) => (
               <BottoneVista key={n} attivo={settimane === n} onClick={() => setSettimane(n)}>
                 {n} settimane

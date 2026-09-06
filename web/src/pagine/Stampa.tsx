@@ -72,7 +72,7 @@ export default function Stampa() {
             className={`min-h-[32px] cursor-pointer rounded-full border px-3 text-sm transition-colors
                         duration-[120ms] ease-out ${scelta === v
               ? 'border-action bg-action text-action-ink'
-              : 'border-border-strong bg-bg text-ink-muted hover:bg-surface-2 hover:text-ink'}`}
+              : 'border-border-controllo bg-bg text-ink-muted hover:bg-surface-2 hover:text-ink'}`}
           >
             {ETICHETTE[v]}
           </button>
@@ -84,7 +84,7 @@ export default function Stampa() {
             <input
               type="date" value={query.get('da') ?? oggiISO()}
               onChange={(e) => { query.set('da', e.target.value); setQuery(query, { replace: true }) }}
-              className="min-h-[32px] rounded-r2 border border-border-strong bg-bg px-2 text-sm text-ink"
+              className="min-h-[32px] rounded-r2 border border-border-controllo bg-bg px-2 text-sm text-ink"
             />
           </label>
         )}
@@ -105,7 +105,7 @@ export default function Stampa() {
 function Testata({ titolo, sottotitolo }: { titolo: string; sottotitolo?: string }) {
   const { utente } = useSessione()
   return (
-    <header className="mb-4 flex items-end justify-between gap-4 border-b border-border-strong pb-2">
+    <header className="mb-4 flex items-end justify-between gap-4 border-b border-border-controllo pb-2">
       <div>
         <p className="mono text-2xs uppercase tracking-[0.08em] text-ink-faint">
           Turni · {utente?.unitNome ?? ''}
@@ -335,9 +335,9 @@ function FoglioMio() {
       <table className="w-full max-w-[80ch] text-base">
         <thead>
           <tr>
-            <th className="border-b border-border-strong py-1 text-left font-semibold">Giornata</th>
-            <th className="border-b border-border-strong py-1 text-left font-semibold">Stato</th>
-            <th className="border-b border-border-strong py-1 text-left font-semibold">Dove</th>
+            <th className="border-b border-border-controllo py-1 text-left font-semibold">Giornata</th>
+            <th className="border-b border-border-controllo py-1 text-left font-semibold">Stato</th>
+            <th className="border-b border-border-controllo py-1 text-left font-semibold">Dove</th>
           </tr>
         </thead>
         <tbody>

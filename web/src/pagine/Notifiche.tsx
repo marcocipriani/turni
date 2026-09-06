@@ -52,7 +52,7 @@ export default function Notifiche() {
           <ul className="divide-y divide-border overflow-hidden rounded-r3 border border-border bg-surface">
             {dati.notifiche.map((n) => (
               <li key={n.id} className="flex gap-3 px-4 py-3">
-                <span className={`mt-1.5 size-2 shrink-0 rounded-full ${n.lettaIl ? 'bg-ink-faint' : 'bg-warn'}`} aria-hidden="true" />
+                <span className={`mt-1.5 size-2 shrink-0 rounded-full ${n.lettaIl ? 'bg-ink-faint' : 'bg-warn-ink'}`} aria-hidden="true" />
                 <div className="min-w-0">
                   <p className="text-base font-medium text-ink">
                     {n.titolo}{!n.lettaIl && <span className="solo-lettori-schermo"> (non letta)</span>}

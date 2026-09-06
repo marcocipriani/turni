@@ -159,7 +159,7 @@ export default function Griglia({ dati, onSeleziona, selezione }: {
         <tfoot>
           <tr>
             <th scope="row"
-                className="sticky bottom-0 left-0 z-[3] border-r border-t border-border-strong bg-surface px-2.5 py-1.5
+                className="sticky bottom-0 left-0 z-[3] border-r border-t border-border-controllo bg-surface px-2.5 py-1.5
                            text-left text-xs font-normal text-ink-muted">
               Postazioni occupate <span className="mono text-ink-faint">su {capienza}</span>
             </th>
@@ -167,7 +167,7 @@ export default function Griglia({ dati, onSeleziona, selezione }: {
               const n = occupazione.get(g) ?? 0
               return (
                 <td key={g}
-                    className={`sticky bottom-0 z-[1] border-r border-t border-border-strong bg-surface px-1 py-1.5
+                    className={`sticky bottom-0 z-[1] border-r border-t border-border-controllo bg-surface px-1 py-1.5
                                 text-center text-ink-muted`}>
                   <span className="mono text-xs" aria-hidden="true">{n}</span>
                   <span className="solo-lettori-schermo">{`${n} di ${capienza} postazioni occupate il ${g}`}</span>
