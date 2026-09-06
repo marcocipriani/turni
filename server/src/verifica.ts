@@ -107,6 +107,26 @@ async function main() {
     'Le presenze non eccedono i posti-giorno disponibili',
     `${presenze.length} su ${capienza * giorniConPresenze}`)
 
+  /* 10 — ogni cella nata da uno scambio resta bloccata */
+  const daScambio = celle.filter((c) => c.origine === 'scambio')
+  esito(daScambio.every((c) => c.bloccata),
+    'Le giornate nate da uno scambio restano bloccate in griglia', `${daScambio.length} celle`)
+
+  /* 11 — il presidio regge anche dopo gli scambi */
+  const settori = await db.select().from(schema.sector).where(eq(schema.sector.richiedePresidio, true))
+  const personeUnita = await db.select({ id: schema.user.id, sectorId: schema.user.sectorId })
+    .from(schema.user).where(eq(schema.user.attivo, true))
+  const giornate = [...new Set(celle.map((c) => c.data))]
+  const inSede = new Set(presenze.map((c) => `${c.userId}|${c.data}`))
+  const scoperti = settori.flatMap((s) => {
+    const membri = personeUnita.filter((u) => u.sectorId === s.id).map((u) => u.id)
+    if (membri.length === 0) return []
+    return giornate.filter((g) => !membri.some((u) => inSede.has(`${u}|${g}`)))
+      .map((g) => `${s.nome} ${g}`)
+  })
+  esito(scoperti.length === 0, 'Nessun settore con presidio resta scoperto',
+    scoperti.length ? scoperti.slice(0, 3).join(', ') : `${settori.length} settori`)
+
   console.log(`\n${passati} superati, ${falliti} falliti\n`)
   await pool.end()
   if (falliti) process.exit(1)

@@ -36,6 +36,7 @@ export type Utente = {
 export type Unita = {
   id: number; parentId: number | null; nome: string; sigla: string | null
   smartMinSettimana: number | null; smartMaxSettimana: number | null
+  scambioAttivo: boolean; scambioOraLimite: string
 }
 
 export type Persona = {
@@ -58,7 +59,10 @@ export type Periodo = {
 export type Cella = {
   userId: number; data: string
   stato: 'presenza' | 'smart' | 'assenza'
-  roomId: number | null; deskId: number | null; bloccata: boolean; causale: string | null
+  roomId: number | null; deskId: number | null; bloccata: boolean
+  /** Nata da uno scambio fra colleghi: la generazione non l'ha decisa. */
+  daScambio?: boolean
+  causale: string | null
 }
 
 export type Griglia = {

@@ -102,6 +102,20 @@ org.patch('/unita/:id/limiti', async (c) => {
   return c.json({ ok: true })
 })
 
+/** Interruttore e ora limite dello scambio: scelta dell'unità, non del sistema. */
+org.patch('/unita/:id/scambio', async (c) => {
+  const id = Number(c.req.param('id'))
+  if (!puoAmministrareUnita(c.get('attore'), id)) throw vietato()
+  const b = z.object({
+    scambioAttivo: z.boolean(),
+    scambioOraLimite: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Ora non valida'),
+  }).safeParse(await c.req.json())
+  if (!b.success) throw new HttpError(422, 'Impostazioni dello scambio non valide')
+  await db.update(schema.unit).set(b.data).where(eq(schema.unit.id, id))
+  await traccia({ entita: 'unit', entitaId: id, azione: 'scambio', utente: c.get('attore').id, dopo: b.data })
+  return c.json({ ok: true })
+})
+
 org.get('/unita/:id/persone', async (c) => {
   const id = Number(c.req.param('id'))
   const a = c.get('attore'), alb = c.get('albero')

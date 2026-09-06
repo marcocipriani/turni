@@ -55,6 +55,11 @@ async function main() {
     "ALTER TABLE `assignment` MODIFY COLUMN `origine` enum('manuale','generata','copiata','scambio') NOT NULL",
   ))
 
+  // La permuta di due giornate diverse è arrivata dopo la cessione secca.
+  if (await tabellaEsiste('scambio')) {
+    await db.execute(sql.raw("ALTER TABLE `scambio` MODIFY COLUMN `tipo` enum('offro','chiedo','permuta') NOT NULL"))
+  }
+
   await tabella('scambio', `
     CREATE TABLE \`scambio\` (
       \`id\` int AUTO_INCREMENT NOT NULL,

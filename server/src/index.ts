@@ -13,6 +13,7 @@ import { notifications } from './routes/notifications'
 import { org } from './routes/org'
 import { overview } from './routes/overview'
 import { periods } from './routes/periods'
+import { swaps } from './routes/swaps'
 
 const COOKIE = process.env.SESSION_COOKIE ?? 'turni_session'
 const app = new Hono<Env>()
@@ -54,6 +55,7 @@ app.route('/api/periodi', periods)
 app.route('/api/notifiche', notifications)
 app.route('/api/panoramica', overview)
 app.route('/api/mio', mio)
+app.route('/api/scambi', swaps)
 
 // Il frontend compilato viene servito dallo stesso processo: un solo slot
 // applicativo da configurare sull'hosting. In alternativa i file di web/dist

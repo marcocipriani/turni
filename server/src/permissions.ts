@@ -108,6 +108,8 @@ export type CellaGriglia = {
   roomId: number | null
   deskId: number | null
   bloccata: boolean
+  /** La cella nasce da uno scambio fra colleghi, non dalla generazione. */
+  daScambio?: boolean
   causale: string | null
 }
 

@@ -258,6 +258,9 @@ periods.get('/:id/griglia', async (c) => {
         roomId: causale ? null : c0?.roomId ?? null,
         deskId: causale ? null : c0?.deskId ?? null,
         bloccata: c0?.bloccata ?? false,
+        // Una cella nata da uno scambio va riconosciuta: chi programma non
+        // riceve notifiche, se ne accorge guardando la griglia.
+        daScambio: c0?.origine === 'scambio',
         causale,
       }
       return mascheraCella(alb, a, grezza, { id: u.id, unitId: u.unitId })

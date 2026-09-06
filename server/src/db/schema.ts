@@ -204,7 +204,7 @@ export const recurringRule = mysqlTable('recurring_rule', {
 export const swap = mysqlTable('scambio', {
   id: id(),
   periodId: int('period_id').notNull(),
-  tipo: mysqlEnum('tipo', ['offro', 'chiedo']).notNull(),
+  tipo: mysqlEnum('tipo', ['offro', 'chiedo', 'permuta']).notNull(),
   proponenteId: int('proponente_id').notNull(),
   destinatarioId: int('destinatario_id').notNull(),
   dataProponente: date('data_proponente', { mode: 'string' }).notNull(),

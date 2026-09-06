@@ -86,6 +86,8 @@ export default function Turni() {
 
   const p = dati?.periodo
   const modificabile = dati?.permessi.scrivere ?? false
+  // Chi programma non riceve notifiche degli scambi: se ne accorge qui.
+  const scambiate = (dati?.celle ?? []).filter((x) => x.daScambio).length
   const errori = (dati?.avvisi ?? []).filter((x) => x.gravita === 'errore')
   const attenzioni = (dati?.avvisi ?? []).filter((x) => x.gravita === 'attenzione')
 
@@ -177,6 +179,11 @@ export default function Turni() {
           <>
             <span className="hidden lg:block"><Legenda /></span>
             <span className="ml-auto flex items-center gap-3 text-sm">
+              {scambiate > 0 && (
+                <span className="text-ink-muted" title="Giornate nate da uno scambio fra colleghi">
+                  <span className="mono">{scambiate}</span> da scambi
+                </span>
+              )}
               {errori.length > 0 && <Pill tono="errore">{errori.length} da risolvere</Pill>}
               {attenzioni.length > 0 && <Pill tono="attesa">{attenzioni.length} segnalazioni</Pill>}
               {errori.length === 0 && attenzioni.length === 0 && <Pill tono="ok">Nessun conflitto</Pill>}
