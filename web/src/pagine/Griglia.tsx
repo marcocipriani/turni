@@ -211,7 +211,7 @@ const RigaPersona = memo(function RigaPersona({
         const testo =
           c?.stato === 'presenza' ? 'font-semibold text-ink'
           : c?.stato === 'assenza' ? 'text-ink-faint'
-          : 'text-ink-faint/60'
+          : 'text-ink-faint'
 
         return (
           <td key={g}
