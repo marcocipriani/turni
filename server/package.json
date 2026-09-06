@@ -11,7 +11,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "verifica": "tsx src/verifica.ts",
-    "carico": "tsx src/carico.ts"
+    "carico": "tsx src/carico.ts",
+    "migra": "tsx src/db/migra.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",

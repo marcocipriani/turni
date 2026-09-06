@@ -18,6 +18,10 @@ export const unit = mysqlTable('unit', {
   // null = limite disattivato (comportamento predefinito)
   smartMinSettimana: tinyint('smart_min_settimana'),
   smartMaxSettimana: tinyint('smart_max_settimana'),
+  // Scambio turni fra colleghi: attivo salvo diversa scelta del dirigente.
+  // L'ora limite è il taglio oltre il quale la giornata di oggi non si tocca più.
+  scambioAttivo: boolean('scambio_attivo').default(true).notNull(),
+  scambioOraLimite: varchar('scambio_ora_limite', { length: 5 }).default('10:00').notNull(),
   creatoIl: now(),
 }, (t) => [index('ix_unit_parent').on(t.parentId)])
 
@@ -126,7 +130,7 @@ export const assignment = mysqlTable('assignment', {
   roomId: int('room_id'),
   deskId: int('desk_id'),
   bloccata: boolean('bloccata').default(false).notNull(),
-  origine: mysqlEnum('origine', ['manuale', 'generata', 'copiata']).notNull(),
+  origine: mysqlEnum('origine', ['manuale', 'generata', 'copiata', 'scambio']).notNull(),
   motivazione: varchar('motivazione', { length: 500 }),
 }, (t) => [
   uniqueIndex('uk_assignment_cell').on(t.periodId, t.userId, t.data),
@@ -169,6 +173,8 @@ export const userPreference = mysqlTable('user_preference', {
   giorniPreferiti: json('giorni_preferiti').$type<number[]>(),
   giorniDaEvitare: json('giorni_da_evitare').$type<number[]>(),
   nota: varchar('nota', { length: 500 }),
+  // Tonalità dell'avatar, 0-7. Null = ricavata dall'identificativo.
+  avatarTinta: tinyint('avatar_tinta'),
 })
 
 export const recurringRule = mysqlTable('recurring_rule', {
@@ -182,6 +188,47 @@ export const recurringRule = mysqlTable('recurring_rule', {
   validoA: date('valido_a', { mode: 'string' }),
   creataDa: int('creata_da').notNull(),
 }, (t) => [index('ix_rule_unit').on(t.unitId)])
+
+/* ─── Scambio di turni fra colleghi ──────────────────────────────── */
+
+/**
+ * Una proposta di scambio fra due persone della stessa unità.
+ * Non passa da nessuna approvazione: vale l'accordo fra i due, entro i vincoli
+ * di presidio, capienza e lavoro agile verificati al momento dell'accettazione.
+ *
+ * Le due colonne di blocco tengono la regola «un turno in scambio non entra in
+ * un altro scambio» dentro il database: valgono null appena lo stato non è più
+ * 'proposto', e l'indice unico su una colonna che sa diventare null vincola le
+ * sole proposte aperte.
+ */
+export const swap = mysqlTable('scambio', {
+  id: id(),
+  periodId: int('period_id').notNull(),
+  tipo: mysqlEnum('tipo', ['offro', 'chiedo']).notNull(),
+  proponenteId: int('proponente_id').notNull(),
+  destinatarioId: int('destinatario_id').notNull(),
+  dataProponente: date('data_proponente', { mode: 'string' }).notNull(),
+  dataDestinatario: date('data_destinatario', { mode: 'string' }).notNull(),
+  stato: mysqlEnum('stato', ['proposto', 'accettato', 'rifiutato', 'ritirato'])
+    .default('proposto').notNull(),
+  messaggio: varchar('messaggio', { length: 280 }),
+  creatoIl: now(),
+  chiusoIl: timestamp('chiuso_il'),
+  bloccoProponente: varchar('blocco_proponente', { length: 40 }).generatedAlwaysAs(
+    sql`(case when \`stato\` = 'proposto' then concat(\`proponente_id\`, ':', \`data_proponente\`) else null end)`,
+    { mode: 'stored' },
+  ),
+  bloccoDestinatario: varchar('blocco_destinatario', { length: 40 }).generatedAlwaysAs(
+    sql`(case when \`stato\` = 'proposto' then concat(\`destinatario_id\`, ':', \`data_destinatario\`) else null end)`,
+    { mode: 'stored' },
+  ),
+}, (t) => [
+  uniqueIndex('uk_scambio_blocco_prop').on(t.bloccoProponente),
+  uniqueIndex('uk_scambio_blocco_dest').on(t.bloccoDestinatario),
+  index('ix_scambio_periodo').on(t.periodId, t.stato),
+  index('ix_scambio_proponente').on(t.proponenteId, t.stato),
+  index('ix_scambio_destinatario').on(t.destinatarioId, t.stato),
+])
 
 /* ─── Notifiche, sessioni, tracciabilità ─────────────────────────── */
 
