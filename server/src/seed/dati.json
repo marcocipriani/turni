@@ -2,18 +2,12 @@
   "radice": {
     "nome": "Dipartimento esempio",
     "sigla": "DIPES",
-    "dirigente": {
-      "nome": "Renata",
-      "cognome": "Vitali"
-    }
+    "dirigente": "Vitali Renata"
   },
   "figlia": {
     "nome": "Ufficio esempio",
     "sigla": "UFFES",
-    "dirigente": {
-      "nome": "Serena",
-      "cognome": "Ferraro"
-    }
+    "dirigente": "Ferraro Serena"
   },
   "stanze": [
     {
@@ -31,15 +25,11 @@
     "Segreteria"
   ],
   "organizzatori": [
-    {
-      "nome": "Marco",
-      "cognome": "Fabbri"
-    }
+    "Fabbri Marco"
   ],
   "persone": [
     {
-      "nome": "Elena",
-      "cognome": "Marchetti",
+      "persona": "Marchetti Elena",
       "settore": "Segreteria",
       "assenze": [
         "2026-09-14",
@@ -47,8 +37,7 @@
       ]
     },
     {
-      "nome": "Sofia",
-      "cognome": "Rinaldi",
+      "persona": "Rinaldi Sofia",
       "settore": "Segreteria",
       "assenze": [
         "2026-09-07",
@@ -59,14 +48,12 @@
       ]
     },
     {
-      "nome": "Valle Tommaso",
-      "cognome": "Di",
+      "persona": "Della Valle Tommaso",
       "settore": "Segreteria",
       "assenze": []
     },
     {
-      "nome": "Nicola",
-      "cognome": "Gatti",
+      "persona": "Gatti Nicola",
       "settore": "Segreteria",
       "assenze": [
         "2026-09-02",
@@ -82,38 +69,32 @@
       ]
     },
     {
-      "nome": "Serena",
-      "cognome": "Ferraro",
+      "persona": "Ferraro Serena",
       "settore": "Contabilità",
       "assenze": []
     },
     {
-      "nome": "Chiara",
-      "cognome": "Piras",
+      "persona": "Piras Chiara",
       "settore": "Contabilità",
       "assenze": []
     },
     {
-      "nome": "Bianco Valerio",
-      "cognome": "De",
+      "persona": "Lo Bianco Valerio",
       "settore": "Contabilità",
       "assenze": []
     },
     {
-      "nome": "Irene",
-      "cognome": "Nobile",
+      "persona": "Nobile Irene",
       "settore": "Contabilità",
       "assenze": []
     },
     {
-      "nome": "Michela",
-      "cognome": "Sartori",
+      "persona": "Sartori Michela",
       "settore": "Contabilità",
       "assenze": []
     },
     {
-      "nome": "Ada",
-      "cognome": "Marchesi",
+      "persona": "Marchesi Ada",
       "settore": "Formazione",
       "assenze": [
         "2026-09-01",
@@ -137,8 +118,7 @@
       ]
     },
     {
-      "nome": "Federica",
-      "cognome": "Bellini",
+      "persona": "Bellini Federica",
       "settore": "Formazione",
       "assenze": [
         "2026-09-01",
@@ -152,14 +132,12 @@
       ]
     },
     {
-      "nome": "Angelis Irene",
-      "cognome": "De",
+      "persona": "De Angelis Irene",
       "settore": "Formazione",
       "assenze": []
     },
     {
-      "nome": "Nadia",
-      "cognome": "Costa",
+      "persona": "Costa Nadia",
       "settore": "Statistica",
       "assenze": [
         "2026-09-02",
@@ -177,26 +155,22 @@
       ]
     },
     {
-      "nome": "Sara",
-      "cognome": "Trevisan",
+      "persona": "Trevisan Sara",
       "settore": "Statistica",
       "assenze": []
     },
     {
-      "nome": "Camilla",
-      "cognome": "Riva",
+      "persona": "Riva Camilla",
       "settore": "Statistica",
       "assenze": []
     },
     {
-      "nome": "Ilaria",
-      "cognome": "Orsini",
+      "persona": "Orsini Ilaria",
       "settore": "Statistica",
       "assenze": []
     },
     {
-      "nome": "Marco",
-      "cognome": "Fabbri",
+      "persona": "Fabbri Marco",
       "settore": "Sviluppo",
       "assenze": [
         "2026-09-11",
@@ -205,8 +179,7 @@
       ]
     },
     {
-      "nome": "Sara",
-      "cognome": "Guerra",
+      "persona": "Guerra Sara",
       "settore": "Sviluppo",
       "assenze": [
         "2026-09-02",
@@ -224,14 +197,12 @@
       ]
     },
     {
-      "nome": "Davide",
-      "cognome": "Meloni",
+      "persona": "Meloni Davide",
       "settore": "Sviluppo",
       "assenze": []
     },
     {
-      "nome": "Giulia",
-      "cognome": "Zanetti",
+      "persona": "Zanetti Giulia",
       "settore": "Sviluppo",
       "assenze": [
         "2026-09-01",

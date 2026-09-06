@@ -64,6 +64,18 @@ body {
   border-radius: var(--r1);
 }
 
+/* Tonalità degli avatar: otto neutri, non otto colori. Il design system riserva
+   la croma agli stati, e due colleghi si distinguono benissimo per luminosità.
+   Restano tutti ben oltre il rapporto 4.5:1 con l'inchiostro primario. */
+:root {
+  --av-0: oklch(0.92 0 0); --av-1: oklch(0.89 0 0); --av-2: oklch(0.86 0 0); --av-3: oklch(0.83 0 0);
+  --av-4: oklch(0.80 0 0); --av-5: oklch(0.77 0 0); --av-6: oklch(0.74 0 0); --av-7: oklch(0.71 0 0);
+}
+:root[data-theme='dark'] {
+  --av-0: oklch(0.26 0 0); --av-1: oklch(0.29 0 0); --av-2: oklch(0.32 0 0); --av-3: oklch(0.35 0 0);
+  --av-4: oklch(0.38 0 0); --av-5: oklch(0.41 0 0); --av-6: oklch(0.44 0 0); --av-7: oklch(0.47 0 0);
+}
+
 /* Il select nativo va dichiarato esplicitamente, option comprese: senza,
    in tema scuro il browser lo rende illeggibile. */
 select { background-color: var(--bg); color: var(--ink); }

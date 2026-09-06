@@ -69,10 +69,10 @@ Accessi generati dal popolamento di prova, tutti con la password indicata in
 | Ruolo | Utenza |
 |---|---|
 | Amministratore di sistema | `admin@turni.test` |
-| Dirigente del Dipartimento | `s.vitali@turni.test` |
-| Dirigente UFFES | `b.ferraro@turni.test` |
-| Organizzatore delegato | `m.fabbri@turni.test` |
-| Dipendente | ogni altra `iniziale.cognome@turni.test` |
+| Dirigente del Dipartimento | `renata.san@turni.test` |
+| Dirigente UFFES | `serena.gio@turni.test` |
+| Organizzatore delegato | `marco.cip@turni.test` |
+| Dipendente | ogni altra `nome.sig@turni.test` |
 
 ## Verifiche
 

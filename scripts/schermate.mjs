@@ -27,9 +27,9 @@ const PAGINE = [
 ]
 
 const UTENTI = {
-  organizzatore: 'm.fabbri@turni.test',
-  dirigente: 'b.ferraro@turni.test',
-  dipendente: 'l.marchetti@turni.test',
+  organizzatore: 'marco.cip@turni.test',
+  dirigente: 'serena.gio@turni.test',
+  dipendente: 'elena.pul@turni.test',
   admin: 'admin@turni.test',
 }
 
