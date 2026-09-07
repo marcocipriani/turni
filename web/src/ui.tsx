@@ -17,6 +17,10 @@ const VARIANTI: Record<VarianteBottone, string> = {
   distruttivo: `${BASE} rounded-r2 border border-border-controllo bg-bg px-3 py-1.5 text-base text-ink hover:bg-danger-wash hover:text-danger-ink hover:border-danger`,
 }
 
+/** Le stesse classi, per quando il comando non è un bottone ma un link o una
+ *  etichetta: uno scarico è un link, e cambiargli forma confonderebbe. */
+export const stileBottone = (variante: VarianteBottone = 'normale') => VARIANTI[variante]
+
 export function Bottone({ variante = 'normale', className = '', ...resto }:
   { variante?: VarianteBottone } & ButtonHTMLAttributes<HTMLButtonElement>) {
   return <button type="button" {...resto} className={`${VARIANTI[variante]} ${className}`} />

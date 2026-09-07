@@ -3,6 +3,7 @@ import { api, ErroreApi } from '../api'
 import * as I from '../icone'
 import { Bottone, Campo, Copiabile, inputCls, Messaggio, Pannello, Scheletro } from '../ui'
 import { Vista } from '../Vista'
+import Dati from './Dati'
 import Organigramma, { type UnitaOrg } from './Organigramma'
 import Utenti, { type Credenziale, type UtenteRiga } from './Utenti'
 
@@ -154,6 +155,10 @@ export default function Amministrazione() {
 
         <section id="utenti">
           <Utenti utenti={utenti} unita={unita} nomeUnita={nomeUnita} prova={prova} onCredenziali={setCredenziali} />
+        </section>
+
+        <section id="dati">
+          <Dati onFatto={ricarica} onCredenziali={setCredenziali} />
         </section>
 
         <section id="causali">

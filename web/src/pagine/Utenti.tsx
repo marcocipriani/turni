@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from 'react'
-import { api } from '../api'
+import { api, ErroreApi } from '../api'
 import * as I from '../icone'
 import { Badge, Bottone, Campo, inputCls, Pannello, Segmented } from '../ui'
 import type { UnitaOrg } from './Organigramma'
@@ -66,12 +66,22 @@ export default function Utenti({ utenti, unita, nomeUnita, prova, onCredenziali 
   const selezionati = ordinati.filter((u) => scelti.has(u.id))
   const tutti = ordinati.length > 0 && selezionati.length === ordinati.length
 
-  /** Le azioni di massa passano dalle stesse rotte di quelle singole, una per volta. */
+  /**
+   * Le azioni di massa passano dalle stesse rotte di quelle singole, una per
+   * volta: nessuna scorciatoia che salti i controlli del server. Se una persona
+   * viene rifiutata — l'unità ha già un dirigente, resterebbe scoperta — le
+   * altre proseguono, e alla fine si dice chi è rimasto indietro.
+   */
   function inMassa(fn: (u: UtenteRiga) => Promise<unknown>, domanda: string) {
     if (!confirm(`${domanda} (${selezionati.length} ${selezionati.length === 1 ? 'persona' : 'persone'})`)) return
     void prova(async () => {
-      for (const u of selezionati) await fn(u)
-      setScelti(new Set())
+      const respinte: string[] = []
+      for (const u of selezionati) {
+        try { await fn(u) }
+        catch (e) { respinte.push(`${nomeDi(u)}: ${e instanceof ErroreApi ? e.message : 'non riuscita'}`) }
+      }
+      setScelti(new Set(selezionati.filter((u) => respinte.some((r) => r.startsWith(nomeDi(u)))).map((u) => u.id)))
+      if (respinte.length) throw new ErroreApi(409, `${respinte.length} non riuscite — ${respinte.join(' · ')}`)
     })
   }
 

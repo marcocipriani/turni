@@ -264,18 +264,29 @@ che comanda. La programmazione dei suoi dipendenti la fa lui, nella sua.
 Censisci, e basta. **Non vedi nessuna programmazione**, nessuna assenza,
 nessuna causale: non è una limitazione tecnica, è come dev'essere.
 
-- **Unità radice** — crea i dipartimenti o le strutture di primo livello e
-  assegna a ciascuno il suo dirigente. Le unità figlie le crea il dirigente.
-- **Utenti** — censisci le persone, assegnale a un'unità, reimposta una
+- **Organigramma** — l'albero delle unità, con il dirigente di ciascuna e
+  quante persone ci lavorano; sulle unità superiori il numero comprende tutto
+  il ramo. Si trascina un'unità sopra un'altra per spostarla, oppure si usa la
+  colonna «Sotto» nella vista a elenco, che fa lo stesso da tastiera. Un'unità
+  si elimina solo quando non contiene più niente.
+- **Utenti** — censisci le persone, correggi nome, posta e unità, reimposta una
   password quando qualcuno la perde. Chi la riceve deve cambiarla al primo
-  accesso.
+  accesso. L'elenco si ordina per cognome o per nome, si raggruppa per ruolo o
+  per unità, e con le caselle di spunta si agisce su più persone insieme.
+- **Dati** — modello, caricamento ed esportazione di ogni sezione, in CSV.
+  Prima si scarica il modello, che dice quali colonne servono; poi si carica il
+  file, che viene *provato* senza scrivere niente e mostra quante righe
+  entrerebbero, quante sono già in archivio e quali hanno errori; solo allora
+  compare «Carica davvero». Le assenze non passano di qui: sono dati personali,
+  e l'amministratore non li vede.
 - **Causali di assenza** — l'elenco che tutti vedranno quando dichiarano
-  un'assenza. Puoi aggiungerne e disattivarne.
-- **Giornate non lavorative** — le festività nazionali sono precaricate.
+  un'assenza. Puoi aggiungerne, rinominarne e disattivarne.
+- **Giornate non lavorative** — le festività nazionali si precaricano per anno.
   Aggiungi le chiusure locali: il santo patrono, i ponti deliberati.
 
-Al primo popolamento di un'installazione nuova, le persone si caricano da un
-file: vedi le istruzioni di rilascio.
+Al primo popolamento di un'installazione nuova le persone si caricano dal
+server, con un comando che stampa le password una volta sola: vedi le
+istruzioni di rilascio.
 
 ---
 
