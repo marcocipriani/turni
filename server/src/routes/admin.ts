@@ -19,9 +19,28 @@ admin.use('*', async (c, next) => {
 
 /* ── Unità radice ───────────────────────────────────────────────── */
 
+/**
+ * L'organigramma ha bisogno, oltre alla gerarchia, di chi comanda ogni unità e
+ * di quanta gente ci lavora. Due letture intere di tabelle piccole: l'albero si
+ * disegna tutto insieme, e nessuna schermata fa una domanda per nodo.
+ */
 admin.get('/unita', async (c) => {
   const righe = await db.select().from(schema.unit).orderBy(asc(schema.unit.id))
-  return c.json(righe)
+  const persone = await db.select({
+    id: schema.user.id, nome: schema.user.nome, cognome: schema.user.cognome,
+    ruolo: schema.user.ruolo, unitId: schema.user.unitId,
+  }).from(schema.user).where(eq(schema.user.attivo, true))
+
+  const quante = new Map<number, number>()
+  const capi = new Map<number, { nome: string; cognome: string }>()
+  for (const p of persone) {
+    if (p.unitId == null || p.ruolo === 'admin') continue
+    quante.set(p.unitId, (quante.get(p.unitId) ?? 0) + 1)
+    if (p.ruolo === 'dirigente') capi.set(p.unitId, { nome: p.nome, cognome: p.cognome })
+  }
+  return c.json(righe.map((u) => ({
+    ...u, persone: quante.get(u.id) ?? 0, dirigente: capi.get(u.id) ?? null,
+  })))
 })
 
 const esiste = async (id: number) =>

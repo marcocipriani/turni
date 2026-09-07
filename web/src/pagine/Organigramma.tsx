@@ -3,11 +3,21 @@ import type { Unita } from '../api'
 import * as I from '../icone'
 import { Bottone, Campo, inputCls, Segmented } from '../ui'
 
-type Nodo = Unita & { figlie: Nodo[] }
+/** L'unità come la vede l'amministratore: con chi la comanda e quanta gente ci lavora. */
+export type UnitaOrg = Unita & {
+  dirigente: { nome: string; cognome: string } | null
+  persone: number
+}
 
-/** L'elenco piatto che arriva dall'API diventa la gerarchia che si vede. */
-export function albero(unita: Unita[]): Nodo[] {
-  const nodi = new Map(unita.map((u) => [u.id, { ...u, figlie: [] as Nodo[] }]))
+type Nodo = UnitaOrg & { figlie: Nodo[]; totale: number }
+
+/**
+ * L'elenco piatto che arriva dall'API diventa la gerarchia che si vede.
+ * `totale` è la gente di tutto il ramo: su un'unità superiore conta anche chi
+ * sta nelle unità sottostanti, che è il numero che interessa a chi guarda.
+ */
+export function albero(unita: UnitaOrg[]): Nodo[] {
+  const nodi = new Map(unita.map((u) => [u.id, { ...u, figlie: [] as Nodo[], totale: u.persone }]))
   const cima: Nodo[] = []
   for (const n of nodi.values()) {
     const padre = n.parentId == null ? undefined : nodi.get(n.parentId)
@@ -15,16 +25,18 @@ export function albero(unita: Unita[]): Nodo[] {
     if (padre) padre.figlie.push(n)
     else cima.push(n)
   }
-  const ordina = (l: Nodo[]) => {
+  const sistema = (l: Nodo[]): number => {
     l.sort((a, b) => a.nome.localeCompare(b.nome, 'it'))
-    for (const n of l) ordina(n.figlie)
+    let somma = 0
+    for (const n of l) { n.totale = n.persone + sistema(n.figlie); somma += n.totale }
+    return somma
   }
-  ordina(cima)
+  sistema(cima)
   return cima
 }
 
 /** Sé stessa e le discendenti: nessuna unità può finire sotto una di queste. */
-export function conDiscendenti(unita: Unita[], id: number): Set<number> {
+export function conDiscendenti(unita: UnitaOrg[], id: number): Set<number> {
   const dentro = new Set([id])
   let cresce = true
   while (cresce) {
@@ -39,16 +51,18 @@ export function conDiscendenti(unita: Unita[], id: number): Set<number> {
 const appiattisci = (nodi: Nodo[], livello = 0): { n: Nodo; livello: number }[] =>
   nodi.flatMap((n) => [{ n, livello }, ...appiattisci(n.figlie, livello + 1)])
 
+const capo = (n: Nodo) => (n.dirigente ? `${n.dirigente.cognome} ${n.dirigente.nome}` : 'senza dirigente')
+
 type Azioni = {
   onSposta: (id: number, parentId: number | null) => void
   onRinomina: (id: number, dati: { nome: string; sigla: string | null }) => void
-  onElimina: (u: Unita) => void
+  onElimina: (u: UnitaOrg) => void
   onNuovaFiglia: (parentId: number) => void
 }
 
-/* ── Riga condivisa dalle due viste ──────────────────────────────── */
+/* ── Pezzi condivisi dalle due viste ─────────────────────────────── */
 
-function Comandi({ u, azioni, inModifica }: { u: Unita; azioni: Azioni; inModifica: () => void }) {
+function Comandi({ u, azioni, inModifica }: { u: UnitaOrg; azioni: Azioni; inModifica: () => void }) {
   return (
     <div className="flex shrink-0 items-center gap-0.5">
       <Bottone variante="icona" onClick={() => azioni.onNuovaFiglia(u.id)}
@@ -66,7 +80,7 @@ function Comandi({ u, azioni, inModifica }: { u: Unita; azioni: Azioni; inModifi
   )
 }
 
-function FormNome({ u, azioni, chiudi }: { u: Unita; azioni: Azioni; chiudi: () => void }) {
+function FormNome({ u, azioni, chiudi }: { u: UnitaOrg; azioni: Azioni; chiudi: () => void }) {
   return (
     <form
       className="flex flex-1 flex-wrap items-end gap-2"
@@ -87,7 +101,7 @@ function FormNome({ u, azioni, chiudi }: { u: Unita; azioni: Azioni; chiudi: () 
 
 /* ── Organigramma ────────────────────────────────────────────────── */
 
-export default function Organigramma({ unita, azioni }: { unita: Unita[]; azioni: Azioni }) {
+export default function Organigramma({ unita, azioni }: { unita: UnitaOrg[]; azioni: Azioni }) {
   // Un organigramma largo non entra in un telefono: lì si parte dall'elenco.
   const [vista, setVista] = useState<'albero' | 'elenco'>(
     () => (typeof window !== 'undefined' && window.innerWidth < 640 ? 'elenco' : 'albero'))
@@ -108,6 +122,11 @@ export default function Organigramma({ unita, azioni }: { unita: Unita[]; azioni
   const sopraCls = (id: number) =>
     sopra === id && accetta(id) ? 'border-action bg-surface-2' : 'border-border bg-bg'
 
+  const conta = (n: Nodo) =>
+    n.totale === n.persone
+      ? `${n.totale} ${n.totale === 1 ? 'persona' : 'persone'}`
+      : `${n.totale} persone in tutto il ramo, ${n.persone} in questa unità`
+
   /** Il blocco è piccolo di proposito: in un organigramma conta la forma, non il dettaglio. */
   const Blocco = ({ n, figlia }: { n: Nodo; figlia: boolean }) => (
     <div
@@ -119,13 +138,20 @@ export default function Organigramma({ unita, azioni }: { unita: Unita[]; azioni
       onDrop={(e) => lascia(e, n.id)}
       title={modifica === n.id ? undefined : `${n.nome} — trascina per spostarla`}
       className={`relative mx-auto flex flex-col items-center gap-0.5 rounded-r2 border px-2 py-1.5 text-center
-                  ${figlia ? 'orga-freccia' : ''} ${modifica === n.id ? 'w-[250px]' : 'w-[148px] cursor-grab'}
+                  ${figlia ? 'orga-freccia' : ''} ${modifica === n.id ? 'w-[250px]' : 'w-[168px] cursor-grab'}
                   ${sopraCls(n.id)} ${preso === n.id ? 'opacity-50' : ''}`}
     >
       {modifica === n.id ? <FormNome u={n} azioni={azioni} chiudi={() => setModifica(null)} /> : (
         <>
           <span className="mono w-full truncate text-sm font-semibold">{n.sigla ?? n.nome}</span>
           {n.sigla && <span className="w-full truncate text-2xs text-ink-muted">{n.nome}</span>}
+          <span className={`w-full truncate text-2xs ${n.dirigente ? 'text-ink-muted' : 'text-ink-faint italic'}`}>
+            {capo(n)}
+          </span>
+          <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-surface-2 px-1.5 text-2xs text-ink-muted"
+                title={conta(n)}>
+            <I.Persona size={11} />{n.totale}
+          </span>
           <Comandi u={n} azioni={azioni} inModifica={() => setModifica(n.id)} />
         </>
       )}
@@ -142,6 +168,8 @@ export default function Organigramma({ unita, azioni }: { unita: Unita[]; azioni
       ))}
     </ul>
   )
+
+  const cella = 'border-b border-border px-2.5 py-1.5 text-[12.5px]'
 
   return (
     <div className="flex flex-col gap-3">
@@ -181,7 +209,7 @@ export default function Organigramma({ unita, azioni }: { unita: Unita[]; azioni
           <table className="w-full border-separate border-spacing-0">
             <thead>
               <tr>
-                {['Unità', 'Sigla', 'Sotto', 'Azioni'].map((t) => (
+                {['Unità', 'Sigla', 'Dirigente', 'Persone', 'Sotto', 'Azioni'].map((t) => (
                   <th key={t} scope="col"
                       className="border-b border-border bg-surface px-2.5 py-1.5 text-left text-xs font-semibold text-ink-muted">
                     {t}
@@ -192,13 +220,15 @@ export default function Organigramma({ unita, azioni }: { unita: Unita[]; azioni
             <tbody>
               {appiattisci(nodi).map(({ n, livello }) => (
                 <tr key={n.id}>
-                  <td className="border-b border-border px-2.5 py-1.5 text-[12.5px]" style={{ paddingLeft: 10 + livello * 18 }}>
+                  <td className={cella} style={{ paddingLeft: 10 + livello * 18 }}>
                     {livello > 0 && <span className="mr-1 text-ink-faint" aria-hidden="true">└</span>}
                     {modifica === n.id
                       ? <FormNome u={n} azioni={azioni} chiudi={() => setModifica(null)} />
                       : n.nome}
                   </td>
-                  <td className="mono border-b border-border px-2.5 py-1.5 text-[12.5px] text-ink-muted">{n.sigla ?? '—'}</td>
+                  <td className={`mono ${cella} text-ink-muted`}>{n.sigla ?? '—'}</td>
+                  <td className={`${cella} ${n.dirigente ? 'text-ink-muted' : 'text-ink-faint italic'}`}>{capo(n)}</td>
+                  <td className={`${cella} tabular-nums text-ink-muted`} title={conta(n)}>{n.totale}</td>
                   <td className="border-b border-border px-2.5 py-1.5">
                     <select
                       className={inputCls} value={n.parentId ?? ''}

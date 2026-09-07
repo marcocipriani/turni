@@ -112,6 +112,10 @@ body {
   --av-4: oklch(0.38 0 0); --av-5: oklch(0.41 0 0); --av-6: oklch(0.44 0 0); --av-7: oklch(0.47 0 0);
 }
 
+/* Le caselle di spunta native arrivano col blu di sistema: qui la selezione
+   è inchiostro come tutto il resto. */
+input[type='checkbox'], input[type='radio'] { accent-color: var(--ink); }
+
 /* Il select nativo va dichiarato esplicitamente, option comprese: senza,
    in tema scuro il browser lo rende illeggibile. */
 select { background-color: var(--bg); color: var(--ink); }

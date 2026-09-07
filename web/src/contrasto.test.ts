@@ -90,6 +90,14 @@ for (const tema of ['chiaro', 'scuro'] as const) {
       expect(rapporto(v(davanti), v(dietro))).toBeGreaterThanOrEqual(TESTO)
     })
 
+    it('i tre gradini del distintivo di ruolo reggono la loro etichetta', () => {
+      // Un ruolo si legge dal riempimento, non dal colore: i tre gradini vanno
+      // dal grigio chiaro all'inchiostro pieno, e ognuno regge il testo sopra.
+      expect(rapporto(v('--ink-muted'), v('--surface-2'))).toBeGreaterThanOrEqual(TESTO)
+      expect(rapporto(v('--bg'), v('--ink-faint'))).toBeGreaterThanOrEqual(TESTO)
+      expect(rapporto(v('--bg'), v('--ink'))).toBeGreaterThanOrEqual(TESTO)
+    })
+
     it('le otto tonalità degli avatar reggono le iniziali', () => {
       for (let i = 0; i < 8; i++) {
         expect(rapporto(v('--ink'), v(`--av-${i}`))).toBeGreaterThanOrEqual(TESTO)

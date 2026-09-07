@@ -53,9 +53,17 @@ export function Segmented<T extends string>({ valore, opzioni, onCambia, etichet
 export const Chip = ({ children }: { children: ReactNode }) =>
   <span className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-sm text-ink-muted">{children}</span>
 
-/** `forte` è il grigio pieno: si usa per distinguere l'amministratore dagli altri. */
-export function Badge({ tono = 'neutro', children }: { tono?: 'neutro' | 'forte'; children: ReactNode }) {
-  const stile = tono === 'forte' ? 'bg-ink-muted text-bg' : 'bg-surface-2 text-ink-muted'
+/**
+ * Tre gradini di riempimento, non tre colori: la croma qui resta riservata
+ * agli stati, e un ruolo non è uno stato. Il salto di luminosità fra i gradini
+ * è abbastanza netto da leggersi in un colpo d'occhio, anche in stampa.
+ */
+export function Badge({ tono = 'neutro', children }: { tono?: 'neutro' | 'medio' | 'forte'; children: ReactNode }) {
+  const stile = {
+    neutro: 'bg-surface-2 text-ink-muted',
+    medio: 'bg-ink-faint text-bg',
+    forte: 'bg-ink text-bg',
+  }[tono]
   return (
     <span className={`inline-flex items-center rounded-full px-1.5 py-px text-2xs uppercase tracking-[0.04em] ${stile}`}>
       {children}
