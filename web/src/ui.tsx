@@ -1,5 +1,5 @@
-import { type ButtonHTMLAttributes, type ReactNode, useEffect, useRef } from 'react'
-import { Attenzione, Chiudi, Info, Spunta } from './icone'
+import { type ButtonHTMLAttributes, type ReactNode, useEffect, useRef, useState } from 'react'
+import { Attenzione, Chiudi, Copia, Info, Spunta } from './icone'
 import { Marchio } from './Marchio'
 
 /* ── Bottoni ─────────────────────────────────────────────────────── */
@@ -53,8 +53,15 @@ export function Segmented<T extends string>({ valore, opzioni, onCambia, etichet
 export const Chip = ({ children }: { children: ReactNode }) =>
   <span className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-sm text-ink-muted">{children}</span>
 
-export const Badge = ({ children }: { children: ReactNode }) =>
-  <span className="inline-flex items-center rounded-full border border-border-controllo px-1.5 py-px text-2xs uppercase tracking-[0.04em] text-ink-muted">{children}</span>
+/** `forte` è il grigio pieno: si usa per distinguere l'amministratore dagli altri. */
+export function Badge({ tono = 'neutro', children }: { tono?: 'neutro' | 'forte'; children: ReactNode }) {
+  const stile = tono === 'forte' ? 'bg-ink-muted text-bg' : 'bg-surface-2 text-ink-muted'
+  return (
+    <span className={`inline-flex items-center rounded-full px-1.5 py-px text-2xs uppercase tracking-[0.04em] ${stile}`}>
+      {children}
+    </span>
+  )
+}
 
 export function Pill({ tono = 'neutro', children }: { tono?: 'neutro' | 'ok' | 'attesa' | 'errore'; children: ReactNode }) {
   const colore = { neutro: 'text-ink-muted', ok: 'text-ok-ink', attesa: 'text-warn-ink', errore: 'text-danger-ink' }[tono]
@@ -71,6 +78,37 @@ export function Stato({ tono, children }: { tono: 'neutro' | 'ok' | 'attesa' | '
   return (
     <span className="inline-flex items-center gap-1.5 text-sm text-ink-muted">
       <span className={`size-2 shrink-0 rounded-full ${sfondo}`} aria-hidden="true" />{children}
+    </span>
+  )
+}
+
+/**
+ * Testo da portare altrove — una password appena generata, per esempio.
+ * La copia può fallire (contesto non sicuro, permesso negato): in quel caso il
+ * testo resta selezionabile a mano e il bottone lo dice.
+ */
+export function Copiabile({ testo, etichetta = 'Copia' }: { testo: string; etichetta?: string }) {
+  const [esito, setEsito] = useState<'fermo' | 'fatto' | 'no'>('fermo')
+
+  async function copia() {
+    try {
+      await navigator.clipboard.writeText(testo)
+      setEsito('fatto')
+    } catch {
+      setEsito('no')
+    }
+    setTimeout(() => setEsito('fermo'), 2500)
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5 align-middle">
+      <code className="mono select-all rounded-r1 bg-surface-2 px-1.5 py-0.5">{testo}</code>
+      <Bottone variante="icona" onClick={() => void copia()} aria-label={`${etichetta} negli appunti`} title={etichetta}>
+        {esito === 'fatto' ? <Spunta size={15} /> : <Copia size={15} />}
+      </Bottone>
+      <span role="status" className="text-sm text-ink-faint">
+        {esito === 'fatto' ? 'copiata' : esito === 'no' ? 'copia non riuscita, selezionala a mano' : ''}
+      </span>
     </span>
   )
 }

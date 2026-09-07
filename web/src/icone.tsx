@@ -39,4 +39,10 @@ export const Persona = (p: Props) => <Svg {...p}><circle cx="12" cy="8" r="4" />
 export const Stanza = (p: Props) => <Svg {...p}><path d="M4 21V4a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v17M4 21h16M15 8h4a1 1 0 0 1 1 1v12" /><circle cx="11.5" cy="12.5" r="1" /></Svg>
 export const Info = (p: Props) => <Svg {...p}><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></Svg>
 export const Scambio = (p: Props) => <Svg {...p}><path d="M4 8h13l-3.5-3.5M20 16H7l3.5 3.5" /></Svg>
+export const Copia = (p: Props) => <Svg {...p}><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1" /></Svg>
+export const Matita = (p: Props) => <Svg {...p}><path d="M4 20h4L20 8a2.8 2.8 0 0 0-4-4L4 16Z" /><path d="M14.5 5.5 18.5 9.5" /></Svg>
+export const Cestino = (p: Props) => <Svg {...p}><path d="M4 7h16M10 4h4M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13M10 11v7M14 11v7" /></Svg>
+export const Presa = (p: Props) => <Svg {...p}><path d="M9 6h.01M9 12h.01M9 18h.01M15 6h.01M15 12h.01M15 18h.01" /></Svg>
+export const Albero = (p: Props) => <Svg {...p}><rect x="9" y="3" width="6" height="4" rx="1" /><rect x="3" y="17" width="6" height="4" rx="1" /><rect x="15" y="17" width="6" height="4" rx="1" /><path d="M12 7v5M6 17v-3h12v3" /></Svg>
+export const Elenco = (p: Props) => <Svg {...p}><path d="M4 6h16M8 12h12M12 18h8" /></Svg>
 export const Stampa = (p: Props) => <Svg {...p}><path d="M7 8V3h10v5" /><path d="M7 18H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2" /><rect x="7" y="14" width="10" height="7" rx="1" /></Svg>
