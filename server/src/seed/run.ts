@@ -112,10 +112,11 @@ async function main() {
     ruolo: 'dirigente', unitId: figliaId,
   })
 
-  // Le stanze appartengono all'unità radice.
+  // Le stanze stanno sull'unità che le usa, che è la stessa che programma:
+  // un periodo cerca la capienza fra le stanze della propria unità.
   for (const s of dati.stanze) {
     const [r] = await db.insert(schema.room)
-      .values({ unitId: radiceId, etichetta: s.etichetta, piano: s.piano })
+      .values({ unitId: figliaId, etichetta: s.etichetta, piano: s.piano })
     await db.insert(schema.desk).values(
       Array.from({ length: s.scrivanie }, (_, i) => ({
         roomId: r.insertId, numero: String(i + 1), x: 40 + i * 120, y: 60,
@@ -162,8 +163,8 @@ async function main() {
   console.log(`
 Popolamento di prova completato.
 
-  Unità radice      ${dati.radice.nome} (${dati.radice.sigla}) — stanze e scrivanie
-  Unità figlia      ${dati.figlia.nome} (${dati.figlia.sigla})
+  Unità radice      ${dati.radice.nome} (${dati.radice.sigla})
+  Unità figlia      ${dati.figlia.nome} (${dati.figlia.sigla}) — stanze, settori, persone
   Settori           ${nomiSettori.join(', ')}
   Dipendenti        ${dipendenti.length}
   Assenze caricate  ${assenze.length}
