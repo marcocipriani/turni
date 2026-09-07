@@ -53,7 +53,7 @@ Ogni unità nominata **deve avere esattamente un dirigente**, altrimenti il
 comando si ferma prima di scrivere qualsiasi cosa.
 
 Il comando si rifiuta di girare su un archivio già popolato. Per aggiungere
-persone dopo: `npm run avvio -w server -- nuovi.csv --aggiungi`.
+persone dopo: `npm run avvio -- nuovi.csv --aggiungi`.
 
 ## `stanze.csv` — stanze e scrivanie
 
