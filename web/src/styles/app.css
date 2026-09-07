@@ -28,6 +28,13 @@ body {
   border-radius: var(--r1);
 }
 
+/* Il campo file sta nascosto sotto la sua etichetta, che è il bottone che si
+   vede: quando il campo prende il fuoco, il contorno deve comparire lì. */
+label:has(input[type='file']:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
 /* Ogni numero incolonnabile ha cifre a larghezza fissa: le colonne non ballano. */
 .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .num { font-variant-numeric: tabular-nums; }
