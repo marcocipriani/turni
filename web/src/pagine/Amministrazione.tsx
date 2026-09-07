@@ -65,7 +65,7 @@ export default function Amministrazione() {
       aiuto="Organigramma, utenze e cataloghi"
       meta={<><span className="mono">{unita.length} unità</span><span aria-hidden="true">·</span><span className="mono">{utenti.length} utenti</span></>}
     >
-      <div className="flex max-w-[1100px] flex-col gap-6">
+      <div className="flex max-w-[1280px] flex-col gap-6">
         {avviso && (
           <Messaggio>
             <div className="flex items-start justify-between gap-3">
@@ -146,7 +146,9 @@ export default function Amministrazione() {
                 </select>
               </Campo>
               <Campo etichetta="Nome del dirigente"><input name="dnome" className={inputCls} required /></Campo>
-              <Campo etichetta="Cognome"><input name="dcognome" className={inputCls} required /></Campo>
+              <Campo etichetta="Cognome" aiuto="Ne restano le prime tre lettere">
+                <input name="dcognome" className={inputCls} required />
+              </Campo>
               <Campo etichetta="Posta"><input name="demail" type="email" className={inputCls} required /></Campo>
               <div className="sm:col-span-6"><Bottone type="submit" variante="primario">Crea unità e dirigente</Bottone></div>
             </form>
@@ -157,10 +159,9 @@ export default function Amministrazione() {
           <Utenti utenti={utenti} unita={unita} nomeUnita={nomeUnita} prova={prova} onCredenziali={setCredenziali} />
         </section>
 
-        <section id="dati">
-          <Dati onFatto={ricarica} onCredenziali={setCredenziali} />
-        </section>
-
+        {/* Due pannelli stretti stanno accanto quando c'è larghezza: sotto,
+            tornano in colonna come tutto il resto. */}
+        <div className="grid items-start gap-6 xl:grid-cols-2">
         <section id="causali">
           <Pannello titolo="Causali di assenza" icona={<I.Assenza size={18} />}
                     piede="Elenco chiuso: al momento della dichiarazione non è ammesso testo libero.">
@@ -266,7 +267,10 @@ export default function Amministrazione() {
             </form>
 
             {festivita.length === 0 ? <p className="text-base text-ink-faint">Nessuna festività caricata.</p> : (
-              <ul className="divide-y divide-border overflow-hidden rounded-r2 border border-border bg-bg">
+              // Un archivio di più anni fa una lista lunghissima: si scorre
+              // dentro il suo riquadro invece di allungare la pagina.
+              <ul className="max-h-[420px] divide-y divide-border overflow-y-auto rounded-r2 border border-border bg-bg"
+                  tabIndex={0} aria-label="Giornate non lavorative in archivio">
                 {festivita.map((f) => (
                   <li key={f.id} className="flex items-center justify-between gap-3 px-3 py-1.5 text-base">
                     <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
@@ -281,6 +285,11 @@ export default function Amministrazione() {
               </ul>
             )}
           </Pannello>
+        </section>
+        </div>
+
+        <section id="dati">
+          <Dati onFatto={ricarica} onCredenziali={setCredenziali} />
         </section>
       </div>
     </Vista>
