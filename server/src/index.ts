@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { serve } from '@hono/node-server'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { Hono } from 'hono'
@@ -100,7 +101,14 @@ app.all('/api/*', (c) => c.json({ errore: 'Rotta non trovata' }, 404))
 // Il frontend compilato viene servito dallo stesso processo: un solo slot
 // applicativo da configurare sull'hosting. In alternativa i file di web/dist
 // possono essere copiati in public_html e serviti dal server web.
-const RADICE_WEB = process.env.WEB_DIST ?? '../web/dist'
+//
+// Il percorso è relativo alla cartella da cui si avvia, che non è sempre la
+// stessa: dalla radice del progetto è `web/dist`, da dentro `server/` è un
+// livello più su. Si guarda quale dei due esiste invece di pretendere che chi
+// avvia se lo ricordi; WEB_DIST resta per i casi che non somigliano a nessuno
+// dei due.
+const RADICE_WEB = process.env.WEB_DIST
+  ?? (existsSync('web/dist/index.html') ? 'web/dist' : '../web/dist')
 // I nomi degli asset contengono l'impronta del contenuto: memorizzabili per sempre.
 app.use('/assets/*', async (c, next) => {
   await next()
