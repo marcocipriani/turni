@@ -117,6 +117,43 @@ body {
 select { background-color: var(--bg); color: var(--ink); }
 select option { background-color: var(--bg); color: var(--ink); }
 
+/* ── Organigramma ──────────────────────────────────────────────────
+   Un albero disegnato coi bordi: nessun canvas, nessuna misura in
+   JavaScript, nessuna libreria. I gomiti fra fratelli nascono dai due
+   pseudo-elementi di ogni nodo, il gambo verso i figli dalla lista che li
+   contiene. La freccia è un triangolo di bordi sul blocco che la riceve. */
+.orga ul { display: flex; justify-content: center; }
+.orga li { position: relative; padding: 22px 6px 0; list-style: none; }
+
+/* Metà barra a sinistra e metà a destra: unite fra fratelli, fanno la traversa. */
+.orga li::before, .orga li::after {
+  content: ''; position: absolute; top: 0; right: 50%;
+  width: 50%; height: 22px; border-top: 1px solid var(--border);
+}
+.orga li::after { right: auto; left: 50%; border-left: 1px solid var(--border); }
+.orga li:first-child::before, .orga li:last-child::after { border: 0 none; }
+.orga li:last-child::before { border-right: 1px solid var(--border); }
+
+/* Figlio unico: niente traversa, il gambo del genitore arriva già al blocco. */
+.orga li:only-child { padding-top: 0; }
+.orga li:only-child::before, .orga li:only-child::after { display: none; }
+
+/* Gambo dal genitore alla fila dei figli. */
+.orga li ul { position: relative; padding-top: 22px; }
+.orga li ul::before {
+  content: ''; position: absolute; top: 0; left: 50%;
+  height: 22px; border-left: 1px solid var(--border);
+}
+
+/* Le radici stanno affiancate senza legami: non hanno un genitore comune. */
+.orga-cima > li { padding-top: 0; }
+.orga-cima > li::before, .orga-cima > li::after { display: none; }
+
+.orga-freccia::before {
+  content: ''; position: absolute; top: -6px; left: 50%; transform: translateX(-50%);
+  border: 6px solid transparent; border-top-color: var(--ink-faint);
+}
+
 /* ── Carta ─────────────────────────────────────────────────────────
    La stampa non è la schermata in bianco e nero: è un documento. Sparisce
    tutta la struttura dell'app — rail, barra in basso, isole, ombre — e resta

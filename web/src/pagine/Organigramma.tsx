@@ -53,14 +53,14 @@ function Comandi({ u, azioni, inModifica }: { u: Unita; azioni: Azioni; inModifi
     <div className="flex shrink-0 items-center gap-0.5">
       <Bottone variante="icona" onClick={() => azioni.onNuovaFiglia(u.id)}
                aria-label={`Aggiungi un'unità sotto ${u.nome}`} title="Aggiungi unità figlia">
-        <I.Piu size={15} />
+        <I.Piu size={14} />
       </Bottone>
       <Bottone variante="icona" onClick={inModifica} aria-label={`Rinomina ${u.nome}`} title="Rinomina">
-        <I.Matita size={15} />
+        <I.Matita size={14} />
       </Bottone>
       <Bottone variante="icona" onClick={() => azioni.onElimina(u)}
                aria-label={`Elimina ${u.nome}`} title="Elimina">
-        <I.Cestino size={15} />
+        <I.Cestino size={14} />
       </Bottone>
     </div>
   )
@@ -88,7 +88,9 @@ function FormNome({ u, azioni, chiudi }: { u: Unita; azioni: Azioni; chiudi: () 
 /* ── Organigramma ────────────────────────────────────────────────── */
 
 export default function Organigramma({ unita, azioni }: { unita: Unita[]; azioni: Azioni }) {
-  const [vista, setVista] = useState<'albero' | 'elenco'>('albero')
+  // Un organigramma largo non entra in un telefono: lì si parte dall'elenco.
+  const [vista, setVista] = useState<'albero' | 'elenco'>(
+    () => (typeof window !== 'undefined' && window.innerWidth < 640 ? 'elenco' : 'albero'))
   const [modifica, setModifica] = useState<number | null>(null)
   const [preso, setPreso] = useState<number | null>(null)
   const [sopra, setSopra] = useState<number | 'radice' | null>(null)
@@ -103,10 +105,11 @@ export default function Organigramma({ unita, azioni }: { unita: Unita[]; azioni
     if (preso != null && accetta(id)) azioni.onSposta(preso, id === 'radice' ? null : id)
     setPreso(null); setSopra(null)
   }
-  const sopraCls = (id: number | 'radice') =>
-    sopra === id && accetta(id) ? 'border-action bg-surface-2' : 'border-transparent'
+  const sopraCls = (id: number) =>
+    sopra === id && accetta(id) ? 'border-action bg-surface-2' : 'border-border bg-bg'
 
-  const Riga = ({ n }: { n: Nodo }) => (
+  /** Il blocco è piccolo di proposito: in un organigramma conta la forma, non il dettaglio. */
+  const Blocco = ({ n, figlia }: { n: Nodo; figlia: boolean }) => (
     <div
       draggable={modifica !== n.id}
       onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; setPreso(n.id) }}
@@ -114,30 +117,27 @@ export default function Organigramma({ unita, azioni }: { unita: Unita[]; azioni
       onDragOver={(e) => { if (!accetta(n.id)) return; e.preventDefault(); e.stopPropagation(); setSopra(n.id) }}
       onDragLeave={() => setSopra((s) => (s === n.id ? null : s))}
       onDrop={(e) => lascia(e, n.id)}
-      className={`flex items-center gap-2 rounded-r2 border bg-bg px-2 py-1.5
+      title={modifica === n.id ? undefined : `${n.nome} — trascina per spostarla`}
+      className={`relative mx-auto flex flex-col items-center gap-0.5 rounded-r2 border px-2 py-1.5 text-center
+                  ${figlia ? 'orga-freccia' : ''} ${modifica === n.id ? 'w-[250px]' : 'w-[148px] cursor-grab'}
                   ${sopraCls(n.id)} ${preso === n.id ? 'opacity-50' : ''}`}
     >
-      <span className="cursor-grab text-ink-faint" aria-hidden="true"><I.Presa size={15} /></span>
       {modifica === n.id ? <FormNome u={n} azioni={azioni} chiudi={() => setModifica(null)} /> : (
         <>
-          <span className="min-w-0 flex-1 truncate text-base">
-            {n.nome}
-            {n.sigla && <span className="mono ml-1.5 text-sm text-ink-faint">{n.sigla}</span>}
-          </span>
+          <span className="mono w-full truncate text-sm font-semibold">{n.sigla ?? n.nome}</span>
+          {n.sigla && <span className="w-full truncate text-2xs text-ink-muted">{n.nome}</span>}
           <Comandi u={n} azioni={azioni} inModifica={() => setModifica(n.id)} />
         </>
       )}
     </div>
   )
 
-  const Rami = ({ l }: { l: Nodo[] }) => (
-    <ul className="flex flex-col gap-1">
+  const Rami = ({ l, cima = false }: { l: Nodo[]; cima?: boolean }) => (
+    <ul className={cima ? 'orga-cima' : ''}>
       {l.map((n) => (
         <li key={n.id}>
-          <Riga n={n} />
-          {n.figlie.length > 0 && (
-            <div className="ml-3 border-l border-border pl-3 pt-1"><Rami l={n.figlie} /></div>
-          )}
+          <Blocco n={n} figlia={!cima} />
+          {n.figlie.length > 0 && <Rami l={n.figlie} />}
         </li>
       ))}
     </ul>
@@ -163,7 +163,9 @@ export default function Organigramma({ unita, azioni }: { unita: Unita[]; azioni
       {unita.length === 0 ? <p className="text-base text-ink-faint">Nessuna unità: creane una qui sotto.</p>
         : vista === 'albero' ? (
         <>
-          <Rami l={nodi} />
+          <div className="overflow-x-auto rounded-r2" tabIndex={0} role="group" aria-label="Organigramma, scorrevole">
+            <div className="orga min-w-max px-2 py-1"><Rami l={nodi} cima /></div>
+          </div>
           <div
             onDragOver={(e) => { if (!accetta('radice')) return; e.preventDefault(); setSopra('radice') }}
             onDragLeave={() => setSopra((s) => (s === 'radice' ? null : s))}
