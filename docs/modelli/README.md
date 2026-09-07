@@ -12,18 +12,18 @@ interpretare, e un file che ne abusa viene rifiutato invece di essere indovinato
 
 | File | Comando |
 |---|---|
-| [`persone.csv`](persone.csv) | `npm run avvio -w server -- persone.csv --dominio esempio.it` |
-| [`stanze.csv`](stanze.csv) | `npm run importa -w server -- stanze stanze.csv` |
-| [`settori.csv`](settori.csv) | `npm run importa -w server -- settori settori.csv` |
-| [`assenze.csv`](assenze.csv) | `npm run importa -w server -- assenze assenze.csv` |
-| [`causali.csv`](causali.csv) | `npm run importa -w server -- causali causali.csv` |
-| [`giornate-non-lavorative.csv`](giornate-non-lavorative.csv) | `npm run importa -w server -- giornate giornate-non-lavorative.csv` |
+| [`persone.csv`](persone.csv) | `npm run avvio -- persone.csv --dominio esempio.it` |
+| [`stanze.csv`](stanze.csv) | `npm run importa -- stanze stanze.csv` |
+| [`settori.csv`](settori.csv) | `npm run importa -- settori settori.csv` |
+| [`assenze.csv`](assenze.csv) | `npm run importa -- assenze assenze.csv` |
+| [`causali.csv`](causali.csv) | `npm run importa -- causali causali.csv` |
+| [`giornate-non-lavorative.csv`](giornate-non-lavorative.csv) | `npm run importa -- giornate giornate-non-lavorative.csv` |
 
 **Prima di scrivere, prova.** `--prova` legge e verifica tutto senza toccare
 l'archivio:
 
 ```bash
-npm run importa -w server -- stanze stanze.csv --prova
+npm run importa -- stanze stanze.csv --prova
 ```
 
 Ricaricare lo stesso file due volte non duplica niente: le righe già presenti

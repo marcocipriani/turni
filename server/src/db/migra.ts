@@ -11,7 +11,7 @@
  * descrizione autorevole: questo file la insegue, e le due cose vanno
  * cambiate insieme.
  *
- *   npm run migra -w server
+ *   npm run migra
  */
 import 'dotenv/config'
 import { sql } from 'drizzle-orm'

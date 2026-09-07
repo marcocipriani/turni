@@ -2,7 +2,7 @@
  * Verifica i criteri di accettazione del capitolo 15 della spec contro
  * un'istanza in esecuzione, popolata con i dati di prova.
  *
- *   npm run verifica -w server
+ *   npm run verifica
  */
 import { and, eq, sql } from 'drizzle-orm'
 import { db, pool, schema } from './db/index'

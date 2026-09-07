@@ -6,9 +6,9 @@
  * stampare. Le assenze si caricano solo da qui — nella pagina non compaiono,
  * perché l'amministratore di sistema non vede i dati personali.
  *
- *   npm run importa -w server -- stanze stanze.csv --prova
- *   npm run importa -w server -- persone nuovi.csv --dominio comune.it
- *   npm run importa -w server -- --modello stanze > stanze.csv
+ *   npm run importa -- stanze stanze.csv --prova
+ *   npm run importa -- persone nuovi.csv --dominio comune.it
+ *   npm run importa -- --modello stanze > stanze.csv
  */
 import 'dotenv/config'
 import { readFileSync } from 'node:fs'
@@ -42,8 +42,8 @@ async function main() {
     console.error(`
 Carica una tabella da un file CSV.
 
-  npm run importa -w server -- <tabella> <file.csv> [--prova] [--dominio comune.it]
-  npm run importa -w server -- --modello <tabella>     stampa il modello
+  npm run importa -- <tabella> <file.csv> [--prova] [--dominio comune.it]
+  npm run importa -- --modello <tabella>     stampa il modello
 
 Tabelle:  ${TABELLE.join('  ')}
 
