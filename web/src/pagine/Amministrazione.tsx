@@ -1,33 +1,37 @@
 import { type FormEvent, useCallback, useEffect, useState } from 'react'
-import { api, ErroreApi, type Unita } from '../api'
+import { api, ErroreApi } from '../api'
 import * as I from '../icone'
-import { Badge, Bottone, Campo, Copiabile, inputCls, Messaggio, Pannello, Scheletro } from '../ui'
+import { Bottone, Campo, Copiabile, inputCls, Messaggio, Pannello, Scheletro } from '../ui'
 import { Vista } from '../Vista'
-import Organigramma from './Organigramma'
+import Organigramma, { type UnitaOrg } from './Organigramma'
+import Utenti, { type Credenziale, type UtenteRiga } from './Utenti'
 
-type UtenteRiga = {
-  id: number; email: string; nome: string; cognome: string
-  ruolo: 'admin' | 'dirigente' | 'dipendente'; unitId: number | null; attivo: boolean
-}
 type Causale = { id: number; codice: string; etichetta: string; attiva: boolean }
 type Festivita = { id: number; data: string; descrizione: string; unitId: number | null }
 
 const GIORNO = new Intl.DateTimeFormat('it-IT', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })
 const inItaliano = (iso: string) => GIORNO.format(new Date(`${iso}T00:00:00`))
 
+/** L'avviso sui limiti del ruolo si legge una volta: chi l'ha capito lo chiude. */
+const CHIAVE_AVVISO = 'turni.avviso.admin'
+const avvisoDaMostrare = () => {
+  try { return localStorage.getItem(CHIAVE_AVVISO) !== 'letto' } catch { return true }
+}
+
 export default function Amministrazione() {
-  const [unita, setUnita] = useState<Unita[] | null>(null)
+  const [unita, setUnita] = useState<UnitaOrg[] | null>(null)
   const [utenti, setUtenti] = useState<UtenteRiga[]>([])
   const [causali, setCausali] = useState<Causale[]>([])
   const [festivita, setFestivita] = useState<Festivita[]>([])
   const [errore, setErrore] = useState<string | null>(null)
-  const [provvisoria, setProvvisoria] = useState<string | null>(null)
+  const [credenziali, setCredenziali] = useState<Credenziale[]>([])
   const [padre, setPadre] = useState<number | null>(null)
-  const [modifica, setModifica] = useState<number | null>(null)
+  const [avviso, setAvviso] = useState(avvisoDaMostrare)
+  const [causaleInModifica, setCausaleInModifica] = useState<number | null>(null)
 
   const ricarica = useCallback(async () => {
     const [u, us, c, f] = await Promise.all([
-      api.get<Unita[]>('/admin/unita'), api.get<UtenteRiga[]>('/admin/utenti'),
+      api.get<UnitaOrg[]>('/admin/unita'), api.get<UtenteRiga[]>('/admin/utenti'),
       api.get<Causale[]>('/admin/causali'), api.get<Festivita[]>('/admin/festivita'),
     ])
     setUnita(u); setUtenti(us); setCausali(c); setFestivita(f)
@@ -39,6 +43,11 @@ export default function Amministrazione() {
     setErrore(null)
     try { await fn(); await ricarica() }
     catch (e) { setErrore(e instanceof ErroreApi ? e.message : 'Operazione non riuscita.') }
+  }
+
+  function chiudiAvviso() {
+    setAvviso(false)
+    try { localStorage.setItem(CHIAVE_AVVISO, 'letto') } catch { /* niente memoria, pazienza */ }
   }
 
   const nomeUnita = (id: number | null) => {
@@ -56,16 +65,37 @@ export default function Amministrazione() {
       meta={<><span className="mono">{unita.length} unità</span><span aria-hidden="true">·</span><span className="mono">{utenti.length} utenti</span></>}
     >
       <div className="flex max-w-[1100px] flex-col gap-6">
-        <Messaggio>
-          L'amministratore di sistema gestisce contenitori e credenziali. Non ha accesso a
-          programmazioni, calendari individuali o causali di assenza.
-        </Messaggio>
+        {avviso && (
+          <Messaggio>
+            <div className="flex items-start justify-between gap-3">
+              <span>
+                L'amministratore di sistema gestisce contenitori e credenziali. Non ha accesso a
+                programmazioni, calendari individuali o causali di assenza.
+              </span>
+              <Bottone variante="icona" onClick={chiudiAvviso} aria-label="Nascondi l'avviso" title="Ho capito">
+                <I.Chiudi size={15} />
+              </Bottone>
+            </div>
+          </Messaggio>
+        )}
         {errore && <Messaggio tono="errore">{errore}</Messaggio>}
-        {provvisoria && (
+        {credenziali.length > 0 && (
           <Messaggio tono="attenzione">
-            Password provvisoria: <Copiabile testo={provvisoria} etichetta="Copia la password" />.
-            Comunicala di persona — Turni non manda messaggi di posta. Va cambiata al primo accesso.
-            <button onClick={() => setProvvisoria(null)} className="ml-3 cursor-pointer underline">Ho preso nota</button>
+            <p>
+              {credenziali.length === 1 ? 'Password provvisoria' : `${credenziali.length} password provvisorie`}.
+              Comunicale di persona — Turni non manda messaggi di posta. Vanno cambiate al primo accesso,
+              e da qui non si rileggono più.
+            </p>
+            <ul className="mt-2 flex flex-col gap-1">
+              {credenziali.map((c, i) => (
+                // Due persone possono chiamarsi uguale: la chiave è la posizione.
+                <li key={i} className="flex flex-wrap items-center gap-2">
+                  <span className="min-w-[14ch] text-ink">{c.chi}</span>
+                  <Copiabile testo={c.password} etichetta="Copia la password" />
+                </li>
+              ))}
+            </ul>
+            <button onClick={() => setCredenziali([])} className="mt-2 cursor-pointer underline">Ho preso nota</button>
           </Messaggio>
         )}
 
@@ -99,7 +129,8 @@ export default function Amministrazione() {
                     nome: f.get('nome'), sigla: f.get('sigla') || undefined, parentId: padre,
                     dirigente: { nome: f.get('dnome'), cognome: f.get('dcognome'), email: f.get('demail') },
                   })
-                  setProvvisoria(r.passwordProvvisoria); form.reset(); setPadre(null)
+                  setCredenziali([{ chi: `${f.get('dcognome')} ${f.get('dnome')}`, password: r.passwordProvvisoria }])
+                  form.reset(); setPadre(null)
                 })
               }}
               className="grid gap-3 border-t border-border pt-4 sm:grid-cols-6"
@@ -122,115 +153,7 @@ export default function Amministrazione() {
         </section>
 
         <section id="utenti">
-          <Pannello titolo="Utenti" icona={<I.Persona size={18} />}>
-            <form
-              onSubmit={(e: FormEvent<HTMLFormElement>) => {
-                e.preventDefault()
-                const form = e.currentTarget
-                const f = new FormData(form)
-                void prova(async () => {
-                  const r = await api.post<{ passwordProvvisoria: string }>('/admin/utenti', {
-                    nome: f.get('nome'), cognome: f.get('cognome'), email: f.get('email'),
-                    ruolo: f.get('ruolo'), unitId: Number(f.get('unitId')),
-                  })
-                  setProvvisoria(r.passwordProvvisoria); form.reset()
-                })
-              }}
-              className="grid gap-3 sm:grid-cols-5"
-            >
-              <Campo etichetta="Nome"><input name="nome" className={inputCls} required /></Campo>
-              <Campo etichetta="Cognome"><input name="cognome" className={inputCls} required /></Campo>
-              <Campo etichetta="Posta"><input name="email" type="email" className={inputCls} required /></Campo>
-              <Campo etichetta="Ruolo">
-                <select name="ruolo" className={inputCls}>
-                  <option value="dipendente">Dipendente</option>
-                  <option value="dirigente">Dirigente</option>
-                </select>
-              </Campo>
-              <Campo etichetta="Unità">
-                <select name="unitId" className={inputCls} required defaultValue="">
-                  <option value="" disabled>Scegli</option>
-                  {unita.map((u) => <option key={u.id} value={u.id}>{u.sigla ?? u.nome}</option>)}
-                </select>
-              </Campo>
-              <div className="sm:col-span-5"><Bottone type="submit">Censisci</Bottone></div>
-            </form>
-
-            <div className="overflow-x-auto rounded-r2 border border-border bg-bg">
-              <table className="w-full border-separate border-spacing-0">
-                <thead>
-                  <tr>
-                    {['Persona', 'Posta', 'Ruolo', 'Unità', 'Azioni'].map((t) => (
-                      <th key={t} scope="col"
-                          className="border-b border-border bg-surface px-2.5 py-1.5 text-left text-xs font-semibold text-ink-muted">
-                        {t}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {utenti.map((u, i) => modifica === u.id ? (
-                    <tr key={u.id}>
-                      <td colSpan={5} className="border-b border-border px-2.5 py-2">
-                        <form
-                          className="grid items-end gap-2 sm:grid-cols-[1fr_1fr_1.4fr_1fr_auto_auto]"
-                          onSubmit={(e: FormEvent<HTMLFormElement>) => {
-                            e.preventDefault()
-                            const f = new FormData(e.currentTarget)
-                            void prova(async () => {
-                              await api.patch(`/admin/utenti/${u.id}`, {
-                                nome: f.get('nome'), cognome: f.get('cognome'),
-                                email: f.get('email'), unitId: Number(f.get('unitId')),
-                              })
-                              setModifica(null)
-                            })
-                          }}
-                        >
-                          <Campo etichetta="Nome"><input name="nome" defaultValue={u.nome} className={inputCls} required /></Campo>
-                          <Campo etichetta="Cognome"><input name="cognome" defaultValue={u.cognome} className={inputCls} required /></Campo>
-                          <Campo etichetta="Posta"><input name="email" type="email" defaultValue={u.email} className={inputCls} required /></Campo>
-                          <Campo etichetta="Unità">
-                            <select name="unitId" className={inputCls} defaultValue={u.unitId ?? ''} required>
-                              {unita.map((x) => <option key={x.id} value={x.id}>{x.sigla ?? x.nome}</option>)}
-                            </select>
-                          </Campo>
-                          <Bottone type="submit" variante="primario">Salva</Bottone>
-                          <Bottone onClick={() => setModifica(null)}>Annulla</Bottone>
-                        </form>
-                      </td>
-                    </tr>
-                  ) : (
-                    <tr key={u.id} className={i % 2 ? 'bg-[color-mix(in_oklch,var(--surface)_50%,var(--bg))]' : ''}>
-                      <td className="border-b border-border px-2.5 py-1.5 text-[12.5px]">
-                        {u.cognome} <span className="text-ink-muted">{u.nome}</span>
-                        {!u.attivo && <span className="ml-2 text-2xs text-ink-faint">disattivato</span>}
-                      </td>
-                      <td className="mono border-b border-border px-2.5 py-1.5 text-[12.5px] text-ink-muted">{u.email}</td>
-                      <td className="border-b border-border px-2.5 py-1.5">
-                        <Badge tono={u.ruolo === 'admin' ? 'forte' : 'neutro'}>{u.ruolo}</Badge>
-                      </td>
-                      <td className="border-b border-border px-2.5 py-1.5 text-[12.5px] text-ink-muted">{nomeUnita(u.unitId)}</td>
-                      <td className="border-b border-border px-2.5 py-1.5">
-                        <div className="flex flex-wrap gap-2">
-                          <Bottone variante="piccolo" onClick={() => setModifica(u.id)}>
-                            <I.Matita size={14} />Correggi
-                          </Bottone>
-                          <Bottone variante="piccolo" onClick={() => void prova(async () => {
-                            const r = await api.post<{ passwordProvvisoria: string }>(`/admin/utenti/${u.id}/reset-password`)
-                            setProvvisoria(r.passwordProvvisoria)
-                          })}>Reset password</Bottone>
-                          <Bottone variante="piccolo"
-                                   onClick={() => void prova(() => api.post(`/admin/utenti/${u.id}/attivo`, { attivo: !u.attivo }))}>
-                            {u.attivo ? 'Disattiva' : 'Riattiva'}
-                          </Bottone>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Pannello>
+          <Utenti utenti={utenti} unita={unita} nomeUnita={nomeUnita} prova={prova} onCredenziali={setCredenziali} />
         </section>
 
         <section id="causali">
@@ -257,11 +180,36 @@ export default function Amministrazione() {
             <ul className="grid gap-1.5 sm:grid-cols-2">
               {causali.map((c) => (
                 <li key={c.id} className="flex items-center justify-between gap-2 rounded-r2 border border-border bg-bg px-2.5 py-1.5">
-                  <span className={`text-base ${c.attiva ? '' : 'text-ink-faint line-through'}`}>{c.etichetta}</span>
-                  <button onClick={() => void prova(() => api.patch(`/admin/causali/${c.id}`, { attiva: !c.attiva }))}
-                          className="cursor-pointer text-sm text-ink-faint underline-offset-2 hover:text-ink hover:underline">
-                    {c.attiva ? 'disattiva' : 'attiva'}
-                  </button>
+                  {causaleInModifica === c.id ? (
+                    <form
+                      className="flex w-full items-center gap-2"
+                      onSubmit={(e: FormEvent<HTMLFormElement>) => {
+                        e.preventDefault()
+                        const f = new FormData(e.currentTarget)
+                        void prova(async () => {
+                          await api.patch(`/admin/causali/${c.id}`, { etichetta: f.get('etichetta') })
+                          setCausaleInModifica(null)
+                        })
+                      }}
+                    >
+                      <input name="etichetta" defaultValue={c.etichetta} className={inputCls} required minLength={2}
+                             aria-label={`Nuovo nome per ${c.etichetta}`} autoFocus />
+                      <Bottone type="submit" variante="piccolo">Salva</Bottone>
+                      <Bottone variante="piccolo" onClick={() => setCausaleInModifica(null)}>Annulla</Bottone>
+                    </form>
+                  ) : (
+                    <>
+                      <span className={`min-w-0 flex-1 truncate text-base ${c.attiva ? '' : 'text-ink-faint line-through'}`}>
+                        {c.etichetta}
+                      </span>
+                      <Bottone variante="icona" onClick={() => setCausaleInModifica(c.id)}
+                               aria-label={`Rinomina ${c.etichetta}`} title="Rinomina"><I.Matita size={14} /></Bottone>
+                      <button onClick={() => void prova(() => api.patch(`/admin/causali/${c.id}`, { attiva: !c.attiva }))}
+                              className="cursor-pointer text-sm text-ink-faint underline-offset-2 hover:text-ink hover:underline">
+                        {c.attiva ? 'disattiva' : 'attiva'}
+                      </button>
+                    </>
+                  )}
                 </li>
               ))}
             </ul>
@@ -270,10 +218,22 @@ export default function Amministrazione() {
 
         <section id="festivita">
           <Pannello titolo="Giornate non lavorative" icona={<I.Calendario size={18} />}
-                    azioni={<Bottone variante="piccolo" onClick={() => void prova(() => api.post(`/admin/festivita/nazionali/${anno + 1}`))}>
-                      Precarica {anno + 1}
-                    </Bottone>}
-                    piede="Le festività nazionali si precaricano per anno. Chiusure d'ufficio e patrono si aggiungono a mano.">
+                    azioni={
+                      <form
+                        className="flex items-center gap-2"
+                        onSubmit={(e: FormEvent<HTMLFormElement>) => {
+                          e.preventDefault()
+                          const a = new FormData(e.currentTarget).get('anno')
+                          void prova(() => api.post(`/admin/festivita/nazionali/${a}`))
+                        }}
+                      >
+                        <select name="anno" className={inputCls} defaultValue={anno + 1} aria-label="Anno da precaricare">
+                          {[anno, anno + 1, anno + 2].map((a) => <option key={a} value={a}>{a}</option>)}
+                        </select>
+                        <Bottone type="submit" variante="piccolo">Precarica</Bottone>
+                      </form>
+                    }
+                    piede="Le festività nazionali si precaricano per anno, saltando quelle già in archivio. Chiusure d'ufficio e patrono si aggiungono a mano.">
             <form
               onSubmit={(e: FormEvent<HTMLFormElement>) => {
                 e.preventDefault()

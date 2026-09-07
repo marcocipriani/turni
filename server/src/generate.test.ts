@@ -35,7 +35,12 @@ describe('calendario', () => {
     const date = italianHolidays(2026).map((h) => h.data)
     expect(date).toContain('2026-04-06')
     expect(date).toContain('2026-12-25')
-    expect(date).toHaveLength(11)
+    expect(date).toHaveLength(12)
+  })
+
+  it('aggiunge San Francesco dal 2026 e non prima', () => {
+    expect(italianHolidays(2026).map((h) => h.data)).toContain('2026-10-04')
+    expect(italianHolidays(2025).map((h) => h.data)).not.toContain('2025-10-04')
   })
 
   it('esclude weekend e festività dalle giornate lavorative', () => {

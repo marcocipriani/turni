@@ -58,6 +58,10 @@ export function italianHolidays(year: number): { data: ISODate; descrizione: str
     ['11-01', 'Ognissanti'], ['12-08', 'Immacolata Concezione'], ['12-25', 'Natale'],
     ['12-26', 'Santo Stefano'],
   ]
+  // Il 4 ottobre torna festa nazionale dal 2026, ottocentesimo anniversario
+  // della morte di Francesco d'Assisi. Prima di quell'anno era una solennità
+  // civile e si lavorava: caricarlo all'indietro falserebbe gli archivi.
+  if (year >= 2026) fisse.push(['10-04', "San Francesco d'Assisi"])
   const out = fisse.map(([md, descrizione]) => ({ data: `${year}-${md}`, descrizione }))
   out.push({ data: addDays(easterSunday(year), 1), descrizione: "Lunedì dell'Angelo" })
   return out.sort((a, b) => a.data.localeCompare(b.data))
