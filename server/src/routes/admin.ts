@@ -8,6 +8,7 @@ import { traccia } from '../lib/audit'
 import { carica, MODELLI, NOME_FILE, type Tabella, TABELLE } from '../lib/caricamento'
 import { italianHolidays } from '../lib/dates'
 import { esporta, SEZIONI, type Sezione } from '../lib/esportazione'
+import { siglaCognome } from '../lib/nomi'
 import { hashPassword } from '../lib/password'
 import { avvisa } from '../lib/notify'
 
@@ -94,6 +95,7 @@ admin.post('/unita', async (c) => {
   const a = c.get('attore')
   const parentId = b.data.parentId ?? null
   if (parentId != null && !(await esiste(parentId))) throw new HttpError(404, 'Unità superiore non trovata')
+  await nomeLibero(b.data.nome, b.data.sigla)
   const password = randomBytes(9).toString('base64url')
   const hash = await hashPassword(password)
 
@@ -108,7 +110,8 @@ admin.post('/unita', async (c) => {
       unitId = ins.insertId
       await tx.insert(schema.user).values({
         email: b.data.dirigente.email.toLowerCase(), passwordHash: hash,
-        nome: b.data.dirigente.nome, cognome: b.data.dirigente.cognome,
+        // Il cognome si tronca prima di entrare, come ovunque: vedi lib/nomi.ts.
+        nome: b.data.dirigente.nome, cognome: siglaCognome(b.data.dirigente.cognome),
         ruolo: 'dirigente', unitId, passwordDaCambiare: true,
       })
     })
@@ -116,6 +119,24 @@ admin.post('/unita', async (c) => {
   await traccia({ entita: 'unit', entitaId: unitId, azione: parentId == null ? 'crea_radice' : 'crea_figlia', utente: a.id, dopo: b.data })
   return c.json({ unitId, passwordProvvisoria: password }, 201)
 })
+
+/**
+ * Nome e sigla di un'unità sono la sua chiave per chi carica un file: due unità
+ * che si chiamano uguale renderebbero ambiguo ogni riferimento, e le righe
+ * finirebbero in silenzio nella sbagliata.
+ */
+async function nomeLibero(nome: string | undefined, sigla: string | null | undefined, escluso?: number) {
+  const righe = await db.select().from(schema.unit)
+  for (const u of righe) {
+    if (u.id === escluso) continue
+    const suoi = [u.nome.toLowerCase(), u.sigla?.toLowerCase()].filter(Boolean)
+    for (const mio of [nome, sigla].filter(Boolean)) {
+      if (suoi.includes(mio!.toLowerCase())) {
+        throw new HttpError(409, `«${mio}» è già il nome o la sigla di un'altra unità.`)
+      }
+    }
+  }
+}
 
 /** L'unità e tutte le sue discendenti: nessuna può finire sotto una di queste. */
 async function conDiscendenti(id: number): Promise<Set<number>> {
@@ -142,6 +163,9 @@ admin.patch('/unita/:id', async (c) => {
   if (!(await esiste(id))) throw new HttpError(404, 'Unità non trovata')
 
   const campi: Record<string, unknown> = {}
+  if (b.data.nome !== undefined || b.data.sigla !== undefined) {
+    await nomeLibero(b.data.nome, b.data.sigla, id)
+  }
   if (b.data.nome !== undefined) campi.nome = b.data.nome
   if (b.data.sigla !== undefined) campi.sigla = b.data.sigla || null
   if (b.data.parentId !== undefined) {
@@ -208,7 +232,7 @@ admin.post('/utenti', async (c) => {
   try {
     const [ins] = await db.insert(schema.user).values({
       email: b.data.email.toLowerCase(), passwordHash: await hashPassword(password),
-      nome: b.data.nome, cognome: b.data.cognome, ruolo: b.data.ruolo,
+      nome: b.data.nome, cognome: siglaCognome(b.data.cognome), ruolo: b.data.ruolo,
       unitId: b.data.unitId, passwordDaCambiare: true,
     })
     id = ins.insertId
@@ -231,7 +255,7 @@ admin.patch('/utenti/:id', async (c) => {
 
   const campi: Record<string, unknown> = {}
   if (b.data.nome !== undefined) campi.nome = b.data.nome
-  if (b.data.cognome !== undefined) campi.cognome = b.data.cognome
+  if (b.data.cognome !== undefined) campi.cognome = siglaCognome(b.data.cognome)
   if (b.data.email !== undefined) campi.email = b.data.email.toLowerCase()
   if (b.data.unitId !== undefined && b.data.unitId !== u.unitId) {
     if (!(await esiste(b.data.unitId))) throw new HttpError(404, 'Unità non trovata')

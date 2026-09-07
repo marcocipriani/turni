@@ -29,13 +29,22 @@ export default function Utenti({ utenti, unita, nomeUnita, prova, onCredenziali 
   const [gruppo, setGruppo] = useState<'nessuno' | 'ruolo' | 'unita'>('nessuno')
   const [modifica, setModifica] = useState<number | null>(null)
   const [scelti, setScelti] = useState<Set<number>>(new Set())
+  const [perPagina, setPerPagina] = useState(25)
+  const [pagina, setPagina] = useState(0)
 
   const confronta = (a: UtenteRiga, b: UtenteRiga) => {
     const primo = ordine === 'cognome' ? 'cognome' : 'nome'
     const secondo = ordine === 'cognome' ? 'nome' : 'cognome'
     return a[primo].localeCompare(b[primo], 'it') || a[secondo].localeCompare(b[secondo], 'it')
   }
-  const ordinati = [...utenti].sort(confronta)
+  const tutteLeRighe = [...utenti].sort(confronta)
+
+  // La pagina si taglia sull'ordinamento, prima dei gruppi: «25 per pagina»
+  // deve voler dire venticinque righe, non venticinque per ogni gruppo.
+  const pagine = Math.max(1, Math.ceil(tutteLeRighe.length / perPagina))
+  const corrente = Math.min(pagina, pagine - 1)
+  const primo = corrente * perPagina
+  const ordinati = tutteLeRighe.slice(primo, primo + perPagina)
 
   /** Un solo gruppo senza titolo quando non si raggruppa: la tabella è una sola. */
   const gruppi: { titolo: string | null; righe: UtenteRiga[] }[] =
@@ -50,6 +59,8 @@ export default function Utenti({ utenti, unita, nomeUnita, prova, onCredenziali 
           .concat([{ titolo: 'senza unità', righe: ordinati.filter((u) => u.unitId == null) }])
           .filter((g) => g.righe.length > 0)
 
+  const cambia = <T,>(f: (v: T) => void) => (v: T) => { f(v); setPagina(0) }
+
   const scegli = (id: number, dentro: boolean) =>
     setScelti((s) => {
       const n = new Set(s)
@@ -63,8 +74,10 @@ export default function Utenti({ utenti, unita, nomeUnita, prova, onCredenziali 
       return n
     })
 
-  const selezionati = ordinati.filter((u) => scelti.has(u.id))
-  const tutti = ordinati.length > 0 && selezionati.length === ordinati.length
+  // La selezione sopravvive al cambio di pagina: le azioni di massa valgono su
+  // tutte le persone scelte, anche quelle che in questo momento non si vedono.
+  const selezionati = tutteLeRighe.filter((u) => scelti.has(u.id))
+  const tutti = ordinati.length > 0 && ordinati.every((u) => scelti.has(u.id))
 
   /**
    * Le azioni di massa passano dalle stesse rotte di quelle singole, una per
@@ -107,7 +120,9 @@ export default function Utenti({ utenti, unita, nomeUnita, prova, onCredenziali 
         className="grid gap-3 sm:grid-cols-5"
       >
         <Campo etichetta="Nome"><input name="nome" className={inputCls} required /></Campo>
-        <Campo etichetta="Cognome"><input name="cognome" className={inputCls} required /></Campo>
+        <Campo etichetta="Cognome" aiuto="In archivio ne restano le prime tre lettere">
+          <input name="cognome" className={inputCls} required />
+        </Campo>
         <Campo etichetta="Posta"><input name="email" type="email" className={inputCls} required /></Campo>
         <Campo etichetta="Ruolo">
           <select name="ruolo" className={inputCls}>
@@ -126,20 +141,38 @@ export default function Utenti({ utenti, unita, nomeUnita, prova, onCredenziali 
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border pt-3">
         <Segmented
-          etichetta="Ordina per" valore={ordine} onCambia={setOrdine}
+          etichetta="Ordina per" valore={ordine} onCambia={cambia(setOrdine)}
           opzioni={[
             { v: 'cognome', testo: 'Cognome', titolo: 'In ordine di cognome' },
             { v: 'nome', testo: 'Nome', titolo: 'In ordine di nome' },
           ]}
         />
         <Segmented
-          etichetta="Raggruppa per" valore={gruppo} onCambia={setGruppo}
+          etichetta="Raggruppa per" valore={gruppo} onCambia={cambia(setGruppo)}
           opzioni={[
             { v: 'nessuno', testo: 'Tutti', titolo: 'Un elenco unico' },
             { v: 'ruolo', testo: 'Ruolo', titolo: 'Raggruppati per ruolo' },
             { v: 'unita', testo: 'Unità', titolo: 'Raggruppati per unità' },
           ]}
         />
+        <label className="flex items-center gap-1.5 whitespace-nowrap text-sm text-ink-muted">
+          Righe
+          <select className={inputCls} value={perPagina}
+                  onChange={(e) => { setPerPagina(Number(e.target.value)); setPagina(0) }}>
+            {[25, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </label>
+        {pagine > 1 && (
+          <div className="flex items-center gap-2">
+            <Bottone variante="piccolo" disabled={corrente === 0}
+                     onClick={() => setPagina(corrente - 1)} aria-label="Pagina precedente">‹</Bottone>
+            <span role="status" className="tabular-nums text-sm text-ink-muted">
+              {primo + 1}–{Math.min(primo + perPagina, tutteLeRighe.length)} di {tutteLeRighe.length}
+            </span>
+            <Bottone variante="piccolo" disabled={corrente >= pagine - 1}
+                     onClick={() => setPagina(corrente + 1)} aria-label="Pagina successiva">›</Bottone>
+          </div>
+        )}
       </div>
 
       {selezionati.length > 0 && (
@@ -190,7 +223,7 @@ export default function Utenti({ utenti, unita, nomeUnita, prova, onCredenziali 
           <thead>
             <tr>
               <th scope="col" className={intestazione}>
-                <input type="checkbox" checked={tutti} aria-label="Seleziona tutte le persone"
+                <input type="checkbox" checked={tutti} aria-label="Seleziona le persone di questa pagina"
                        onChange={(e) => scegliTutti(ordinati, e.target.checked)} />
               </th>
               {['Persona', 'Posta', 'Ruolo', 'Unità', 'Azioni'].map((t) => (
@@ -245,7 +278,7 @@ export default function Utenti({ utenti, unita, nomeUnita, prova, onCredenziali 
                            onChange={(e) => scegli(u.id, e.target.checked)} />
                   </td>
                   <td className={cella}>
-                    {u.cognome} <span className="text-ink-muted">{u.nome}</span>
+                    <span className="font-semibold">{u.cognome}</span> <span className="text-ink-muted">{u.nome}</span>
                     {!u.attivo && <span className="ml-2 text-2xs text-ink-faint">disattivato</span>}
                   </td>
                   <td className={`mono ${cella} text-ink-muted`}>{u.email}</td>

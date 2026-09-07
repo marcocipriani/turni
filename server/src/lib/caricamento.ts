@@ -19,7 +19,7 @@
 import { randomInt } from 'node:crypto'
 import { eq } from 'drizzle-orm'
 import { db, schema } from '../db/index'
-import { ISO, leggiCsv, type Riga, si } from './csv'
+import { EMAIL, ISO, leggiCsv, lungo, type Riga, si } from './csv'
 import { dividiNome, siglaCognome } from './nomi'
 import { hashPassword } from './password'
 
@@ -46,14 +46,34 @@ export class Esito {
 
 /* ── Anagrafiche già in archivio, per risolvere i riferimenti ─────── */
 
-async function unitaPerNome() {
-  const righe = await db.select().from(schema.unit)
-  const m = new Map<string, number>()
+/**
+ * Un'unità si nomina col nome per esteso o con la sigla: chi compila il file usa
+ * quello che ha sottomano, e devono portare allo stesso posto. Se due unità
+ * condividono un nome il riferimento è ambiguo, e va detto invece che scegliere
+ * a caso: l'archivio nuovo lo impedisce, uno vecchio può contenerlo.
+ */
+function indice(righe: { id: number; nome: string; sigla: string | null }[]) {
+  const uno = new Map<string, number>()
+  const ambigue = new Set<string>()
   for (const u of righe) {
-    m.set(u.nome.toLowerCase(), u.id)
-    if (u.sigla) m.set(u.sigla.toLowerCase(), u.id)
+    for (const k of [u.nome.toLowerCase(), u.sigla?.toLowerCase()]) {
+      if (!k) continue
+      if (uno.has(k) && uno.get(k) !== u.id) ambigue.add(k)
+      uno.set(k, u.id)
+    }
   }
-  return m
+  return {
+    id: (nome: string) => uno.get(nome.toLowerCase()),
+    ambigua: (nome: string) => ambigue.has(nome.toLowerCase()),
+    aggiungi: (nome: string, sigla: string | null, id: number) => {
+      uno.set(nome.toLowerCase(), id)
+      if (sigla) uno.set(sigla.toLowerCase(), id)
+    },
+  }
+}
+
+async function unitaPerNome() {
+  return indice(await db.select().from(schema.unit))
 }
 
 /**
@@ -93,13 +113,7 @@ const senzaAccenti = (s: string) =>
 
 async function persone(righe: Riga[], e: Esito, opz: Opzioni) {
   const righeUnita = await db.select().from(schema.unit)
-  // Un'unità si nomina col nome per esteso o con la sigla: chi compila il file
-  // usa quello che ha sottomano, e devono portare allo stesso posto.
-  const idUnita = new Map<string, number>()
-  for (const u of righeUnita) {
-    idUnita.set(u.nome.toLowerCase(), u.id)
-    if (u.sigla) idUnita.set(u.sigla.toLowerCase(), u.id)
-  }
+  const idUnita = indice(righeUnita)
   const emailInArchivio = new Set((await db.select({ email: schema.user.email }).from(schema.user))
     .map((u) => u.email))
   const dirigentiInArchivio = new Set(
@@ -122,10 +136,16 @@ async function persone(righe: Riga[], e: Esito, opz: Opzioni) {
     try { ({ nome, cognome } = dividiNome(r.persona)) }
     catch (x) { e.errore(i, (x as Error).message); continue }
 
+    const troppo = lungo(nome, 80, 'persona') ?? lungo(r.unita ?? '', 160, 'unita')
+      ?? lungo(r.sigla ?? '', 32, 'sigla') ?? lungo(r.settore ?? '', 120, 'settore')
+      ?? lungo(r.unitaPadre ?? '', 160, 'unitaPadre')
+    if (troppo) { e.errore(i, troppo); continue }
+
     const sigla = siglaCognome(cognome)
     const email = (r.email
       || (opz.dominio ? `${senzaAccenti(nome)}.${senzaAccenti(sigla)}@${opz.dominio}` : '')).toLowerCase()
     if (!email) { e.errore(i, 'nessun indirizzo, e nessun dominio con cui costruirlo.'); continue }
+    if (email.length > 190 || !EMAIL.test(email)) { e.errore(i, `indirizzo non valido: «${email}».`); continue }
     if (emailViste.has(email)) { e.errore(i, `indirizzo ripetuto «${email}».`); continue }
     emailViste.add(email)
     // Già in archivio: la riga si salta, così lo stesso file si può ripassare.
@@ -143,14 +163,15 @@ async function persone(righe: Riga[], e: Esito, opz: Opzioni) {
   }
   for (const [u, n] of capiNelFile) {
     if (n > 1) e.errori.push(`L'unità «${u}» ha ${n} dirigenti nel file: ne è previsto uno solo.`)
-    const idEsistente = idUnita.get(u.toLowerCase())
+    const idEsistente = idUnita.id(u)
     if (idEsistente != null && dirigentiInArchivio.has(idEsistente)) {
       e.errori.push(`L'unità «${u}» ha già un dirigente in archivio.`)
     }
   }
   const citate = new Set(buone.filter((p) => p.r.unita).map((p) => p.r.unita!))
   for (const u of citate) {
-    const idEsistente = idUnita.get(u.toLowerCase())
+    if (idUnita.ambigua(u)) e.errori.push(`«${u}» è il nome di due unità diverse: il riferimento è ambiguo.`)
+    const idEsistente = idUnita.id(u)
     const haCapo = capiNelFile.has(u) || (idEsistente != null && dirigentiInArchivio.has(idEsistente))
     if (!haCapo) e.errori.push(`L'unità «${u}» non ha nessun dirigente, né nel file né in archivio.`)
   }
@@ -162,7 +183,7 @@ async function persone(righe: Riga[], e: Esito, opz: Opzioni) {
      qui, prima di scrivere, perché dopo l'albero sarebbe già storto. */
 
   const nota = (n: string) => n.toLowerCase()
-  const conosciuta = (n: string) => citate.has(n) || idUnita.has(nota(n))
+  const conosciuta = (n: string) => citate.has(n) || idUnita.id(n) != null
   const padreNelFile = new Map<string, string>()
 
   for (const p of buone) {
@@ -183,7 +204,7 @@ async function persone(righe: Riga[], e: Esito, opz: Opzioni) {
   // Il grafo si ragiona per chiavi stabili: un'unità già in archivio è il suo
   // id, una che nasce dal file è il suo nome. Così i due mondi si mescolano
   // senza confondersi.
-  const chiave = (n: string) => { const id = idUnita.get(nota(n)); return id == null ? `nuova:${nota(n)}` : `id:${id}` }
+  const chiave = (n: string) => { const id = idUnita.id(n); return id == null ? `nuova:${nota(n)}` : `id:${id}` }
   const sopra = new Map<string, string | null>()
   for (const u of righeUnita) sopra.set(`id:${u.id}`, u.parentId == null ? null : `id:${u.parentId}`)
   for (const u of citate) if (!sopra.has(chiave(u))) sopra.set(chiave(u), null)
@@ -212,66 +233,66 @@ async function persone(righe: Riga[], e: Esito, opz: Opzioni) {
     return
   }
 
-  /* ── Unità, in due passate: prima tutte, poi i legami di parentela ── */
+  /* ── Scrittura, tutta dentro una transazione ──────────────────────
+     Le persone entrano tutte o nessuna: se l'ultima riga si scontra con un
+     indirizzo appena preso da qualcun altro, non devono restare a metà né le
+     utenze né le unità nate per contenerle. */
 
-  const idDi = (nome: string) => idUnita.get(nome.toLowerCase())
+  await db.transaction(async (tx) => {
+    const idDi = (nome: string) => idUnita.id(nome)
 
-  for (const nome of citate) {
-    if (idDi(nome)) continue
-    const sigla = buone.find((p) => p.r.unita === nome && p.r.sigla)?.r.sigla || null
-    const [ins] = await db.insert(schema.unit).values({ nome, sigla })
-    idUnita.set(nome.toLowerCase(), ins.insertId)
-    if (sigla) idUnita.set(sigla.toLowerCase(), ins.insertId)
-    e.note.push(`unità: ${nome}`)
-  }
-  for (const [figlia, padre] of padreNelFile) {
-    await db.update(schema.unit).set({ parentId: idDi(padre)! }).where(eq(schema.unit.id, idDi(figlia)!))
-  }
+    for (const nome of citate) {
+      if (idDi(nome)) continue
+      const sigla = buone.find((p) => p.r.unita === nome && p.r.sigla)?.r.sigla || null
+      const [ins] = await tx.insert(schema.unit).values({ nome, sigla })
+      idUnita.aggiungi(nome, sigla, ins.insertId)
+      e.note.push(`unità: ${nome}`)
+    }
+    for (const [figlia, padre] of padreNelFile) {
+      await tx.update(schema.unit).set({ parentId: idDi(padre)! }).where(eq(schema.unit.id, idDi(figlia)!))
+    }
 
-  /* ── Settori ──────────────────────────────────────────────────────── */
+    const settoreId = new Map<string, number>()
+    for (const s of await tx.select().from(schema.sector)) settoreId.set(`${s.unitId}|${s.nome}`, s.id)
+    for (const p of buone) {
+      const nome = p.r.settore
+      if (!nome || !p.r.unita) continue
+      const uid = idDi(p.r.unita)!
+      const k = `${uid}|${nome}`
+      if (settoreId.has(k)) continue
+      const [ins] = await tx.insert(schema.sector).values({
+        unitId: uid, nome, richiedePresidio: si(p.r.presidio), ordine: settoreId.size,
+      })
+      settoreId.set(k, ins.insertId)
+      e.note.push(`settore: ${nome}${si(p.r.presidio) ? ' (presidio)' : ''}`)
+    }
 
-  const settoreId = new Map<string, number>()
-  for (const s of await db.select().from(schema.sector)) settoreId.set(`${s.unitId}|${s.nome}`, s.id)
-  for (const p of buone) {
-    const nome = p.r.settore
-    if (!nome || !p.r.unita) continue
-    const uid = idDi(p.r.unita)!
-    const k = `${uid}|${nome}`
-    if (settoreId.has(k)) continue
-    const [ins] = await db.insert(schema.sector).values({
-      unitId: uid, nome, richiedePresidio: si(p.r.presidio), ordine: settoreId.size,
-    })
-    settoreId.set(k, ins.insertId)
-    e.note.push(`settore: ${nome}${si(p.r.presidio) ? ' (presidio)' : ''}`)
-  }
+    const idPerEmail = new Map<string, number>()
+    for (const p of buone) {
+      const password = passwordCasuale()
+      const uid = p.r.unita ? idDi(p.r.unita)! : null
+      const sid = p.r.settore && uid ? settoreId.get(`${uid}|${p.r.settore}`) ?? null : null
+      const [ins] = await tx.insert(schema.user).values({
+        email: p.email, passwordHash: await hashPassword(password),
+        nome: p.nome, cognome: p.sigla,
+        ruolo: p.r.ruolo as 'admin' | 'dirigente' | 'dipendente',
+        unitId: uid, sectorId: sid, passwordDaCambiare: true,
+      })
+      idPerEmail.set(p.email, ins.insertId)
+      e.credenziali.push({ chi: `${p.sigla} ${p.nome}`, email: p.email, password })
+      e.aggiunti++
+    }
 
-  /* ── Persone e deleghe ────────────────────────────────────────────── */
-
-  const idPerEmail = new Map<string, number>()
-  for (const p of buone) {
-    const password = passwordCasuale()
-    const uid = p.r.unita ? idDi(p.r.unita)! : null
-    const sid = p.r.settore && uid ? settoreId.get(`${uid}|${p.r.settore}`) ?? null : null
-    const [ins] = await db.insert(schema.user).values({
-      email: p.email, passwordHash: await hashPassword(password),
-      nome: p.nome, cognome: p.sigla,
-      ruolo: p.r.ruolo as 'admin' | 'dirigente' | 'dipendente',
-      unitId: uid, sectorId: sid, passwordDaCambiare: true,
-    })
-    idPerEmail.set(p.email, ins.insertId)
-    e.credenziali.push({ chi: `${p.sigla} ${p.nome}`, email: p.email, password })
-    e.aggiunti++
-  }
-
-  for (const p of buone) {
-    if (!si(p.r.organizzatore) || !p.r.unita) continue
-    const capo = buone.find((x) => x.r.ruolo === 'dirigente' && x.r.unita === p.r.unita)
-    const nominatoDa = capo ? idPerEmail.get(capo.email) : undefined
-    if (!nominatoDa) continue
-    await db.insert(schema.organizer)
-      .values({ userId: idPerEmail.get(p.email)!, unitId: idDi(p.r.unita)!, nominatoDa })
-    e.note.push(`organizzatore: ${p.sigla} ${p.nome}`)
-  }
+    for (const p of buone) {
+      if (!si(p.r.organizzatore) || !p.r.unita) continue
+      const capo = buone.find((x) => x.r.ruolo === 'dirigente' && x.r.unita === p.r.unita)
+      const nominatoDa = capo ? idPerEmail.get(capo.email) : undefined
+      if (!nominatoDa) continue
+      await tx.insert(schema.organizer)
+        .values({ userId: idPerEmail.get(p.email)!, unitId: idDi(p.r.unita)!, nominatoDa })
+      e.note.push(`organizzatore: ${p.sigla} ${p.nome}`)
+    }
+  })
 }
 
 /* ── Stanze e scrivanie ───────────────────────────────────────────── */
@@ -282,9 +303,12 @@ async function stanze(righe: Riga[], e: Esito, opz: Opzioni) {
 
   for (const [i, r] of righe.entries()) {
     if (!r.stanza) { e.errore(i, 'manca la colonna «stanza».'); continue }
+    const troppo = lungo(r.stanza, 60, 'stanza') ?? lungo(r.piano ?? '', 40, 'piano')
+    if (troppo) { e.errore(i, troppo); continue }
     if (esistenti.has(r.stanza.toLowerCase())) { e.saltati++; continue }
 
-    const unitId = unita.get((r.unita ?? '').toLowerCase())
+    if (unita.ambigua(r.unita ?? '')) { e.errore(i, `«${r.unita}» è il nome di due unità diverse.`); continue }
+    const unitId = unita.id(r.unita ?? '')
     if (!unitId) { e.errore(i, `unità «${r.unita}» non trovata.`); continue }
 
     // «5» crea le scrivanie da 1 a 5; «1,2,5» crea esattamente quelle. Serve
@@ -295,6 +319,9 @@ async function stanze(righe: Riga[], e: Esito, opz: Opzioni) {
       : Array.from({ length: Number(grezzo) || 0 }, (_, n) => String(n + 1))
     if (numeri.length === 0) { e.errore(i, 'nessuna scrivania: indica un numero, oppure l\'elenco «1,2,5».'); continue }
     if (new Set(numeri).size !== numeri.length) { e.errore(i, 'due scrivanie con lo stesso numero.'); continue }
+    if (numeri.length > 200) { e.errore(i, `${numeri.length} scrivanie in una stanza sola: controlla la riga.`); continue }
+    const numeroLungo = numeri.find((n) => n.length > 20)
+    if (numeroLungo) { e.errore(i, `il numero di scrivania «${numeroLungo}» supera i 20 caratteri.`); continue }
 
     if (!opz.prova) {
       const [ins] = await db.insert(schema.room)
@@ -318,7 +345,10 @@ async function settori(righe: Riga[], e: Esito, opz: Opzioni) {
 
   for (const [i, r] of righe.entries()) {
     if (!r.settore) { e.errore(i, 'manca la colonna «settore».'); continue }
-    const unitId = unita.get((r.unita ?? '').toLowerCase())
+    const troppo = lungo(r.settore, 120, 'settore')
+    if (troppo) { e.errore(i, troppo); continue }
+    if (unita.ambigua(r.unita ?? '')) { e.errore(i, `«${r.unita}» è il nome di due unità diverse.`); continue }
+    const unitId = unita.id(r.unita ?? '')
     if (!unitId) { e.errore(i, `unità «${r.unita}» non trovata.`); continue }
 
     const k = `${unitId}|${r.settore.toLowerCase()}`
@@ -384,6 +414,8 @@ async function causali(righe: Riga[], e: Esito, opz: Opzioni) {
     if (!/^[a-z0-9_]+$/.test(r.codice)) {
       e.errore(i, `codice «${r.codice}»: solo minuscole, cifre e trattino basso.`); continue
     }
+    const troppo = lungo(r.codice, 40, 'codice') ?? lungo(r.etichetta, 120, 'etichetta')
+    if (troppo) { e.errore(i, troppo); continue }
     if (esistenti.has(r.codice)) { e.saltati++; continue }
 
     if (!opz.prova) {
@@ -411,12 +443,15 @@ async function giornate(righe: Riga[], e: Esito, opz: Opzioni) {
   for (const [i, r] of righe.entries()) {
     if (!ISO.test(r.data ?? '')) { e.errore(i, 'data non valida: serve nella forma 2026-12-24.'); continue }
     if (!r.descrizione) { e.errore(i, 'manca la descrizione.'); continue }
+    const troppo = lungo(r.descrizione, 120, 'descrizione')
+    if (troppo) { e.errore(i, troppo); continue }
 
     // Unità vuota significa «vale per tutti»: è il caso delle festività
     // nazionali, e resta il predefinito.
     let unitId: number | null = null
     if (r.unita) {
-      unitId = unita.get(r.unita.toLowerCase()) ?? null
+      if (unita.ambigua(r.unita)) { e.errore(i, `«${r.unita}» è il nome di due unità diverse.`); continue }
+      unitId = unita.id(r.unita) ?? null
       if (unitId == null) { e.errore(i, `unità «${r.unita}» non trovata.`); continue }
     }
 

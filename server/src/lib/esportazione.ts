@@ -17,7 +17,13 @@ export type Sezione = (typeof SEZIONI)[number]
  * dentro una cella spezzerebbe la riga a chi la rilegge, e diventa una virgola.
  * Meglio un carattere cambiato che un file che non torna dentro.
  */
-const cella = (v: unknown) => (v == null ? '' : String(v).replace(/[;\r\n]+/g, ',').trim())
+function cella(v: unknown) {
+  const pulita = v == null ? '' : String(v).replace(/[;\r\n]+/g, ',').trim()
+  // Un valore che comincia per = + - @ è una formula per il foglio di calcolo
+  // che aprirà il file, e i nomi qui dentro li scrivono gli utenti. Uno spazio
+  // davanti lo rende testo, e chi rilegge il file lo toglie: il giro torna.
+  return /^[=+\-@]/.test(pulita) ? ` ${pulita}` : pulita
+}
 
 const foglio = (intestazione: string[], righe: unknown[][]) =>
   [intestazione.join(';'), ...righe.map((r) => r.map(cella).join(';'))].join('\n') + '\n'
