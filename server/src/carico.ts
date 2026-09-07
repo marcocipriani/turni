@@ -2,7 +2,7 @@
  * Prova di carico del motore, isolata dal database: 500 persone su 22 giornate,
  * la dimensione che la spec indica come tetto di estensione.
  *
- *   npm run carico -w server
+ *   npm run carico
  */
 import { generate, type Persona } from './generate'
 import { workingDays } from './lib/dates'

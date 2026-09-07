@@ -6,8 +6,8 @@
  * persone reali, e ciascuna riceve una password diversa, casuale, mostrata una
  * volta sola su questo terminale e mai più recuperabile.
  *
- *   npm run avvio -w server -- persone.csv --dominio comune.it
- *   npm run avvio -w server -- nuovi.csv --aggiungi
+ *   npm run avvio -- persone.csv --dominio comune.it
+ *   npm run avvio -- nuovi.csv --aggiungi
  *
  * Le persone le carica il motore condiviso (lib/caricamento.ts), lo stesso che
  * serve `importa` e la pagina «Sistema»: qui attorno c'è solo ciò che riguarda
@@ -58,10 +58,10 @@ async function main() {
     console.error(`
 Serve un file CSV.
 
-  npm run avvio -w server -- persone.csv --dominio comune.it
+  npm run avvio -- persone.csv --dominio comune.it
 
 Colonne: persona;ruolo;unita;sigla;unitaPadre;settore;presidio;organizzatore;email
-Il modello si stampa con: npm run importa -w server -- --modello persone
+Il modello si stampa con: npm run importa -- --modello persone
 `)
     process.exit(1)
   }
