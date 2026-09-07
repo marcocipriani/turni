@@ -82,7 +82,7 @@ mio.get('/', async (c) => {
 
   const [stanzeRighe, scrivanie] = await Promise.all([
     db.select().from(schema.room)
-      .where(and(eq(schema.room.unitId, radice(alb, unitId)), eq(schema.room.attiva, true))),
+      .where(and(eq(schema.room.unitId, unitId), eq(schema.room.attiva, true))),
     db.select().from(schema.desk).where(eq(schema.desk.attiva, true)),
   ])
   const capienza = new Map<number, number>()

@@ -120,7 +120,7 @@ export default function Utenti({ utenti, unita, nomeUnita, prova, onCredenziali 
         className="grid gap-3 sm:grid-cols-5"
       >
         <Campo etichetta="Nome"><input name="nome" className={inputCls} required /></Campo>
-        <Campo etichetta="Cognome" aiuto="In archivio ne restano le prime tre lettere">
+        <Campo etichetta="Cognome">
           <input name="cognome" className={inputCls} required />
         </Campo>
         <Campo etichetta="Posta"><input name="email" type="email" className={inputCls} required /></Campo>

@@ -8,7 +8,7 @@ import { traccia } from '../lib/audit'
 import { carica, MODELLI, NOME_FILE, type Tabella, TABELLE } from '../lib/caricamento'
 import { italianHolidays } from '../lib/dates'
 import { esporta, SEZIONI, type Sezione } from '../lib/esportazione'
-import { siglaCognome } from '../lib/nomi'
+
 import { hashPassword } from '../lib/password'
 import { avvisa } from '../lib/notify'
 
@@ -111,7 +111,7 @@ admin.post('/unita', async (c) => {
       await tx.insert(schema.user).values({
         email: b.data.dirigente.email.toLowerCase(), passwordHash: hash,
         // Il cognome si tronca prima di entrare, come ovunque: vedi lib/nomi.ts.
-        nome: b.data.dirigente.nome, cognome: siglaCognome(b.data.dirigente.cognome),
+        nome: b.data.dirigente.nome, cognome: b.data.dirigente.cognome,
         ruolo: 'dirigente', unitId, passwordDaCambiare: true,
       })
     })
@@ -232,7 +232,7 @@ admin.post('/utenti', async (c) => {
   try {
     const [ins] = await db.insert(schema.user).values({
       email: b.data.email.toLowerCase(), passwordHash: await hashPassword(password),
-      nome: b.data.nome, cognome: siglaCognome(b.data.cognome), ruolo: b.data.ruolo,
+      nome: b.data.nome, cognome: b.data.cognome, ruolo: b.data.ruolo,
       unitId: b.data.unitId, passwordDaCambiare: true,
     })
     id = ins.insertId
@@ -255,7 +255,7 @@ admin.patch('/utenti/:id', async (c) => {
 
   const campi: Record<string, unknown> = {}
   if (b.data.nome !== undefined) campi.nome = b.data.nome
-  if (b.data.cognome !== undefined) campi.cognome = siglaCognome(b.data.cognome)
+  if (b.data.cognome !== undefined) campi.cognome = b.data.cognome
   if (b.data.email !== undefined) campi.email = b.data.email.toLowerCase()
   if (b.data.unitId !== undefined && b.data.unitId !== u.unitId) {
     if (!(await esiste(b.data.unitId))) throw new HttpError(404, 'Unità non trovata')

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dividiNome, siglaCognome } from './nomi'
+import { dividiNome, indirizzoDa } from './nomi'
 
 describe('dividiNome', () => {
   it('tiene la particella attaccata al cognome', () => {
@@ -29,15 +29,17 @@ describe('dividiNome', () => {
   })
 })
 
-describe('siglaCognome', () => {
-  it('toglie spazi e apostrofi, poi tronca a tre', () => {
-    expect(siglaCognome('Della Valle')).toBe('Del')
-    expect(siglaCognome('De Angelis')).toBe('DeA')
-    expect(siglaCognome('Marchetti')).toBe('Mar')
-    expect(siglaCognome("D'Angelo")).toBe('DAn')
+describe('indirizzoDa', () => {
+  it('costruisce iniziale del nome, punto, cognome', () => {
+    expect(indirizzoDa('Elena', 'Marchetti', 'turni.test')).toBe('e.marchetti@turni.test')
+    expect(indirizzoDa('Tommaso', 'Della Valle', 'turni.test')).toBe('t.dellavalle@turni.test')
   })
 
-  it('non allunga un cognome più corto di tre', () => {
-    expect(siglaCognome('Po')).toBe('Po')
+  it('toglie accenti e apostrofi, che in un indirizzo non stanno', () => {
+    expect(indirizzoDa('Niccolò', "D'Angelo", 'x.it')).toBe('n.dangelo@x.it')
+  })
+
+  it('prende solo la prima lettera dei nomi doppi', () => {
+    expect(indirizzoDa('Maria Luisa', 'Rossi', 'x.it')).toBe('m.rossi@x.it')
   })
 })

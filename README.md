@@ -52,12 +52,11 @@ Turni fa quel lavoro sapendo tutte e quattro le cose.
 
 Non è una sezione di conformità: sono scelte che hanno cambiato il codice.
 
-**Il cognome non esiste per esteso.** Viene troncato a tre caratteri *prima*
-dell'inserimento in archivio — `Di Marco` diventa `DiM` — e lo stesso vale per
-gli indirizzi generati. A video compare la sola sigla; il nome si aggiunge solo
-alle sigle che collidono in quella schermata. Un test verifica che nessun
-cognome in archivio superi i tre caratteri: la minimizzazione non regge su una
-convenzione, regge su un controllo.
+**Dell'anagrafica entra solo ciò che serve a fare i turni.** Nome, cognome,
+indirizzo, unità e settore: nessun codice fiscale, nessuna matricola, nessun
+dato contrattuale, nessuna data di nascita. Negli elenchi compare il solo
+cognome, e il nome si aggiunge alle sole righe che altrimenti si
+confonderebbero in quella schermata.
 
 **Un collega non distingue un assente da chi lavora da casa.** Il mascheramento
 avviene in un punto solo del server, prima della serializzazione, e nessuna

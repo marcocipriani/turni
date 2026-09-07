@@ -25,10 +25,8 @@
  *   settore          facoltativo; creato se non esiste
  *   presidio         facoltativo, «si» se il settore richiede presidio
  *   organizzatore    facoltativo, «si» per delegare la programmazione
- *   email            facoltativa; senza, si costruisce da nome e sigla
- *
- * Il cognome viene troncato a tre caratteri prima di entrare nell'archivio,
- * come ovunque: vedi lib/nomi.ts.
+ *   email            facoltativa; senza, si costruisce come
+ *                    iniziale-del-nome.cognome@dominio
  */
 import 'dotenv/config'
 import { readFileSync } from 'node:fs'

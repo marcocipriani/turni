@@ -44,8 +44,6 @@ export default function Organizzazione() {
   if (unitId == null || !unita) {
     return <Vista titolo="Struttura" icona={<I.Organizzazione size={17} />} caricando><Scheletro righe={5} /></Vista>
   }
-  const proprietariaStanze = unita.radiceId === unita.id
-
   return (
     <Vista
       titolo={unita.nome} icona={<I.Organizzazione size={17} />}
@@ -223,29 +221,25 @@ export default function Organizzazione() {
 
         <section id="stanze">
           <Pannello titolo="Stanze e scrivanie" icona={<I.Stanza size={18} />}
-                    piede={proprietariaStanze
-                      ? 'La capienza di una stanza è il numero di scrivanie attive.'
-                      : "Le stanze appartengono all'unità radice: le gestisce il suo dirigente."}>
-            {proprietariaStanze && (
-              <form
-                onSubmit={(e: FormEvent<HTMLFormElement>) => {
-                  e.preventDefault()
-                  const form = e.currentTarget
-                  const f = new FormData(form)
-                  void prova(() => api.post('/org/stanze', {
-                    unitId, etichetta: f.get('etichetta'), piano: f.get('piano') || undefined,
-                    scrivanie: Number(f.get('scrivanie')),
-                  }))
-                  form.reset()
-                }}
-                className="grid items-end gap-3 sm:grid-cols-[1fr_1fr_120px_auto]"
-              >
-                <Campo etichetta="Etichetta"><input name="etichetta" className={inputCls} required placeholder="101" /></Campo>
-                <Campo etichetta="Piano"><input name="piano" className={inputCls} placeholder="Primo piano" /></Campo>
-                <Campo etichetta="Scrivanie"><input name="scrivanie" type="number" min={1} max={200} defaultValue={4} className={inputCls} required /></Campo>
-                <Bottone type="submit" variante="primario">Crea</Bottone>
-              </form>
-            )}
+                    piede="La capienza di una stanza è il numero di scrivanie attive.">
+            <form
+              onSubmit={(e: FormEvent<HTMLFormElement>) => {
+                e.preventDefault()
+                const form = e.currentTarget
+                const f = new FormData(form)
+                void prova(() => api.post('/org/stanze', {
+                  unitId, etichetta: f.get('etichetta'), piano: f.get('piano') || undefined,
+                  scrivanie: Number(f.get('scrivanie')),
+                }))
+                form.reset()
+              }}
+              className="grid items-end gap-3 sm:grid-cols-[1fr_1fr_120px_auto]"
+            >
+              <Campo etichetta="Etichetta"><input name="etichetta" className={inputCls} required placeholder="101" /></Campo>
+              <Campo etichetta="Piano"><input name="piano" className={inputCls} placeholder="Primo piano" /></Campo>
+              <Campo etichetta="Scrivanie"><input name="scrivanie" type="number" min={1} max={200} defaultValue={4} className={inputCls} required /></Campo>
+              <Bottone type="submit" variante="primario">Crea</Bottone>
+            </form>
 
             {stanze.length === 0 ? <p className="text-base text-ink-faint">Nessuna stanza.</p> : (
               <ul className="grid gap-3 sm:grid-cols-2">
@@ -257,7 +251,6 @@ export default function Organizzazione() {
                       {s.scrivanie.map((d) => (
                         <li key={d.id}>
                           <button
-                            disabled={!proprietariaStanze}
                             onClick={() => void prova(() => api.patch(`/org/scrivanie/${d.id}`, { attiva: !d.attiva }))}
                             aria-label={`Scrivania ${d.numero}, ${d.attiva ? 'attiva' : 'disattivata'}`}
                             className={`mono cursor-pointer rounded-r1 border px-2 py-0.5 text-sm disabled:cursor-default
@@ -265,14 +258,12 @@ export default function Organizzazione() {
                           >{d.numero}</button>
                         </li>
                       ))}
-                      {proprietariaStanze && (
-                        <li>
-                          <Bottone variante="piccolo"
-                                   onClick={() => void prova(() => api.post(`/org/stanze/${s.id}/scrivanie`, { numero: String(s.scrivanie.length + 1) }))}>
-                            <I.Piu size={13} />scrivania
-                          </Bottone>
-                        </li>
-                      )}
+                      <li>
+                        <Bottone variante="piccolo"
+                                 onClick={() => void prova(() => api.post(`/org/stanze/${s.id}/scrivanie`, { numero: String(s.scrivanie.length + 1) }))}>
+                          <I.Piu size={13} />scrivania
+                        </Bottone>
+                      </li>
                     </ul>
                   </li>
                 ))}

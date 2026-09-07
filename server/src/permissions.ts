@@ -83,11 +83,6 @@ export function puoAmministrareUnita(a: Attore, unitId: number): boolean {
   return a.ruolo === 'dirigente' && a.unitId === unitId
 }
 
-/** Stanze e scrivanie: il dirigente dell'unità radice che le possiede. */
-export function puoGestireStanze(albero: Albero, a: Attore, unitRadiceId: number): boolean {
-  return a.ruolo === 'dirigente' && a.unitId != null && radice(albero, a.unitId) === unitRadiceId && a.unitId === unitRadiceId
-}
-
 /**
  * Chi vede la causale di un'assenza: l'interessato, gli organizzatori della sua
  * unità di programmazione, e il dirigente di qualunque unità che la contenga.

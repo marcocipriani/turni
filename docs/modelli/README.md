@@ -47,17 +47,13 @@ sola**: copiala subito.
 | `settore` | facoltativo; creato se non esiste |
 | `presidio` | `si` se quel settore richiede una presenza ogni giorno |
 | `organizzatore` | `si` per delegare la costruzione dei turni |
-| `email` | facoltativa: senza, si costruisce come `nome.sigla@dominio` |
+| `email` | facoltativa: senza, si costruisce come `iniziale.cognome@dominio` |
 
 Ogni unità nominata **deve avere esattamente un dirigente**, altrimenti il
 comando si ferma prima di scrivere qualsiasi cosa.
 
 Il comando si rifiuta di girare su un archivio già popolato. Per aggiungere
 persone dopo: `npm run avvio -w server -- nuovi.csv --aggiungi`.
-
-> In archivio il cognome entra troncato a tre caratteri — `Di Marco` diventa
-> `DiM` — e non c'è modo di risalire per esteso. Non è impaginazione: è la
-> quantità di dato che serve.
 
 ## `stanze.csv` — stanze e scrivanie
 

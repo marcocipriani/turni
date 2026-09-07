@@ -20,7 +20,7 @@ import { randomInt } from 'node:crypto'
 import { eq } from 'drizzle-orm'
 import { db, schema } from '../db/index'
 import { EMAIL, ISO, leggiCsv, lungo, type Riga, si } from './csv'
-import { dividiNome, siglaCognome } from './nomi'
+import { dividiNome, indirizzoDa } from './nomi'
 import { hashPassword } from './password'
 
 export const TABELLE = ['persone', 'stanze', 'settori', 'assenze', 'causali', 'giornate'] as const
@@ -77,9 +77,9 @@ async function unitaPerNome() {
 }
 
 /**
- * Le persone si cercano per nome e sigla del cognome: in archivio il cognome
- * per esteso non c'è, quindi «Della Valle Tommaso» va prima ridotto a
- * «Tommaso» + «Del», che è ciò che il database contiene davvero.
+ * Le persone si cercano per nome e cognome, come stanno in archivio. «Della
+ * Valle Tommaso» va prima diviso in «Della Valle» + «Tommaso»: il file scrive
+ * cognome e nome attaccati, il database li tiene in due colonne.
  */
 async function personePerNome() {
   const righe = await db.select({
@@ -92,7 +92,7 @@ async function personePerNome() {
   }
   return (completo: string) => {
     const { nome, cognome } = dividiNome(completo)
-    return m.get(`${nome}|${siglaCognome(cognome)}`.toLowerCase()) ?? []
+    return m.get(`${nome}|${cognome}`.toLowerCase()) ?? []
   }
 }
 
@@ -108,9 +108,6 @@ export const passwordCasuale = () =>
   Array.from({ length: 4 }, () =>
     Array.from({ length: 4 }, () => ALFABETO[randomInt(ALFABETO.length)]).join('')).join('-')
 
-const senzaAccenti = (s: string) =>
-  s.normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z]/g, '').toLowerCase()
-
 async function persone(righe: Riga[], e: Esito, opz: Opzioni) {
   const righeUnita = await db.select().from(schema.unit)
   const idUnita = indice(righeUnita)
@@ -121,7 +118,7 @@ async function persone(righe: Riga[], e: Esito, opz: Opzioni) {
       .filter((u) => u.ruolo === 'dirigente' && u.unitId != null)
       .map((u) => u.unitId!))
 
-  type Persona = { nome: string; sigla: string; email: string; r: Riga }
+  type Persona = { nome: string; cognome: string; email: string; r: Riga }
   const buone: Persona[] = []
   const emailViste = new Set<string>()
 
@@ -136,14 +133,14 @@ async function persone(righe: Riga[], e: Esito, opz: Opzioni) {
     try { ({ nome, cognome } = dividiNome(r.persona)) }
     catch (x) { e.errore(i, (x as Error).message); continue }
 
-    const troppo = lungo(nome, 80, 'persona') ?? lungo(r.unita ?? '', 160, 'unita')
+    const troppo = lungo(nome, 80, 'persona') ?? lungo(cognome, 80, 'persona')
+      ?? lungo(r.unita ?? '', 160, 'unita')
       ?? lungo(r.sigla ?? '', 32, 'sigla') ?? lungo(r.settore ?? '', 120, 'settore')
       ?? lungo(r.unitaPadre ?? '', 160, 'unitaPadre')
     if (troppo) { e.errore(i, troppo); continue }
 
-    const sigla = siglaCognome(cognome)
     const email = (r.email
-      || (opz.dominio ? `${senzaAccenti(nome)}.${senzaAccenti(sigla)}@${opz.dominio}` : '')).toLowerCase()
+      || (opz.dominio ? indirizzoDa(nome, cognome, opz.dominio) : '')).toLowerCase()
     if (!email) { e.errore(i, 'nessun indirizzo, e nessun dominio con cui costruirlo.'); continue }
     if (email.length > 190 || !EMAIL.test(email)) { e.errore(i, `indirizzo non valido: «${email}».`); continue }
     if (emailViste.has(email)) { e.errore(i, `indirizzo ripetuto «${email}».`); continue }
@@ -151,7 +148,7 @@ async function persone(righe: Riga[], e: Esito, opz: Opzioni) {
     // Già in archivio: la riga si salta, così lo stesso file si può ripassare.
     if (emailInArchivio.has(email)) { e.saltati++; continue }
 
-    buone.push({ nome, sigla, email, r })
+    buone.push({ nome, cognome, email, r })
   }
 
   // Un'unità ha un dirigente solo, e non ne può restare senza: il database
@@ -274,12 +271,12 @@ async function persone(righe: Riga[], e: Esito, opz: Opzioni) {
       const sid = p.r.settore && uid ? settoreId.get(`${uid}|${p.r.settore}`) ?? null : null
       const [ins] = await tx.insert(schema.user).values({
         email: p.email, passwordHash: await hashPassword(password),
-        nome: p.nome, cognome: p.sigla,
+        nome: p.nome, cognome: p.cognome,
         ruolo: p.r.ruolo as 'admin' | 'dirigente' | 'dipendente',
         unitId: uid, sectorId: sid, passwordDaCambiare: true,
       })
       idPerEmail.set(p.email, ins.insertId)
-      e.credenziali.push({ chi: `${p.sigla} ${p.nome}`, email: p.email, password })
+      e.credenziali.push({ chi: `${p.cognome} ${p.nome}`, email: p.email, password })
       e.aggiunti++
     }
 
@@ -290,7 +287,7 @@ async function persone(righe: Riga[], e: Esito, opz: Opzioni) {
       if (!nominatoDa) continue
       await tx.insert(schema.organizer)
         .values({ userId: idPerEmail.get(p.email)!, unitId: idDi(p.r.unita)!, nominatoDa })
-      e.note.push(`organizzatore: ${p.sigla} ${p.nome}`)
+      e.note.push(`organizzatore: ${p.cognome} ${p.nome}`)
     }
   })
 }
@@ -299,17 +296,20 @@ async function persone(righe: Riga[], e: Esito, opz: Opzioni) {
 
 async function stanze(righe: Riga[], e: Esito, opz: Opzioni) {
   const unita = await unitaPerNome()
-  const esistenti = new Set((await db.select().from(schema.room)).map((r) => r.etichetta.toLowerCase()))
+  // L'etichetta è unica dentro l'unità, non nell'archivio intero: due servizi
+  // su piani diversi possono avere ciascuno la propria stanza «12».
+  const esistenti = new Set((await db.select().from(schema.room))
+    .map((r) => `${r.unitId}|${r.etichetta.toLowerCase()}`))
 
   for (const [i, r] of righe.entries()) {
     if (!r.stanza) { e.errore(i, 'manca la colonna «stanza».'); continue }
     const troppo = lungo(r.stanza, 60, 'stanza') ?? lungo(r.piano ?? '', 40, 'piano')
     if (troppo) { e.errore(i, troppo); continue }
-    if (esistenti.has(r.stanza.toLowerCase())) { e.saltati++; continue }
 
     if (unita.ambigua(r.unita ?? '')) { e.errore(i, `«${r.unita}» è il nome di due unità diverse.`); continue }
     const unitId = unita.id(r.unita ?? '')
     if (!unitId) { e.errore(i, `unità «${r.unita}» non trovata.`); continue }
+    if (esistenti.has(`${unitId}|${r.stanza.toLowerCase()}`)) { e.saltati++; continue }
 
     // «5» crea le scrivanie da 1 a 5; «1,2,5» crea esattamente quelle. Serve
     // quando la numerazione sul posto ha dei buchi, che è il caso normale.
@@ -330,7 +330,7 @@ async function stanze(righe: Riga[], e: Esito, opz: Opzioni) {
         roomId: ins.insertId, numero, x: 40 + (n % 5) * 120, y: 60 + Math.floor(n / 5) * 140,
       })))
     }
-    esistenti.add(r.stanza.toLowerCase())
+    esistenti.add(`${unitId}|${r.stanza.toLowerCase()}`)
     e.aggiunti++
     e.note.push(`${r.stanza} — ${numeri.length} scrivanie`)
   }
