@@ -17,9 +17,9 @@ mese, quattro settimane. Lo decide chi organizza.
 **Settore** — un gruppo di persone dentro l'unità. Alcuni settori richiedono
 *presidio*: qualcuno di quel settore dev'essere in sede ogni giorno lavorativo.
 
-**Sigla** — nelle liste il cognome compare accorciato a tre lettere: `Ros`,
-`DiM`, `DeA`. Non è un vezzo grafico: nell'archivio il cognome per esteso non
-c'è. Quando due sigle coincidono, quelle due righe mostrano anche il nome.
+**Come compaiono i nomi** — negli elenchi si legge il solo cognome. Quando in
+una schermata due persone hanno lo stesso cognome, quelle due righe — e solo
+quelle — mostrano anche il nome.
 
 ---
 
@@ -305,9 +305,9 @@ settore. Se lo dicessimo, diremmo di lui qualcosa che non ti riguarda.
 Restano. Le programmazioni pubblicate non si riscrivono: chi organizza nella
 nuova unità viene avvisato, con l'invito a riprogrammare i periodi futuri.
 
-**Perché la griglia mostra `Mar Elena` e non `Marchetti Elena`?**
-Perché due sigle `Mar` coincidono in quell'elenco, e il nome serve a
-distinguerle. Dove non c'è ambiguità compare la sola sigla.
+**Perché la griglia mostra `Rossi Elena` e non solo `Rossi`?**
+Perché in quell'elenco ci sono due Rossi, e il nome serve a distinguerle. Dove
+non c'è ambiguità compare il solo cognome.
 
 **Ho perso la password.**
 L'amministratore di sistema ne assegna una nuova, che dovrai cambiare al primo

@@ -232,8 +232,7 @@ org.get('/unita/:id/stanze', async (c) => {
   const id = Number(c.req.param('id'))
   const a = c.get('attore'), alb = c.get('albero')
   if (!puoLeggereUnita(alb, a, id)) throw vietato()
-  const rid = radice(alb, id)
-  const stanze = await db.select().from(schema.room).where(eq(schema.room.unitId, rid))
+  const stanze = await db.select().from(schema.room).where(eq(schema.room.unitId, id))
   const scrivanie = stanze.length
     ? await db.select().from(schema.desk).where(inArray(schema.desk.roomId, stanze.map((s) => s.id)))
     : []
@@ -244,7 +243,7 @@ org.get('/unita/:id/stanze', async (c) => {
   })))
 })
 
-/** Le stanze appartengono all'unità radice: le gestisce il suo dirigente. */
+/** Ogni unità ha le proprie stanze, e le gestisce il suo dirigente. */
 org.post('/stanze', async (c) => {
   const b = z.object({
     unitId: z.number().int(), etichetta: z.string().min(1), piano: z.string().optional(),
@@ -252,9 +251,9 @@ org.post('/stanze', async (c) => {
   }).safeParse(await c.req.json())
   if (!b.success) throw new HttpError(422, 'Dati della stanza non validi')
 
-  const a = c.get('attore'), alb = c.get('albero')
-  if (a.ruolo !== 'dirigente' || a.unitId !== b.data.unitId || radice(alb, b.data.unitId) !== b.data.unitId) {
-    throw vietato('Le stanze le gestisce il dirigente dell\'unità radice')
+  const a = c.get('attore')
+  if (!puoAmministrareUnita(a, b.data.unitId)) {
+    throw vietato('Le stanze le gestisce il dirigente dell\'unità')
   }
   const [ins] = await db.insert(schema.room).values({
     unitId: b.data.unitId, etichetta: b.data.etichetta, piano: b.data.piano ?? null,

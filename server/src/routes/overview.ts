@@ -40,7 +40,7 @@ overview.get('/', async (c) => {
       id: schema.user.id, nome: schema.user.nome, cognome: schema.user.cognome,
       unitId: schema.user.unitId, sectorId: schema.user.sectorId, ruolo: schema.user.ruolo,
     }).from(schema.user).where(and(inArray(schema.user.unitId, unitaVisibili), eq(schema.user.attivo, true))),
-    db.select().from(schema.room).where(and(inArray(schema.room.unitId, radici), eq(schema.room.attiva, true))),
+    db.select().from(schema.room).where(and(inArray(schema.room.unitId, unitaVisibili), eq(schema.room.attiva, true))),
     db.select().from(schema.desk).where(eq(schema.desk.attiva, true)),
     db.select().from(schema.holiday).where(and(gte(schema.holiday.data, da), lte(schema.holiday.data, aData),
       or(isNull(schema.holiday.unitId), inArray(schema.holiday.unitId, radici)))),

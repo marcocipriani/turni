@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { eq, like, not, sql } from 'drizzle-orm'
 import { db, pool, schema } from '../db/index'
 import { italianHolidays } from '../lib/dates'
-import { dividiNome, siglaCognome } from '../lib/nomi'
+import { dividiNome, indirizzoDa } from '../lib/nomi'
 import { hashPassword } from '../lib/password'
 
 /** Le persone arrivano come stringa «Cognome Nome», l'ordine dell'archivio di origine. */
@@ -18,8 +18,8 @@ type Dati = {
 
 /**
  * L'archivio di prova versionato ha nomi inventati. Chi lavora su un ambiente
- * proprio può puntare SEED_DATI a un file con i nomi veri, che resta fuori dal
- * repository: i dati del personale non hanno motivo di entrarci.
+ * proprio può puntare SEED_DATI a un altro file della stessa forma, che resta
+ * fuori dal repository: i dati del personale non hanno motivo di entrarci.
  */
 const PERCORSO_DATI = process.env.SEED_DATI
   ? new URL(process.env.SEED_DATI, `file://${process.cwd()}/`)
@@ -39,25 +39,13 @@ const CAUSALI = [
   ['altro', 'Altro permesso'],
 ]
 
-const senzaAccenti = (s: string) =>
-  s.normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z]/g, '').toLowerCase()
+/** Nome e cognome di una persona dell'archivio di origine, che li scrive attaccati. */
+const anagrafica = (completo: string) => dividiNome(completo)
 
-/**
- * Nome, cognome e sigla di una persona dell'archivio di origine.
- * Nel database finisce la sigla, mai il cognome per esteso.
- */
-function anagrafica(completo: string) {
-  const { cognome, nome } = dividiNome(completo)
-  return { nome, sigla: siglaCognome(cognome) }
-}
-
-/**
- * Indirizzo sintetico: nessun indirizzo istituzionale reale entra nell'archivio
- * di prova, e nemmeno un cognome per esteso travestito da indirizzo.
- */
+/** Indirizzo sintetico: nessun indirizzo istituzionale reale entra nell'archivio di prova. */
 const emailDi = (completo: string) => {
-  const { nome, sigla } = anagrafica(completo)
-  return `${senzaAccenti(nome)}.${senzaAccenti(sigla)}@${DOMINIO}`
+  const { nome, cognome } = anagrafica(completo)
+  return indirizzoDa(nome, cognome, DOMINIO)
 }
 
 async function guardie() {
@@ -101,7 +89,7 @@ async function main() {
   )
 
   await db.insert(schema.user).values({
-    email: `admin@${DOMINIO}`, passwordHash: hash, nome: 'Amministratore', cognome: 'Sis',
+    email: `admin@${DOMINIO}`, passwordHash: hash, nome: 'Amministratore', cognome: 'Sistema',
     ruolo: 'admin', unitId: null,
   })
 
@@ -110,7 +98,7 @@ async function main() {
   const dirRadice = anagrafica(dati.radice.dirigente)
   await db.insert(schema.user).values({
     email: emailDi(dati.radice.dirigente), passwordHash: hash,
-    nome: dirRadice.nome, cognome: dirRadice.sigla,
+    nome: dirRadice.nome, cognome: dirRadice.cognome,
     ruolo: 'dirigente', unitId: radiceId,
   })
 
@@ -120,7 +108,7 @@ async function main() {
   const dirFigliaAnag = anagrafica(dati.figlia.dirigente)
   await db.insert(schema.user).values({
     email: emailDi(dati.figlia.dirigente), passwordHash: hash,
-    nome: dirFigliaAnag.nome, cognome: dirFigliaAnag.sigla,
+    nome: dirFigliaAnag.nome, cognome: dirFigliaAnag.cognome,
     ruolo: 'dirigente', unitId: figliaId,
   })
 
@@ -147,9 +135,9 @@ async function main() {
   const dipendenti = dati.persone.filter((p) => p.persona !== dati.figlia.dirigente)
   const idPerNome = new Map<string, number>()
   for (const p of dipendenti) {
-    const { nome, sigla } = anagrafica(p.persona)
+    const { nome, cognome } = anagrafica(p.persona)
     const [u] = await db.insert(schema.user).values({
-      email: emailDi(p.persona), passwordHash: hash, nome, cognome: sigla,
+      email: emailDi(p.persona), passwordHash: hash, nome, cognome,
       ruolo: 'dipendente', unitId: figliaId, sectorId: settori.get(p.settore) ?? null,
     })
     idPerNome.set(p.persona, u.insertId)
@@ -186,8 +174,8 @@ Popolamento di prova completato.
     dirigente UCS   ${emailDi(dati.figlia.dirigente)}
     organizzatore   ${dati.organizzatori.map(emailDi).join(', ')}
 
-  Nessun indirizzo istituzionale reale è stato importato, e i cognomi sono
-  troncati a tre caratteri già dentro l'archivio.
+  Nessun indirizzo istituzionale reale è stato importato: gli indirizzi sono
+  costruiti dai nomi, sul dominio di prova.
 `)
   await pool.end()
 }

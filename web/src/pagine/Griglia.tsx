@@ -59,8 +59,8 @@ export default function Griglia({ dati, onSeleziona, selezione }: {
   }, [dati.persone, dati.settori])
 
   const righe = useMemo(() => gruppi.flatMap((g) => g.persone), [gruppi])
-  // Il cognome è già una sigla di tre lettere: il nome compare solo dove serve
-  // a distinguere due sigle uguali.
+  // In griglia si legge il cognome: il nome compare solo dove due persone
+  // lo condividono.
   const nomi = useMemo(() => etichette(dati.persone), [dati.persone])
   const capienza = dati.stanze.reduce((s, r) => s + r.capienza, 0)
 

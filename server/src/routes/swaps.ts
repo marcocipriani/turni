@@ -58,7 +58,7 @@ async function contestoScambio(
 
   const [settori, stanze, celle, indisponibili] = await Promise.all([
     db.select().from(schema.sector).where(eq(schema.sector.unitId, p.unitId)),
-    db.select().from(schema.room).where(and(eq(schema.room.unitId, rid), eq(schema.room.attiva, true))),
+    db.select().from(schema.room).where(and(eq(schema.room.unitId, p.unitId), eq(schema.room.attiva, true))),
     db.select().from(schema.assignment).where(eq(schema.assignment.periodId, p.id)),
     giorniIndisponibili(ids, p.dataInizio, p.dataFine),
   ])

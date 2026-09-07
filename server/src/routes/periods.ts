@@ -38,8 +38,10 @@ async function contesto(p: typeof schema.period.$inferSelect, alb: Albero) {
   const settori = await db.select().from(schema.sector)
     .where(eq(schema.sector.unitId, p.unitId)).orderBy(asc(schema.sector.ordine))
 
+  // Le stanze sono quelle dell'unità che programma: due uffici sullo stesso
+  // piano hanno stanze distinte, e la capienza dell'uno non è quella dell'altro.
   const stanzeRighe = await db.select().from(schema.room)
-    .where(and(eq(schema.room.unitId, rid), eq(schema.room.attiva, true))).orderBy(asc(schema.room.id))
+    .where(and(eq(schema.room.unitId, p.unitId), eq(schema.room.attiva, true))).orderBy(asc(schema.room.id))
   const scrivanie = stanzeRighe.length
     ? await db.select().from(schema.desk).where(
         and(inArray(schema.desk.roomId, stanzeRighe.map((s) => s.id)), eq(schema.desk.attiva, true)))

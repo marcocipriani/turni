@@ -5,10 +5,6 @@
  * cominciano con una particella: dividere al primo spazio produce «Di» come
  * cognome e «Valle Tommaso» come nome. Qui la particella resta attaccata al
  * cognome, dove appartiene.
- *
- * Il cognome viene poi troncato a tre caratteri PRIMA di entrare nell'archivio:
- * è una misura di minimizzazione, non una scelta di impaginazione. Chi legge il
- * database non deve trovarci il cognome per esteso.
  */
 
 /** Particelle che fanno parte del cognome, non nomi propri. */
@@ -47,16 +43,12 @@ export function dividiNome(completo: string): { cognome: string; nome: string } 
 }
 
 /**
- * Sigla del cognome: spazi e apostrofi via, primi tre caratteri, maiuscola
- * iniziale su ogni parola conservata.
- *
- *   'Della Valle' → 'Del'   'De Angelis' → 'DeA'   'Marchetti' → 'Mar'
- *
- * Tre caratteri fanno collidere i cognomi vicini — Marchetti e Marchesi
- * danno entrambi 'Mar'. È voluto: la disambiguazione la fa il nome, a video.
+ * Indirizzo costruito dal nome, quando il file non ne porta uno: iniziale del
+ * nome, punto, cognome senza spazi né accenti. È la forma degli indirizzi
+ * istituzionali — «Marchetti Elena» → «e.marchetti@dominio».
  */
-export function siglaCognome(cognome: string): string {
-  const compatto = cognome.replace(/[\s'’]/g, '')
-  if (!compatto) throw new Error('Cognome vuoto: non si può ricavarne una sigla.')
-  return compatto.slice(0, 3)
+export function indirizzoDa(nome: string, cognome: string, dominio: string): string {
+  const pulito = (s: string) =>
+    s.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z]/g, '').toLowerCase()
+  return `${pulito(nome).slice(0, 1)}.${pulito(cognome)}@${dominio}`.toLowerCase()
 }

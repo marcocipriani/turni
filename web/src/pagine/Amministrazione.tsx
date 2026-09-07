@@ -146,7 +146,7 @@ export default function Amministrazione() {
                 </select>
               </Campo>
               <Campo etichetta="Nome del dirigente"><input name="dnome" className={inputCls} required /></Campo>
-              <Campo etichetta="Cognome" aiuto="Ne restano le prime tre lettere">
+              <Campo etichetta="Cognome">
                 <input name="dcognome" className={inputCls} required />
               </Campo>
               <Campo etichetta="Posta"><input name="demail" type="email" className={inputCls} required /></Campo>

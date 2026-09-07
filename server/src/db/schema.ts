@@ -66,7 +66,7 @@ export const sector = mysqlTable('sector', {
 
 export const room = mysqlTable('room', {
   id: id(),
-  unitId: int('unit_id').notNull(),          // unità radice proprietaria
+  unitId: int('unit_id').notNull(),          // l'unità che la usa
   etichetta: varchar('etichetta', { length: 60 }).notNull(),
   piano: varchar('piano', { length: 40 }),
   larghezzaCm: int('larghezza_cm').default(600).notNull(),
