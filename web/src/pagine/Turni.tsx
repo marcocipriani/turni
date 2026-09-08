@@ -12,11 +12,16 @@ import * as I from '../icone'
 import { puoProgrammare, useSessione } from '../sessione'
 import { Bottone, Messaggio, Pill, Scheletro, StatoVuoto } from '../ui'
 import { Drawer, Toolbar, Vista } from '../Vista'
-import { Giorni } from './Giorni'
+import { addDays, Giorni, lunediDi } from './Giorni'
 import Griglia, { Legenda } from './Griglia'
 import { EditorCella, type EsitoGenerazione, EsitoProposta, NuovoPeriodo, StatoPeriodo } from './periodo'
 
 const oggiISO = () => new Date().toISOString().slice(0, 10)
+
+const gg = (iso: string) => `${iso.slice(8)}/${iso.slice(5, 7)}`
+
+/** Che tratto di calendario si sta guardando: senza, le frecce spostano al buio. */
+const finestra = (da: string, settimane: number) => `${gg(da)} → ${gg(addDays(da, settimane * 7 - 1))}`
 
 /** Etichetta compatta di un periodo: le date bastano a riconoscerlo. */
 const etichettaPeriodo = (p: Periodo) =>
@@ -36,6 +41,7 @@ export default function Turni() {
   const [inCorso, setInCorso] = useState(false)
   const [nuovoAperto, setNuovoAperto] = useState(false)
   const [settimane, setSettimane] = useState(2)
+  const [inizio, setInizio] = useState(() => lunediDi(oggiISO()))
 
   const unita = useMemo(() => {
     if (!utente) return null
@@ -173,14 +179,34 @@ export default function Turni() {
             </select>
           </label>
         ) : (
-          <div role="radiogroup" aria-label="Quante settimane mostrare"
-               className="inline-flex overflow-hidden rounded-r2 border border-border-controllo">
-            {[2, 4].map((n) => (
-              <BottoneVista key={n} attivo={settimane === n} onClick={() => setSettimane(n)}>
-                {n} settimane
-              </BottoneVista>
-            ))}
-          </div>
+          <>
+            <div role="radiogroup" aria-label="Quante settimane mostrare"
+                 className="inline-flex overflow-hidden rounded-r2 border border-border-controllo">
+              {[1, 2, 4].map((n) => (
+                <BottoneVista key={n} attivo={settimane === n} onClick={() => setSettimane(n)}>
+                  {n === 1 ? '1 settimana' : `${n} settimane`}
+                </BottoneVista>
+              ))}
+            </div>
+
+            <div className="inline-flex items-center gap-1">
+              <Bottone variante="icona" title="Indietro" aria-label="Settimane precedenti"
+                       onClick={() => setInizio((d) => addDays(d, -settimane * 7))}>
+                <I.Freccia size={16} className="rotate-180" />
+              </Bottone>
+              <Bottone variante="icona" title="Avanti" aria-label="Settimane successive"
+                       onClick={() => setInizio((d) => addDays(d, settimane * 7))}>
+                <I.Freccia size={16} />
+              </Bottone>
+              {inizio !== lunediDi(oggiISO()) && (
+                <Bottone title="Torna a questa settimana" onClick={() => setInizio(lunediDi(oggiISO()))}>
+                  Oggi
+                </Bottone>
+              )}
+            </div>
+
+            <span className="text-sm text-ink-muted">{finestra(inizio, settimane)}</span>
+          </>
         )}
 
         {inGriglia && dati && (
@@ -202,7 +228,7 @@ export default function Turni() {
 
       {errore && <div className="px-4 py-2"><Messaggio tono="errore">{errore}</Messaggio></div>}
 
-      {!inGriglia && <Giorni settimane={settimane} />}
+      {!inGriglia && <Giorni settimane={settimane} da={inizio} />}
 
       {inGriglia && !dati && !errore && <div className="p-4 md:p-6"><Scheletro righe={6} /></div>}
 
