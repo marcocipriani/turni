@@ -14,6 +14,9 @@
  *   npm run migra
  */
 import 'dotenv/config'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { sql } from 'drizzle-orm'
 import { db, pool } from './index'
 
@@ -44,8 +47,27 @@ async function tabella(nome: string, ddl: string) {
   console.log(`  + tabella ${nome}`)
 }
 
+/**
+ * Prima installazione: l'archivio è vuoto e le tabelle vanno create tutte.
+ * Il DDL sta in `schema.sql`, estratto dall'archivio di sviluppo. Le modifiche
+ * qui sotto sono successive a quel punto di partenza: su un archivio nuovo
+ * trovano già tutto a posto e non fanno niente.
+ */
+async function schemaIniziale() {
+  if (await tabellaEsiste('unit')) return
+  const file = join(dirname(fileURLToPath(import.meta.url)), 'schema.sql')
+  const istruzioni = readFileSync(file, 'utf8')
+    .split(/;\s*(?:\n|$)/)
+    .map((i) => i.replace(/^\s*--.*$/gm, '').trim())
+    .filter(Boolean)
+  for (const i of istruzioni) await db.execute(sql.raw(i))
+  console.log(`  + ${istruzioni.length} tabelle`)
+}
+
 async function main() {
   console.log('Migrazione dello schema…')
+
+  await schemaIniziale()
 
   // Scambio turni: interruttore e ora limite, per unità organizzativa.
   await colonna('unit', 'scambio_attivo', '`scambio_attivo` tinyint(1) NOT NULL DEFAULT 1')
