@@ -9,13 +9,14 @@
   ],
   "scripts": {
     "dev": "npm run dev --workspace server & npm run dev --workspace web && wait",
-    "build": "npm run build --workspace server && npm run build --workspace web",
-    "start": "tsx server/src/index.ts",
+    "build": "npm run build --workspace server && npm run build:server && npm run build --workspace web",
+    "build:server": "esbuild server/src/index.ts server/src/db/migra.ts server/src/avvio.ts server/src/importa.ts --bundle --platform=node --format=esm --outdir=server/dist --outbase=server/src --packages=external && cp server/src/db/schema.sql server/dist/db/schema.sql",
     "test": "npm run test --workspace server && npm run test --workspace web",
-    "migra": "tsx server/src/db/migra.ts",
+    "start": "node server/dist/index.js",
+    "migra": "node server/dist/db/migra.js",
     "seed": "tsx server/src/seed/run.ts",
-    "avvio": "tsx server/src/avvio.ts",
-    "importa": "tsx server/src/importa.ts",
+    "avvio": "node server/dist/avvio.js",
+    "importa": "node server/dist/importa.js",
     "verifica": "tsx server/src/verifica.ts",
     "carico": "tsx server/src/carico.ts"
   },
@@ -28,7 +29,8 @@
     "fsevents@2.3.3": true
   },
   "devDependencies": {
-    "axe-core": "^4.13.0"
+    "axe-core": "^4.13.0",
+    "esbuild": "^0.28.2"
   },
   "license": "MIT"
 }

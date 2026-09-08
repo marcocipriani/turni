@@ -12,3 +12,5 @@ rilascio/
 # di rilascio, design system di riferimento, materiali di partenza con dati
 # reali, istruzioni e credenziali. Non esce da questa macchina.
 private/
+
+server/dist/
