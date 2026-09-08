@@ -5,7 +5,7 @@
  * fa il sistema operativo. Zero dipendenze da mantenere, zero lavoro sul server,
  * e funziona anche dal telefono con «Condividi → Stampa».
  */
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, type Griglia as DatiGriglia } from '../api'
 import * as I from '../icone'
@@ -78,6 +78,20 @@ export default function Stampa() {
           </button>
         ))}
 
+        {scelta === 'periodo' && (
+          <label className="ml-auto flex cursor-pointer items-center gap-2 text-sm text-ink-muted">
+            <input
+              type="checkbox" checked={query.get('gruppi') === '1'}
+              onChange={(e) => {
+                if (e.target.checked) query.set('gruppi', '1'); else query.delete('gruppi')
+                setQuery(query, { replace: true })
+              }}
+              className="size-4 cursor-pointer accent-[var(--action)]"
+            />
+            Raggruppa per settore
+          </label>
+        )}
+
         {(scelta === 'giorno' || scelta === 'stanze') && (
           <label className="ml-auto flex items-center gap-2 text-sm text-ink-muted">
             Dal
@@ -91,7 +105,9 @@ export default function Stampa() {
       </div>
 
       <div className="p-4 md:p-6">
-        {scelta === 'periodo' && <FoglioPeriodo id={Number(query.get('id')) || null} />}
+        {scelta === 'periodo' && (
+          <FoglioPeriodo id={Number(query.get('id')) || null} raggruppa={query.get('gruppi') === '1'} />
+        )}
         {scelta === 'giorno' && <FoglioGiorni da={query.get('da') ?? oggiISO()} />}
         {scelta === 'stanze' && <FoglioStanze da={query.get('da') ?? oggiISO()} />}
         {scelta === 'mio' && <FoglioMio />}
@@ -125,7 +141,7 @@ const Orientamento = ({ orizzontale }: { orizzontale?: boolean }) => (
 
 /* ── Griglia del periodo: il foglio da bacheca ───────────────────── */
 
-function FoglioPeriodo({ id }: { id: number | null }) {
+function FoglioPeriodo({ id, raggruppa }: { id: number | null; raggruppa: boolean }) {
   const [dati, setDati] = useState<DatiGriglia | null>(null)
   const [errore, setErrore] = useState<string | null>(null)
 
@@ -136,6 +152,22 @@ function FoglioPeriodo({ id }: { id: number | null }) {
 
   const nomi = useMemo(() => etichette(dati?.persone ?? []), [dati])
   const stanze = useMemo(() => new Map((dati?.stanze ?? []).map((s) => [s.id, s.etichetta])), [dati])
+
+  /**
+   * Gli stessi blocchi della griglia a video, nello stesso ordine: chi confronta
+   * il foglio con lo schermo non deve rifare la mappa mentale ogni volta.
+   * Senza raggruppamento resta un elenco solo, che è come stampava prima.
+   */
+  const gruppi = useMemo(() => {
+    if (!dati) return []
+    if (!raggruppa) return [{ titolo: null as string | null, persone: dati.persone }]
+    const out = dati.settori
+      .map((s) => ({ titolo: s.nome, persone: dati.persone.filter((p) => p.sectorId === s.id) }))
+      .filter((g) => g.persone.length)
+    const senza = dati.persone.filter((p) => !dati.settori.some((s) => s.id === p.sectorId))
+    if (senza.length) out.push({ titolo: 'Senza settore', persone: senza })
+    return out
+  }, [dati, raggruppa])
 
   if (errore) return <Messaggio tono="errore">{errore}</Messaggio>
   if (!dati) return <Scheletro righe={6} />
@@ -166,31 +198,43 @@ function FoglioPeriodo({ id }: { id: number | null }) {
             </tr>
           </thead>
           <tbody>
-            {dati.persone.map((p) => (
-              <tr key={p.id}>
-                <td className="border border-border px-1.5 py-0.5 whitespace-nowrap">{nomi.get(p.id)}</td>
-                {dati.giorni.map((g) => {
-                  const c = celle.get(`${p.id}|${g}`)
-                  const inSede = c?.stato === 'presenza'
-                  return (
-                    <td key={g}
-                        className={`mono border border-border px-1 py-0.5 text-center text-2xs
-                                    ${inSede ? 'font-semibold' : 'text-ink-faint'}`}>
-                      {inSede
-                        ? (c!.roomId != null ? stanze.get(c!.roomId)?.split('·')[0]?.trim() ?? 'S' : 'S')
-                        : c?.stato === 'assenza' ? '×' : '·'}
-                    </td>
-                  )
-                })}
-              </tr>
+            {gruppi.map((gr) => (
+              <Fragment key={gr.titolo ?? 'tutti'}>
+                {gr.titolo && (
+                  <tr>
+                    <th colSpan={dati.giorni.length + 1}
+                        className="border border-border bg-surface-2 px-1.5 py-0.5 text-left text-2xs
+                                   font-semibold uppercase tracking-[0.06em]">
+                      {gr.titolo}
+                      <span className="ml-2 font-normal normal-case tracking-normal text-ink-faint">
+                        {gr.persone.length} {gr.persone.length === 1 ? 'persona' : 'persone'}
+                      </span>
+                    </th>
+                  </tr>
+                )}
+                {gr.persone.map((p) => (
+                  <tr key={p.id}>
+                    <td className="border border-border px-1.5 py-0.5 whitespace-nowrap">{nomi.get(p.id)}</td>
+                    {dati.giorni.map((g) => {
+                      const c = celle.get(`${p.id}|${g}`)
+                      const inSede = c?.stato === 'presenza'
+                      return (
+                        <td key={g}
+                            className={`mono border border-border px-1 py-0.5 text-center text-2xs
+                                        ${inSede ? 'font-semibold' : 'text-ink-faint'}`}>
+                          {inSede
+                            ? (c!.roomId != null ? stanze.get(c!.roomId)?.split('·')[0]?.trim() ?? 'S' : 'S')
+                            : c?.stato === 'assenza' ? '×' : '·'}
+                        </td>
+                      )
+                    })}
+                  </tr>
+                ))}
+              </Fragment>
             ))}
           </tbody>
         </table>
       </div>
-
-      <p className="mt-3 text-sm text-ink-faint">
-        Il numero indica la stanza assegnata. «·» è lavoro agile, «×» un'assenza dichiarata.
-      </p>
     </div>
   )
 }

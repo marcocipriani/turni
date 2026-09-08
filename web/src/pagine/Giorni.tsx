@@ -29,14 +29,27 @@ export type DatiGiorni = {
 
 const oggiISO = () => new Date().toISOString().slice(0, 10)
 
-function addDays(iso: string, n: number) {
+export function addDays(iso: string, n: number) {
   const d = new Date(`${iso}T00:00:00Z`)
   d.setUTCDate(d.getUTCDate() + n)
   return d.toISOString().slice(0, 10)
 }
 
-export function Giorni({ settimane, onCaricato }: {
+/**
+ * Il lunedì della settimana di una data. Le finestre partono di lunedì: due
+ * settimane che cominciano di mercoledì non si confrontano con niente, e le
+ * frecce avanti e indietro finirebbero per scavalcare mezze settimane.
+ */
+export function lunediDi(iso: string) {
+  const d = new Date(`${iso}T00:00:00Z`)
+  // getUTCDay(): 0 è domenica. Il lunedì della sua settimana sta sei giorni prima.
+  return addDays(iso, -((d.getUTCDay() + 6) % 7))
+}
+
+export function Giorni({ settimane, da, onCaricato }: {
   settimane: number
+  /** Primo giorno da mostrare. Chi chiama decide dove si è, così le frecce funzionano. */
+  da: string
   onCaricato?: (d: DatiGiorni | null) => void
 }) {
   const { utente } = useSessione()
@@ -44,7 +57,6 @@ export function Giorni({ settimane, onCaricato }: {
   const [errore, setErrore] = useState<string | null>(null)
 
   useEffect(() => {
-    const da = oggiISO()
     const a = addDays(da, settimane * 7 - 1)
     void api.get<DatiGiorni>(`/panoramica?da=${da}&a=${a}`)
       .then((d) => { setDati(d); onCaricato?.(d) })
@@ -52,7 +64,7 @@ export function Giorni({ settimane, onCaricato }: {
     // onCaricato è un riferimento nuovo a ogni render del padre: tenerlo fra le
     // dipendenze rifarebbe la richiesta a ogni battito.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settimane])
+  }, [settimane, da])
 
   const feriali = useMemo(() => (dati?.giorni ?? []).filter((g) => g.feriale && !g.festivo), [dati])
   const stanzaPerId = useMemo(() => new Map((dati?.stanze ?? []).map((s) => [s.id, s])), [dati])
