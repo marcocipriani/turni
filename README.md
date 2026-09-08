@@ -153,7 +153,7 @@ anche se trova in archivio un solo indirizzo fuori dal dominio di prova.
 ## Verifiche
 
 ```bash
-npm test          # 113 test: motore, permessi, scambi, nomi, contrasti, accessibilità
+npm test          # 144 test: motore, permessi, scambi, nomi, contrasti, accessibilità
 npm run verifica  # 12 criteri di accettazione contro un'istanza avviata
 npm run carico    # motore fino a 1000 persone
 npm run build     # controllo dei tipi e build di produzione
