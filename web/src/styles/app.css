@@ -201,3 +201,28 @@ select option { background-color: var(--bg); color: var(--ink); }
     scroll-behavior: auto !important;
   }
 }
+
+/* ── Suggerimento della pagina di accesso ──────────────────────────
+   Popover nativo: il top layer lo tiene fuori da ogni ritaglio e da ogni
+   z-index, e Esc e il clic fuori li gestisce il browser. Qui resta solo la
+   posizione, che il popover nativo da solo non sa dare: ancorato sotto il
+   bottone — così non copre i campi che si stanno compilando — e ribaltato
+   sopra se sotto non c'è spazio.
+   Dove il posizionamento ad àncora non c'è ancora (Firefox), il messaggio
+   scende in fondo alla finestra: è corto e si legge lo stesso. */
+.ancora-aiuto { anchor-name: --aiuto-password; }
+.suggerimento {
+  position: fixed;
+  position-anchor: --aiuto-password;
+  position-area: block-end;
+  position-try-fallbacks: flip-block;
+  margin: var(--s2) 0;
+  width: max-content;
+  max-width: min(320px, calc(100vw - 32px));
+}
+@supports not (position-anchor: --aiuto-password) {
+  .suggerimento {
+    inset: auto var(--s4) max(var(--s4), env(safe-area-inset-bottom));
+    margin-inline: auto;
+  }
+}
