@@ -7,11 +7,11 @@
  * diverge.
  */
 import { useEffect, useState } from 'react'
-import { api, ErroreApi } from '../api'
+import { api } from '../api'
+import { useAzione } from '../azioni'
 import { pezziData } from '../date'
 import * as I from '../icone'
 import { Avatar, etichette } from '../persone'
-import { APTICO, vibra } from '../tocco'
 import { Bottone, Messaggio, Modale, Scheletro, Tag } from '../ui'
 
 export type Proposta = {
@@ -56,25 +56,19 @@ export function descriviProposta(p: Proposta, chi: string) {
 /* ── Proposte in corso ───────────────────────────────────────────── */
 
 export function Scambi({ elenco, onCambiato }: { elenco: Elenco; onCambiato: () => void }) {
-  const [inCorso, setInCorso] = useState<number | null>(null)
-  const [errore, setErrore] = useState<string | null>(null)
+  // Una sola azione per l'elenco: la chiave è la proposta, così reagisce il
+  // bottone che si è premuto e non tutti quelli in colonna.
+  const azione = useAzione()
   const aperte = [...elenco.inArrivo, ...elenco.inUscita]
   if (aperte.length === 0) return null
 
-  async function agisci(id: number, fn: () => Promise<unknown>) {
-    setErrore(null); setInCorso(id)
-    try { await fn(); vibra(APTICO.conferma); onCambiato() }
-    catch (e) {
-      vibra(APTICO.errore)
-      setErrore(e instanceof ErroreApi ? e.message : 'Operazione non riuscita.')
-    }
-    finally { setInCorso(null) }
-  }
+  const agisci = (chiave: string, fn: () => Promise<unknown>) =>
+    azione.esegui(async () => { await fn(); onCambiato() }, chiave)
 
   return (
     <section className="flex flex-col gap-2" aria-label="Scambi in corso">
       <h2 className="mono text-2xs uppercase tracking-[0.06em] text-ink-faint">Scambi in corso</h2>
-      {errore && <Messaggio tono="errore">{errore}</Messaggio>}
+      {azione.errore && <Messaggio tono="errore">{azione.errore}</Messaggio>}
 
       <ul className="divide-y divide-border overflow-hidden rounded-r3 border border-border bg-surface">
         {aperte.map((p) => {
@@ -90,19 +84,19 @@ export function Scambi({ elenco, onCambiato }: { elenco: Elenco; onCambiato: () 
                 {p.ioPropongo ? (
                   <>
                     <Tag>in attesa</Tag>
-                    <Bottone variante="piccolo" disabled={inCorso === p.id}
-                             onClick={() => void agisci(p.id, () => api.del(`/scambi/${p.id}`))}>
+                    <Bottone variante="piccolo" disabled={azione.inCorso} stato={azione.statoDi(`${p.id}:ritira`)}
+                             onClick={() => void agisci(`${p.id}:ritira`, () => api.del(`/scambi/${p.id}`))}>
                       Ritira
                     </Bottone>
                   </>
                 ) : (
                   <>
-                    <Bottone variante="piccolo" disabled={inCorso === p.id}
-                             onClick={() => void agisci(p.id, () => api.post(`/scambi/${p.id}/rifiuta`))}>
+                    <Bottone variante="piccolo" disabled={azione.inCorso} stato={azione.statoDi(`${p.id}:rifiuta`)}
+                             onClick={() => void agisci(`${p.id}:rifiuta`, () => api.post(`/scambi/${p.id}/rifiuta`))}>
                       Rifiuta
                     </Bottone>
-                    <Bottone variante="primario" disabled={inCorso === p.id}
-                             onClick={() => void agisci(p.id, () => api.post(`/scambi/${p.id}/accetta`))}>
+                    <Bottone variante="primario" disabled={azione.inCorso} stato={azione.statoDi(`${p.id}:accetta`)}
+                             onClick={() => void agisci(`${p.id}:accetta`, () => api.post(`/scambi/${p.id}/accetta`))}>
                       Accetta
                     </Bottone>
                   </>
@@ -128,7 +122,7 @@ export function ModaleScambio({ data, aperta, onChiudi, onFatto }: {
   const [scambio, setScambio] = useState<{ attivo: boolean; oraLimite: string } | null>(null)
   const [scelto, setScelto] = useState<number | null>(null)
   const [errore, setErrore] = useState<string | null>(null)
-  const [inCorso, setInCorso] = useState(false)
+  const proposta = useAzione()
 
   useEffect(() => {
     if (!aperta || !data) return
@@ -143,20 +137,14 @@ export function ModaleScambio({ data, aperta, onChiudi, onFatto }: {
 
   async function proponi(c: Candidato, g: { data: string; tipo: 'offro' | 'chiedo' | 'permuta' }) {
     if (!data) return
-    setErrore(null); setInCorso(true)
-    try {
-      await api.post('/scambi', {
-        tipo: g.tipo,
-        destinatarioId: c.userId,
-        dataProponente: g.tipo === 'chiedo' ? g.data : data,
-        dataDestinatario: g.data,
-      })
-      vibra(APTICO.conferma)
-      onFatto(); onChiudi()
-    } catch (e) {
-      vibra(APTICO.errore)
-      setErrore(e instanceof ErroreApi ? e.message : 'Proposta non riuscita.')
-    } finally { setInCorso(false) }
+    // La modale si chiude solo se la proposta è passata: `esegui` lo dice.
+    const andata = await proposta.esegui(() => api.post('/scambi', {
+      tipo: g.tipo,
+      destinatarioId: c.userId,
+      dataProponente: g.tipo === 'chiedo' ? g.data : data,
+      dataDestinatario: g.data,
+    }), `${c.userId}:${g.data}`)
+    if (andata) { onFatto(); onChiudi() }
   }
 
   return (
@@ -166,7 +154,9 @@ export function ModaleScambio({ data, aperta, onChiudi, onFatto }: {
       piede={<Bottone onClick={onChiudi}>Chiudi</Bottone>}
     >
       <div className="flex flex-col gap-3">
-        {errore && <Messaggio tono="errore">{errore}</Messaggio>}
+        {/* Due errori diversi, un posto solo: quello del caricamento dei
+            candidati e quello della proposta appena rifiutata. */}
+        {(errore ?? proposta.errore) && <Messaggio tono="errore">{errore ?? proposta.errore}</Messaggio>}
 
         {scambio && !scambio.attivo && (
           <Messaggio tono="attenzione">Lo scambio dei turni non è attivo in questa unità.</Messaggio>
@@ -211,7 +201,7 @@ export function ModaleScambio({ data, aperta, onChiudi, onFatto }: {
                       <div className="entra flex flex-wrap gap-1.5 border-t border-border bg-bg px-3 py-2.5">
                         {c.giornate.map((g) => (
                           <button
-                            key={`${g.data}-${g.tipo}`} type="button" disabled={inCorso}
+                            key={`${g.data}-${g.tipo}`} type="button" disabled={proposta.inCorso}
                             onClick={() => void proponi(c, g)}
                             title={g.tipo === 'permuta'
                               ? `Permuta con la sua giornata di ${quando(g.data)}`

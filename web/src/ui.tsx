@@ -1,4 +1,5 @@
 import { type ButtonHTMLAttributes, type ReactNode, useEffect, useId, useRef, useState } from 'react'
+import type { StatoBottone } from './azioni'
 import { Attenzione, Chiudi, Copia, Freccia, Info, Spunta } from './icone'
 import { Marchio } from './Marchio'
 import { vibra } from './tocco'
@@ -28,9 +29,27 @@ const VARIANTI: Record<VarianteBottone, string> = {
  *  etichetta: uno scarico è un link, e cambiargli forma confonderebbe. */
 export const stileBottone = (variante: VarianteBottone = 'normale') => VARIANTI[variante]
 
-export function Bottone({ variante = 'normale', className = '', ...resto }:
-  { variante?: VarianteBottone } & ButtonHTMLAttributes<HTMLButtonElement>) {
-  return <button type="button" {...resto} className={`${VARIANTI[variante]} ${className}`} />
+export function Bottone({ variante = 'normale', stato = 'fermo', className = '', children, ...resto }:
+  { variante?: VarianteBottone
+    /** L'esito dell'azione che il bottone comanda: lo dà `useAzione`. */
+    stato?: StatoBottone } & ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button type="button" aria-busy={stato === 'attesa' || undefined} {...resto}
+            className={`${VARIANTI[variante]} ${stato === 'fermo' ? '' : 'relative'} ${className}`}>
+      {/* L'etichetta non se ne va: si dissolve dov'è, e l'indicatore le si
+          sovrappone. Così il bottone non cambia larghezza mentre lavora, e
+          quello che c'era scritto resta al suo posto quando torna. */}
+      <span className={`inline-flex items-center gap-2 transition-opacity duration-[120ms] ease-out
+                        ${stato === 'fermo' ? '' : 'opacity-0'}`}>
+        {children}
+      </span>
+      {stato !== 'fermo' && (
+        <span className="absolute inset-0 grid place-items-center" aria-hidden="true">
+          {stato === 'attesa' ? <span className="girandola" /> : <Spunta size={15} />}
+        </span>
+      )}
+    </button>
+  )
 }
 
 /* ── Segmented: unico controllo dove l'inchiostro pieno indica selezione ── */
@@ -223,7 +242,8 @@ export function Messaggio({ tono = 'info', titolo, chiudibile, children }: {
 
   return (
     <div role={tono === 'errore' ? 'alert' : undefined}
-         className={`flex items-start gap-2 rounded-r2 border border-l-[3px] px-3 py-2 text-base ${s.cornice}`}>
+         className={`flex items-start gap-2 rounded-r2 border border-l-[3px] px-3 py-2 text-base
+                     ${tono === 'errore' ? 'entra-errore' : 'entra'} ${s.cornice}`}>
       <Icona size={16} className="mt-0.5" />
       <div className="min-w-0 flex-1">
         {intestazione && <p className="font-semibold">{intestazione}</p>}

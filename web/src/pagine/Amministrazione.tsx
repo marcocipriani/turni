@@ -1,5 +1,6 @@
 import { type FormEvent, useCallback, useEffect, useState } from 'react'
-import { api, ErroreApi } from '../api'
+import { api } from '../api'
+import { useAzione, useNuovi } from '../azioni'
 import * as I from '../icone'
 import { Bottone, Campo, Copiabile, inputCls, Messaggio, Pannello, Scheletro } from '../ui'
 import { Vista } from '../Vista'
@@ -24,7 +25,8 @@ export default function Amministrazione() {
   const [utenti, setUtenti] = useState<UtenteRiga[]>([])
   const [causali, setCausali] = useState<Causale[]>([])
   const [festivita, setFestivita] = useState<Festivita[]>([])
-  const [errore, setErrore] = useState<string | null>(null)
+  const azione = useAzione()
+  const { errore, setErrore } = azione
   const [credenziali, setCredenziali] = useState<Credenziale[]>([])
   const [padre, setPadre] = useState<number | null>(null)
   const [avviso, setAvviso] = useState(avvisoDaMostrare)
@@ -40,11 +42,12 @@ export default function Amministrazione() {
 
   useEffect(() => { void ricarica().catch((e) => setErrore(String(e.message))) }, [ricarica])
 
-  async function prova(fn: () => Promise<unknown>) {
-    setErrore(null)
-    try { await fn(); await ricarica() }
-    catch (e) { setErrore(e instanceof ErroreApi ? e.message : 'Operazione non riuscita.') }
-  }
+  /** La chiave, dove c'è, dice quale bottone deve mostrare l'esito. */
+  const prova = (fn: () => Promise<unknown>, chiave?: string): Promise<boolean> =>
+    azione.esegui(async () => { await fn(); await ricarica() }, chiave)
+
+  const causaliNuove = useNuovi(causali.map((c) => c.id))
+  const festiviNuovi = useNuovi(festivita.map((f) => f.id))
 
   function chiudiAvviso() {
     setAvviso(false)
@@ -132,7 +135,7 @@ export default function Amministrazione() {
                   })
                   setCredenziali([{ chi: `${f.get('dcognome')} ${f.get('dnome')}`, password: r.passwordProvvisoria }])
                   form.reset(); setPadre(null)
-                })
+                }, 'unita')
               }}
               className="grid gap-3 border-t border-border pt-4 sm:grid-cols-6"
             >
@@ -150,7 +153,7 @@ export default function Amministrazione() {
                 <input name="dcognome" className={inputCls} required />
               </Campo>
               <Campo etichetta="Posta"><input name="demail" type="email" className={inputCls} required /></Campo>
-              <div className="sm:col-span-6"><Bottone type="submit" variante="primario">Crea unità e dirigente</Bottone></div>
+              <div className="sm:col-span-6"><Bottone type="submit" stato={azione.statoDi('unita')} variante="primario">Crea unità e dirigente</Bottone></div>
             </form>
           </Pannello>
         </section>
@@ -173,19 +176,21 @@ export default function Amministrazione() {
                 void prova(async () => {
                   await api.post('/admin/causali', { etichetta: f.get('etichetta') })
                   form.reset()
-                })
+                }, 'causale')
               }}
               className="flex flex-wrap items-end gap-2"
             >
               <Campo etichetta="Nuova causale">
                 <input name="etichetta" className={inputCls} required minLength={2} placeholder="Permesso elettorale" />
               </Campo>
-              <Bottone type="submit">Aggiungi</Bottone>
+              <Bottone type="submit" stato={azione.statoDi('causale')}>Aggiungi</Bottone>
             </form>
 
             <ul className="grid gap-1.5 sm:grid-cols-2">
               {causali.map((c) => (
-                <li key={c.id} className="flex items-center justify-between gap-2 rounded-r2 border border-border bg-bg px-2.5 py-1.5">
+                <li key={c.id}
+                    className={`flex items-center justify-between gap-2 rounded-r2 border border-border bg-bg px-2.5 py-1.5
+                                ${causaliNuove.has(c.id) ? 'entra appena' : ''}`}>
                   {causaleInModifica === c.id ? (
                     <form
                       className="flex w-full items-center gap-2"
@@ -195,7 +200,7 @@ export default function Amministrazione() {
                         void prova(async () => {
                           await api.patch(`/admin/causali/${c.id}`, { etichetta: f.get('etichetta') })
                           setCausaleInModifica(null)
-                        })
+                        }, 'rinomina')
                       }}
                     >
                       <input name="etichetta" defaultValue={c.etichetta} className={inputCls} required minLength={2}
@@ -251,7 +256,7 @@ export default function Amministrazione() {
                     unitId: f.get('unitId') ? Number(f.get('unitId')) : null,
                   })
                   form.reset()
-                })
+                }, 'festivita')
               }}
               className="grid items-end gap-3 sm:grid-cols-[1fr_1.4fr_1fr_auto]"
             >
@@ -263,7 +268,7 @@ export default function Amministrazione() {
                   {unita.filter((u) => u.parentId == null).map((u) => <option key={u.id} value={u.id}>{u.sigla ?? u.nome}</option>)}
                 </select>
               </Campo>
-              <Bottone type="submit">Aggiungi</Bottone>
+              <Bottone type="submit" stato={azione.statoDi('festivita')}>Aggiungi</Bottone>
             </form>
 
             {festivita.length === 0 ? <p className="text-base text-ink-faint">Nessuna festività caricata.</p> : (
@@ -272,7 +277,9 @@ export default function Amministrazione() {
               <ul className="max-h-[420px] divide-y divide-border overflow-y-auto rounded-r2 border border-border bg-bg"
                   tabIndex={0} aria-label="Giornate non lavorative in archivio">
                 {festivita.map((f) => (
-                  <li key={f.id} className="flex items-center justify-between gap-3 px-3 py-1.5 text-base">
+                  <li key={f.id}
+                      className={`flex items-center justify-between gap-3 px-3 py-1.5 text-base
+                                  ${festiviNuovi.has(f.id) ? 'entra appena' : ''}`}>
                     <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
                       <span className="tabular-nums text-ink-muted">{inItaliano(f.data)}</span>
                       <span>{f.descrizione}</span>

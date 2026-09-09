@@ -1,5 +1,6 @@
 import { type FormEvent, useEffect, useState } from 'react'
-import { api, ErroreApi } from '../api'
+import { api } from '../api'
+import { useAzione, useNuovi } from '../azioni'
 import * as I from '../icone'
 import { Bottone, Campo, inputCls, Messaggio, Pannello, Scheletro, Tag } from '../ui'
 import { Vista } from '../Vista'
@@ -16,7 +17,12 @@ export default function Assenze() {
   const [causali, setCausali] = useState<Causale[]>([])
   const [dati, setDati] = useState<{ assenze: Assenza[]; regole: Regola[] } | null>(null)
   const [pref, setPref] = useState<Preferenze | null>(null)
-  const [errore, setErrore] = useState<string | null>(null)
+  /* Un'azione per pannello: la spunta compare sul bottone che si è premuto, e
+     l'errore resta accanto al modulo che l'ha causato invece di andare in cima
+     alla pagina, lontano da dove si sta guardando. */
+  const assenze = useAzione()
+  const regole = useAzione()
+  const preferenze = useAzione()
 
   const [dataInizio, setDataInizio] = useState(oggi())
   const [dataFine, setDataFine] = useState(oggi())
@@ -38,23 +44,27 @@ export default function Assenze() {
 
   const etichetta = (c: string) => causali.find((x) => x.codice === c)?.etichetta ?? c
 
-  async function prova(fn: () => Promise<unknown>) {
-    setErrore(null)
-    try { await fn(); await ricarica() }
-    catch (e) { setErrore(e instanceof ErroreApi ? e.message : 'Operazione non riuscita.') }
-  }
+  // Le righe appena comparse si illuminano un istante: in un elenco lungo dice
+  // quale è nata adesso senza dover rileggere le date.
+  const assenzeNuove = useNuovi((dati?.assenze ?? []).map((a) => a.id))
+  const regoleNuove = useNuovi((dati?.regole ?? []).map((r) => r.id))
 
   return (
     <Vista titolo="Assenze e preferenze" icona={<I.Assenza size={17} />}
            aiuto="La causale la vedi tu, chi programma e il tuo dirigente. Mai i colleghi.">
       <div className="flex max-w-[860px] flex-col gap-6">
-        {errore && <Messaggio tono="errore">{errore}</Messaggio>}
 
         <section id="dichiara">
           <Pannello titolo="Dichiara un'assenza" icona={<I.Assenza size={18} />}
                     piede="Puoi dichiararla in qualsiasi momento, anche su una giornata già pubblicata: il calendario non cambia da solo, ma chi programma viene avvisato.">
             <form
-              onSubmit={(e: FormEvent<HTMLFormElement>) => { e.preventDefault(); void prova(() => api.post('/assenze', { dataInizio, dataFine, causale })) }}
+              onSubmit={(e: FormEvent<HTMLFormElement>) => {
+                e.preventDefault()
+                void assenze.esegui(async () => {
+                  await api.post('/assenze', { dataInizio, dataFine, causale })
+                  await ricarica()
+                })
+              }}
               className="grid items-end gap-3 sm:grid-cols-[1fr_1fr_1.4fr_auto]"
             >
               <Campo etichetta="Dal">
@@ -70,20 +80,27 @@ export default function Assenze() {
                   {causali.map((c) => <option key={c.id} value={c.codice}>{c.etichetta}</option>)}
                 </select>
               </Campo>
-              <Bottone type="submit" variante="primario">Dichiara</Bottone>
+              <Bottone type="submit" variante="primario" stato={assenze.stato}>Dichiara</Bottone>
             </form>
+
+            {assenze.errore && <Messaggio tono="errore">{assenze.errore}</Messaggio>}
 
             {!dati ? <Scheletro righe={2} />
               : dati.assenze.length === 0 ? <p className="text-base text-ink-faint">Nessuna assenza dichiarata.</p>
               : (
                 <ul className="divide-y divide-border overflow-hidden rounded-r2 border border-border bg-bg">
                   {dati.assenze.map((a) => (
-                    <li key={a.id} className="flex items-center justify-between gap-3 px-3 py-2 text-base">
+                    <li key={a.id}
+                        className={`flex items-center justify-between gap-3 px-3 py-2 text-base
+                                    ${assenzeNuove.has(a.id) ? 'entra appena' : ''}`}>
                       <span className="mono">
                         {a.dataInizio}{a.dataFine !== a.dataInizio && ` → ${a.dataFine}`}
                         <span className="ml-2 font-sans text-sm text-ink-muted">{etichetta(a.causale)}</span>
                       </span>
-                      <Bottone variante="piccolo" onClick={() => void prova(() => api.del(`/assenze/${a.id}`))}>Revoca</Bottone>
+                      <Bottone variante="piccolo" stato={assenze.statoDi(a.id)}
+                               onClick={() => void assenze.esegui(async () => {
+                                 await api.del(`/assenze/${a.id}`); await ricarica()
+                               }, a.id)}>Revoca</Bottone>
                     </li>
                   ))}
                 </ul>
@@ -96,9 +113,12 @@ export default function Assenze() {
             <form
               onSubmit={(e: FormEvent<HTMLFormElement>) => {
                 e.preventDefault()
-                void prova(() => api.post('/assenze/regole', {
-                  giornoSettimana: giornoRegola, causale: causaleRegola, validoDa: oggi(), validoA: null,
-                }))
+                void regole.esegui(async () => {
+                  await api.post('/assenze/regole', {
+                    giornoSettimana: giornoRegola, causale: causaleRegola, validoDa: oggi(), validoA: null,
+                  })
+                  await ricarica()
+                })
               }}
               className="grid items-end gap-3 sm:grid-cols-[1fr_1.4fr_auto]"
             >
@@ -112,18 +132,25 @@ export default function Assenze() {
                   {causali.map((c) => <option key={c.id} value={c.codice}>{c.etichetta}</option>)}
                 </select>
               </Campo>
-              <Bottone type="submit">Aggiungi</Bottone>
+              <Bottone type="submit" stato={regole.stato}>Aggiungi</Bottone>
             </form>
+
+            {regole.errore && <Messaggio tono="errore">{regole.errore}</Messaggio>}
 
             {dati && dati.regole.length > 0 && (
               <ul className="divide-y divide-border overflow-hidden rounded-r2 border border-border bg-bg">
                 {dati.regole.map((r) => (
-                  <li key={r.id} className="flex items-center justify-between gap-3 px-3 py-2 text-base">
+                  <li key={r.id}
+                      className={`flex items-center justify-between gap-3 px-3 py-2 text-base
+                                  ${regoleNuove.has(r.id) ? 'entra appena' : ''}`}>
                     <span>Ogni {GIORNI.find(([n]) => n === r.giornoSettimana)?.[1]}
                       <span className="ml-2 text-sm text-ink-muted">{etichetta(r.causale)}</span>
                       <span className="mono ml-2 text-sm text-ink-faint">dal {r.validoDa}</span>
                     </span>
-                    <Bottone variante="piccolo" onClick={() => void prova(() => api.del(`/assenze/regole/${r.id}`))}>Rimuovi</Bottone>
+                    <Bottone variante="piccolo" stato={regole.statoDi(r.id)}
+                             onClick={() => void regole.esegui(async () => {
+                               await api.del(`/assenze/regole/${r.id}`); await ricarica()
+                             }, r.id)}>Rimuovi</Bottone>
                   </li>
                 ))}
               </ul>
@@ -135,7 +162,12 @@ export default function Assenze() {
           <Pannello titolo="Preferenze" icona={<I.Persona size={18} />}
                     piede="Non vincolano la programmazione: la generazione le premia quando può.">
             {pref && (
-              <form onSubmit={(e: FormEvent<HTMLFormElement>) => { e.preventDefault(); void prova(() => api.put('/assenze/preferenze', pref)) }}
+              <form onSubmit={(e: FormEvent<HTMLFormElement>) => {
+                      e.preventDefault()
+                      void preferenze.esegui(async () => {
+                        await api.put('/assenze/preferenze', pref); await ricarica()
+                      })
+                    }}
                     className="flex flex-col gap-4">
                 {(['giorniPreferiti', 'giorniDaEvitare'] as const).map((campo) => (
                   <fieldset key={campo}>
@@ -162,7 +194,9 @@ export default function Assenze() {
                   <textarea className={`${inputCls} min-h-[56px] resize-y`} rows={2} value={pref.nota ?? ''}
                             onChange={(e) => setPref({ ...pref, nota: e.target.value })} />
                 </Campo>
-                <Bottone type="submit" variante="primario" className="self-start">Salva</Bottone>
+                <Bottone type="submit" variante="primario" stato={preferenze.stato}
+                         className="self-start">Salva</Bottone>
+                {preferenze.errore && <Messaggio tono="errore">{preferenze.errore}</Messaggio>}
               </form>
             )}
           </Pannello>

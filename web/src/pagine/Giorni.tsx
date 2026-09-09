@@ -314,8 +314,8 @@ function ColonnaGiorno({ giorno, oggi, primo, fissa, ioId, stanze, settori, nomi
 
       <div className="flex items-center gap-2 border-b border-border px-3 py-1.5">
         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2">
-          <div className="h-full rounded-full bg-focus"
-               style={{ width: `${giorno.capienza ? Math.min(100, (giorno.presenti.length / giorno.capienza) * 100) : 0}%` }} />
+          <div className="h-full w-full origin-left rounded-full bg-focus transition-transform duration-[180ms] ease-out"
+               style={{ transform: `scaleX(${giorno.capienza ? Math.min(1, giorno.presenti.length / giorno.capienza) : 0})` }} />
         </div>
         <span className="mono text-2xs text-ink-faint">{giorno.presenti.length}/{giorno.capienza}</span>
         <span className="solo-lettori-schermo">
@@ -381,8 +381,13 @@ function ColonnaGiorno({ giorno, oggi, primo, fissa, ioId, stanze, settori, nomi
               <I.Croce size={11} className="mr-1 inline-block" />
               Assenze <span className="mono">{giorno.assenti.length}</span>
             </summary>
-            <Elenco gente={ordina(giorno.assenti)} nomi={nomi} ioId={ioId}
-                    settori={raggruppa ? settori : undefined} />
+            {/* Solo il contenuto si dissolve: l'altezza cambia di colpo, ed è
+                voluto — animare un'altezza fa rifare il layout a ogni
+                fotogramma, e qui di giornate ce ne sono cinque per volta. */}
+            <div className="entra">
+              <Elenco gente={ordina(giorno.assenti)} nomi={nomi} ioId={ioId}
+                      settori={raggruppa ? settori : undefined} />
+            </div>
           </details>
         )}
 

@@ -22,7 +22,8 @@ export default function Utenti({ utenti, unita, nomeUnita, prova, onCredenziali 
   utenti: UtenteRiga[]
   unita: UnitaOrg[]
   nomeUnita: (id: number | null) => string
-  prova: (fn: () => Promise<unknown>) => Promise<void>
+  /** L'azione della pagina che ospita: la chiave, se c'è, illumina un bottone. */
+  prova: (fn: () => Promise<unknown>, chiave?: string) => Promise<boolean>
   onCredenziali: (c: Credenziale[]) => void
 }) {
   const [ordine, setOrdine] = useState<'cognome' | 'nome'>('cognome')
