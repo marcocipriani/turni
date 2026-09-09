@@ -1,5 +1,6 @@
 import { type FormEvent, useCallback, useEffect, useState } from 'react'
-import { api, ErroreApi, type Persona, type Settore, type StanzaVista, type Unita } from '../api'
+import { api, type Persona, type Settore, type StanzaVista, type Unita } from '../api'
+import { useAzione, useNuovi } from '../azioni'
 import * as I from '../icone'
 import { useSessione } from '../sessione'
 import { Badge, Bottone, Campo, inputCls, Messaggio, Pannello, Scheletro, Tag } from '../ui'
@@ -20,7 +21,8 @@ export default function Organizzazione() {
   const [delegati, setDelegati] = useState<Delegato[]>([])
   const [stanze, setStanze] = useState<StanzaVista[]>([])
   const [modifica, setModifica] = useState<number | null>(null)
-  const [errore, setErrore] = useState<string | null>(null)
+  const azione = useAzione()
+  const { errore, setErrore } = azione
 
   const ricarica = useCallback(async () => {
     if (unitId == null) return
@@ -36,15 +38,17 @@ export default function Organizzazione() {
 
   useEffect(() => { void ricarica().catch((e) => setErrore(String(e.message))) }, [ricarica])
 
-  /** Vero se l'operazione è andata: chi apre un editor lo chiude solo allora. */
-  async function prova(fn: () => Promise<unknown>) {
-    setErrore(null)
-    try { await fn(); await ricarica(); return true }
-    catch (e) {
-      setErrore(e instanceof ErroreApi ? e.message : 'Operazione non riuscita.')
-      return false
-    }
-  }
+  /**
+   * Vero se l'operazione è andata: chi apre un editor lo chiude solo allora.
+   * La chiave, dove c'è, dice quale bottone deve mostrare l'esito.
+   */
+  const prova = (fn: () => Promise<unknown>, chiave?: string): Promise<boolean> =>
+    azione.esegui(async () => { await fn(); await ricarica() }, chiave)
+
+  // Quello che è appena nato si illumina per un attimo: in una pagina fitta di
+  // elenchi dice dov'è finita la cosa che si è appena creata.
+  const settoriNuovi = useNuovi(settori.map((s) => s.id))
+  const stanzeNuove = useNuovi(stanze.map((s) => s.id))
 
   // La stanza si riserva a chi è in forza all'unità che la possiede: è la
   // stessa regola che il server fa rispettare, qui solo per non proporre nomi
@@ -81,7 +85,7 @@ export default function Organizzazione() {
                 const leggi = (k: string) => { const v = f.get(k) as string; return v === '' ? null : Number(v) }
                 void prova(() => api.patch(`/org/unita/${unitId}/limiti`, {
                   smartMinSettimana: leggi('min'), smartMaxSettimana: leggi('max'),
-                }))
+                }), 'limiti')
               }}
               className="grid items-end gap-3 sm:grid-cols-[1fr_1fr_auto]"
             >
@@ -91,7 +95,7 @@ export default function Organizzazione() {
               <Campo etichetta="Massimo di giornate in agile a settimana">
                 <input name="max" type="number" min={0} max={5} className={inputCls} defaultValue={unita.smartMaxSettimana ?? ''} />
               </Campo>
-              <Bottone type="submit" variante="primario">Salva</Bottone>
+              <Bottone type="submit" variante="primario" stato={azione.statoDi('limiti')}>Salva</Bottone>
             </form>
           </Pannello>
         </section>
@@ -106,7 +110,7 @@ export default function Organizzazione() {
                 void prova(() => api.patch(`/org/unita/${unitId}/scambio`, {
                   scambioAttivo: f.get('attivo') === 'on',
                   scambioOraLimite: String(f.get('ora') || '10:00'),
-                }))
+                }), 'scambio')
               }}
               className="grid items-end gap-3 sm:grid-cols-[1fr_1fr_auto]"
             >
@@ -120,7 +124,7 @@ export default function Organizzazione() {
                      aiuto="Dopo quest'ora la giornata in corso non si tocca più.">
                 <input name="ora" type="time" className={inputCls} defaultValue={unita.scambioOraLimite} />
               </Campo>
-              <Bottone type="submit" variante="primario">Salva</Bottone>
+              <Bottone type="submit" variante="primario" stato={azione.statoDi('scambio')}>Salva</Bottone>
             </form>
           </Pannello>
         </section>
@@ -135,7 +139,7 @@ export default function Organizzazione() {
                 const f = new FormData(form)
                 void prova(() => api.post(`/org/unita/${unitId}/settori`, {
                   nome: f.get('nome'), richiedePresidio: f.get('presidio') === 'on', ordine: settori.length,
-                }))
+                }), 'settore')
                 form.reset()
               }}
               className="flex flex-wrap items-end gap-3"
@@ -144,7 +148,7 @@ export default function Organizzazione() {
               <label className="flex cursor-pointer items-center gap-2 pb-2 text-base">
                 <input type="checkbox" name="presidio" /> Richiede presidio
               </label>
-              <div className="pb-0.5"><Bottone type="submit">Aggiungi</Bottone></div>
+              <div className="pb-0.5"><Bottone type="submit" stato={azione.statoDi('settore')}>Aggiungi</Bottone></div>
             </form>
 
             {settori.length === 0 ? <p className="text-base text-ink-faint">Nessun settore.</p> : (
@@ -152,7 +156,9 @@ export default function Organizzazione() {
                 {settori.map((s) => {
                   const quante = persone.filter((p) => p.sectorId === s.id).length
                   return (
-                    <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+                    <li key={s.id}
+                        className={`flex flex-wrap items-center justify-between gap-2 px-3 py-2
+                                    ${settoriNuovi.has(s.id) ? 'entra appena' : ''}`}>
                       <span className="text-base">
                         {s.nome}
                         <span className="mono ml-2 text-sm text-ink-faint">{quante}</span>
@@ -265,7 +271,7 @@ export default function Organizzazione() {
                   soprannome: f.get('soprannome') || undefined, piano: f.get('piano') || undefined,
                   riservataA: f.get('riservataA') ? Number(f.get('riservataA')) : null,
                   scrivanie: Number(f.get('scrivanie')),
-                }))
+                }), 'stanza')
                 form.reset()
               }}
               className="grid items-end gap-3 sm:grid-cols-[.7fr_1fr_1fr_1fr_100px_auto]"
@@ -280,13 +286,15 @@ export default function Organizzazione() {
                 </select>
               </Campo>
               <Campo etichetta="Scrivanie"><input name="scrivanie" type="number" min={1} max={200} defaultValue={4} className={inputCls} required /></Campo>
-              <Bottone type="submit" variante="primario">Crea</Bottone>
+              <Bottone type="submit" variante="primario" stato={azione.statoDi('stanza')}>Crea</Bottone>
             </form>
 
             {stanze.length === 0 ? <p className="text-base text-ink-faint">Nessuna stanza.</p> : (
               <ul className="grid gap-3 sm:grid-cols-2">
                 {stanze.map((s) => (
-                  <li key={s.id} className={`rounded-r2 border border-border bg-bg p-3 ${s.attiva ? '' : 'opacity-60'}`}>
+                  <li key={s.id}
+                      className={`rounded-r2 border border-border bg-bg p-3 ${s.attiva ? '' : 'opacity-60'}
+                                  ${stanzeNuove.has(s.id) ? 'entra appena' : ''}`}>
                     {modifica === s.id ? (
                       <FormaStanza stanza={s} riservabili={riservabili} onChiudi={() => setModifica(null)}
                                    onSalva={(dati) => void prova(() => api.patch(`/org/stanze/${s.id}`, dati))

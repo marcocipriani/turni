@@ -113,6 +113,41 @@ label:has(input[type='file']:focus-visible) {
 @keyframes entra-overlay { from { opacity: 0; transform: translateY(6px) scale(.98); } }
 .entra-overlay { animation: entra-overlay var(--t-base) var(--ease-out); }
 
+/* ── Conferme ──────────────────────────────────────────────────────
+   Un'azione riuscita deve vedersi, e vedersi costa poco: si animano solo
+   `opacity` e `transform`, le due proprietà che il compositor sa muovere senza
+   rifare il layout della pagina. Niente colori che sfumano, niente altezze che
+   crescono, niente JavaScript a ogni fotogramma. Lo verifica
+   `verifiche/movimento.test.ts`, che legge questi fotogrammi chiave.
+   Le due durate lunghe qui sotto sono deliberate: una spunta e un'evidenza
+   vanno viste, non intercettate al volo. */
+
+/* La riga appena nata. Il fondo è un velo sotto il testo: `isolation` fa della
+   riga un contesto di impilamento, così lo z-index negativo del velo resta
+   sopra il fondo della riga e sotto quello che c'è scritto. Sfumare l'opacità
+   di un velo costa meno che animare un colore di fondo. */
+@keyframes svanisce { to { opacity: 0; } }
+.appena { position: relative; isolation: isolate; }
+.appena::after {
+  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: var(--surface-2);
+  animation: svanisce 1.2s var(--ease-out) forwards;
+}
+
+/* L'errore entra da sinistra: comparire secco, in fondo a una pagina piena, è
+   un modo per non farsi leggere. */
+@keyframes entra-errore { from { opacity: 0; transform: translateX(-4px); } }
+.entra-errore { animation: entra-errore var(--t-base) var(--ease-out); }
+
+/* La girandola del bottone al lavoro. Ruota e basta: nessun colore da
+   ricalcolare, nessuna misura da rimisurare. */
+@keyframes gira { to { transform: rotate(1turn); } }
+.girandola {
+  width: 14px; height: 14px; border-radius: 999px;
+  border: 2px solid currentColor; border-top-color: transparent;
+  animation: gira .7s linear infinite;
+}
+
 /* Barra di caricamento indeterminata: 2px sotto l'header. */
 @keyframes scorre { 0% { left: -35%; } 100% { left: 100%; } }
 .barra-carico { position: relative; height: 2px; overflow: hidden; }

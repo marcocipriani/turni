@@ -176,7 +176,11 @@ export default function Mio() {
         )}
 
         {visibili.length > 0 && (
-          <ul className="overflow-hidden rounded-r3 border border-border bg-surface">
+          /* `key` sui filtri: l'elenco si rimonta e rifà la sua dissolvenza.
+             Costa un rimontaggio di qualche decina di righe — se un giorno le
+             giornate diventassero centinaia, questa è la riga da togliere. */
+          <ul key={[...attivi].sort().join()}
+              className="entra overflow-hidden rounded-r3 border border-border bg-surface">
             {visibili.map((g, i) => {
               // Le settimane restano separate anche quando un filtro toglie di
               // mezzo delle giornate: il salto si vede dal lunedì, non dal

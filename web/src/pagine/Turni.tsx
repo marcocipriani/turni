@@ -7,7 +7,8 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { api, ErroreApi, type Griglia as DatiGriglia, type Periodo } from '../api'
+import { api, type Griglia as DatiGriglia, type Periodo } from '../api'
+import { type StatoBottone, useAzione } from '../azioni'
 import { addDays, lunediDi, oggiISO } from '../date'
 import * as I from '../icone'
 import { puoProgrammare, useSessione } from '../sessione'
@@ -38,9 +39,9 @@ export default function Turni() {
   const [periodi, setPeriodi] = useState<Periodo[] | null>(null)
   const [dati, setDati] = useState<DatiGriglia | null>(null)
   const [selezione, setSelezione] = useState<{ userId: number; data: string } | null>(null)
-  const [errore, setErrore] = useState<string | null>(null)
+  const azione = useAzione()
+  const { errore, setErrore } = azione
   const [esito, setEsito] = useState<EsitoGenerazione | null>(null)
-  const [inCorso, setInCorso] = useState(false)
   const [nuovoAperto, setNuovoAperto] = useState(false)
   const [cambiamentiAperti, setCambiamentiAperti] = useState(false)
   // Una settimana: è la domanda che si fa entrando — «questa settimana chi
@@ -78,17 +79,6 @@ export default function Turni() {
     void caricaGriglia(Number(id)).catch((e) => setErrore(e.message))
   }, [id, caricaGriglia])
 
-  async function azione(fn: () => Promise<unknown>) {
-    setErrore(null); setInCorso(true)
-    // Passano di qui tutte le azioni della pagina — genera, proponi, approva,
-    // rimanda indietro: la conferma al dito si mette una volta sola, qui.
-    try { await fn(); vibra(APTICO.conferma) }
-    catch (e) {
-      vibra(APTICO.errore)
-      setErrore(e instanceof ErroreApi ? e.message : 'Operazione non riuscita.')
-    }
-    finally { setInCorso(false) }
-  }
 
   /* Sfogliare col dito. Le frecce restano — sono l'unico appiglio da tastiera
      e col mouse — ma su un calendario il gesto che viene in mente è trascinare.
@@ -135,7 +125,7 @@ export default function Turni() {
   return (
     <Vista
       denso
-      caricando={inCorso}
+      caricando={azione.inCorso}
       titolo="Turni"
       icona={<I.Griglia size={17} />}
       aiuto={inGriglia && p
@@ -157,31 +147,31 @@ export default function Turni() {
       azioni={
         <>
           {inGriglia && p && modificabile && p.stato !== 'pubblicato' && (
-            <Comando titolo="Genera una proposta" disabled={inCorso} icona={<I.Bacchetta size={15} />}
-                     onClick={() => void azione(async () => {
+            <Comando titolo="Genera una proposta" stato={azione.statoDi('genera')} disabled={azione.inCorso} icona={<I.Bacchetta size={15} />}
+                     onClick={() => void azione.esegui(async () => {
                        setEsito(await api.post<EsitoGenerazione>(`/periodi/${p.id}/genera`))
                        await caricaGriglia(p.id)
-                     })}>Genera</Comando>
+                     }, 'genera')}>Genera</Comando>
           )}
           {inGriglia && p && modificabile && p.stato !== 'pubblicato' && (
-            <Comando titolo="Invia in approvazione" disabled={inCorso} icona={<I.Freccia size={15} />}
-                     onClick={() => void azione(async () => {
+            <Comando titolo="Invia in approvazione" stato={azione.statoDi('invia')} disabled={azione.inCorso} icona={<I.Freccia size={15} />}
+                     onClick={() => void azione.esegui(async () => {
                        await api.post(`/periodi/${p.id}/invia`); await caricaGriglia(p.id); await caricaPeriodi()
-                     })}>Invia</Comando>
+                     }, 'invia')}>Invia</Comando>
           )}
           {inGriglia && p && dati?.permessi.approvare && p.stato === 'in_approvazione' && (
             <>
-              <Comando variante="distruttivo" titolo="Rimanda indietro" disabled={inCorso}
+              <Comando variante="distruttivo" titolo="Rimanda indietro" stato={azione.statoDi('respingi')} disabled={azione.inCorso}
                        icona={<I.Croce size={15} />}
-                       onClick={() => void azione(async () => {
+                       onClick={() => void azione.esegui(async () => {
                          const nota = prompt('Perché lo rimandi indietro?')
                          if (!nota) return
                          await api.post(`/periodi/${p.id}/respingi`, { nota }); await caricaGriglia(p.id)
-                       })}>Respingi</Comando>
-              <Comando variante="primario" titolo="Approva e pubblica" disabled={inCorso} icona={<I.Spunta size={15} />}
-                       onClick={() => void azione(async () => {
+                       }, 'respingi')}>Respingi</Comando>
+              <Comando variante="primario" titolo="Approva e pubblica" stato={azione.statoDi('pubblica')} disabled={azione.inCorso} icona={<I.Spunta size={15} />}
+                       onClick={() => void azione.esegui(async () => {
                          await api.post(`/periodi/${p.id}/approva`); await caricaGriglia(p.id); await caricaPeriodi()
-                       })}>Pubblica</Comando>
+                       }, 'pubblica')}>Pubblica</Comando>
             </>
           )}
           {!inGriglia && scrivibile && (
@@ -239,11 +229,11 @@ export default function Turni() {
               {[1, 2, 4].map((n) => (
                 <BottoneVista key={n} attivo={settimane === n} onClick={() => setSettimane(n)}
                               aria-label={n === 1 ? '1 settimana' : `${n} settimane`}>
-                  {/* Sul telefono il numero basta: il gruppo dice già di che
-                      cosa si parla, e per esteso i due interruttori non stanno
-                      sulla stessa riga. */}
-                  <span className="sm:hidden">{n}</span>
-                  <span className="hidden sm:inline">{n === 1 ? '1 settimana' : `${n} settimane`}</span>
+                  {/* Per esteso quando c'è spazio. Sotto i 460px i due
+                      interruttori non ci starebbero sulla stessa riga: la
+                      parola si abbrevia, ma non sparisce. */}
+                  <span className="min-[460px]:hidden">{n} sett.</span>
+                  <span className="hidden min-[460px]:inline">{n === 1 ? '1 settimana' : `${n} settimane`}</span>
                 </BottoneVista>
               ))}
             </div>
@@ -389,12 +379,13 @@ export default function Turni() {
 }
 
 /** Comando dell'header: icona sempre, parola solo quando c'è larghezza. */
-function Comando({ titolo, icona, children, variante = 'normale', ...resto }: {
+function Comando({ titolo, icona, children, variante = 'normale', stato, ...resto }: {
   titolo: string; icona?: React.ReactNode; children: React.ReactNode
   variante?: 'normale' | 'primario' | 'distruttivo'
+  stato?: StatoBottone
 } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
-    <Bottone variante={variante} title={titolo} aria-label={titolo} {...resto}>
+    <Bottone variante={variante} stato={stato} title={titolo} aria-label={titolo} {...resto}>
       {icona}<span className="hidden sm:inline">{children}</span>
     </Bottone>
   )
