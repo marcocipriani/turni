@@ -11,10 +11,25 @@
 
 /* Reset minimale: il design system presuppone questi tre comportamenti. */
 *, *::before, *::after { box-sizing: border-box; }
-/* `dvh` e non `100%`: su Safari iOS la barra degli indirizzi si ritrae e si
-   riapre, e con un'altezza fissa il fondo della pagina finisce sotto di lei.
-   Il fallback serve ai browser che il dvh non ce l'hanno. */
-html, body, #root { height: 100%; height: 100dvh; }
+/* La shell è alta quanto la finestra e il documento non scorre: scorre solo la
+   regione interna della vista. Senza `overflow: hidden` il documento resta
+   scorribile — con `viewport-fit=cover` la pagina si estende sotto le barre di
+   sistema, e quei pixel bastano — e header e barra in basso se ne vanno via
+   insieme al contenuto, che è tutto dentro la stessa griglia.
+
+   `svh` e non `dvh`: è l'altezza della finestra con le barre del browser
+   mostrate, e non cambia mai. Con `dvh` l'altezza si muove insieme alla barra
+   degli indirizzi, e siccome qui non si può scorrere il documento per farla
+   ritrarre, l'unico effetto sarebbe un salto. Il fallback serve ai browser
+   senza unità di viewport dinamiche.
+   `overscroll-behavior` toglie il rimbalzo elastico ai bordi: qui non c'è
+   niente oltre il bordo da mostrare. */
+html, body, #root {
+  height: 100%;
+  height: 100svh;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
 body {
   font-family: var(--font-sans);
   font-size: 14px;

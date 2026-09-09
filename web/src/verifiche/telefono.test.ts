@@ -35,6 +35,13 @@ function bloccoTelefono(): string {
   throw new Error('blocco del telefono senza chiusura')
 }
 
+/** La regola che dà forma alla shell: altezza della finestra e scorrimento. */
+function shell(): string {
+  const m = app.match(/html, body, #root \{[^}]*\}/)
+  expect(m, 'manca la regola di shell su html, body, #root').not.toBeNull()
+  return m![0]
+}
+
 const misure = (css: string) => new Map(
   [...css.matchAll(/(--text-[\w-]+)\s*:\s*([\d.]+)px/g)].map(([, n, v]) => [n!, Number(v)]),
 )
@@ -56,10 +63,29 @@ describe('viewport', () => {
     }
   })
 
-  it("l'altezza segue la finestra dinamica, non quella teorica", () => {
-    // Su Safari iOS la barra degli indirizzi si ritrae: con `100%` secco il
-    // fondo della pagina finisce sotto di lei.
-    expect(app).toMatch(/html, body, #root \{[^}]*100dvh/)
+  it('il documento non scorre: scorre la regione interna', () => {
+    /* È il difetto che portava via header e barra in basso insieme al
+       contenuto: con `cover` la pagina si estende sotto le barre di sistema, e
+       se il documento è scorribile se ne va tutto quanto. */
+    expect(shell()).toMatch(/overflow:\s*hidden/)
+  })
+
+  it("l'altezza della shell non si muove sotto i piedi", () => {
+    // `dvh` cambia insieme alla barra degli indirizzi. Qui il documento non
+    // scorre, quindi quella barra non si ritrae mai: resterebbe solo il salto.
+    expect(shell(), 'la shell non deve dipendere da un\'altezza dinamica').not.toMatch(/\d+dvh/)
+    expect(shell()).toMatch(/height:\s*100svh/)
+  })
+
+  it('chi si estende sotto le barre di sistema si tiene alla larga da tutte', () => {
+    // Con `cover` il contenuto passa anche sotto la barra di stato, non solo
+    // sopra quella di navigazione: senza il margine in alto l'header ci finisce
+    // sotto.
+    if (!META_COVER.test(html)) return
+    for (const lato of ['top', 'bottom']) {
+      expect(vista, `manca il margine dalla safe area ${lato}`)
+        .toContain(`env(safe-area-inset-${lato})`)
+    }
   })
 })
 

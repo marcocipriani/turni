@@ -32,7 +32,8 @@ export default function App() {
        basso, che flotta perché è un comando e non contenuto. Da tablet in su
        torna la scrivania con le sue isole. */
     <div className="grid h-full grid-cols-1 grid-rows-[minmax(0,1fr)_auto] gap-2 overflow-hidden bg-surface
-                    pb-[max(8px,env(safe-area-inset-bottom))]
+                    pb-[max(8px,env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)]
+                    pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]
                     md:grid-cols-[68px_minmax(0,1fr)] md:grid-rows-1 md:p-2 md:pb-2">
       <a href="#contenuto" className="solo-lettori-schermo salta">Salta al contenuto</a>
 
