@@ -118,6 +118,7 @@ CREATE TABLE `period` (
   `creato_da` int(11) NOT NULL,
   `pubblicato_da` int(11) DEFAULT NULL,
   `pubblicato_il` timestamp NULL DEFAULT NULL,
+  `aggiornato_il` timestamp NULL DEFAULT NULL,
   `creato_il` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   KEY `ix_period_unit` (`unit_id`,`data_inizio`)
@@ -161,7 +162,9 @@ CREATE TABLE `room` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `unit_id` int(11) NOT NULL,
   `etichetta` varchar(60) NOT NULL,
+  `soprannome` varchar(60) DEFAULT NULL,
   `piano` varchar(40) DEFAULT NULL,
+  `riservata_a` int(11) DEFAULT NULL,
   `larghezza_cm` int(11) NOT NULL DEFAULT 600,
   `altezza_cm` int(11) NOT NULL DEFAULT 400,
   `attiva` tinyint(1) NOT NULL DEFAULT 1,
@@ -245,5 +248,6 @@ CREATE TABLE `user_preference` (
   `giorni_da_evitare` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL,
   `nota` varchar(500) DEFAULT NULL,
   `avatar_tinta` tinyint(4) DEFAULT NULL,
+  `programmazione_vista_il` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

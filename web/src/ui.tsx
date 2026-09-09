@@ -1,5 +1,5 @@
-import { type ButtonHTMLAttributes, type ReactNode, useEffect, useRef, useState } from 'react'
-import { Attenzione, Chiudi, Copia, Info, Spunta } from './icone'
+import { type ButtonHTMLAttributes, type ReactNode, useEffect, useId, useRef, useState } from 'react'
+import { Attenzione, Chiudi, Copia, Freccia, Info, Spunta } from './icone'
 import { Marchio } from './Marchio'
 
 /* ── Bottoni ─────────────────────────────────────────────────────── */
@@ -171,17 +171,71 @@ export function Pannello({ titolo, icona, azioni, piede, tonoPiede = 'neutro', c
 
 /* ── Messaggi ────────────────────────────────────────────────────── */
 
-export function Messaggio({ tono = 'info', children }: { tono?: 'info' | 'errore' | 'attenzione'; children: ReactNode }) {
-  const stile = {
-    info: 'border-border text-ink-muted',
-    errore: 'border-danger bg-danger-wash text-danger-ink',
-    attenzione: 'border-border-controllo text-warn-ink',
-  }[tono]
+/**
+ * Tre gradini di importanza, e ognuno si comporta come merita.
+ *
+ *   errore      il più forte: non si scarta, si richiude. Un conflitto resta un
+ *               conflitto anche quando dà fastidio guardarlo, e la riga di
+ *               sintesi non se ne va dalla pagina.
+ *   attenzione  si scarta: è una segnalazione, non un blocco.
+ *   info        nessun colore, nessun comando: è una nota, non uno stato.
+ *
+ * La gerarchia si legge prima del testo — filetto pieno a sinistra e fondo
+ * lavato sui due gradini alti, niente sul terzo — e non è affidata alla sola
+ * croma: cambiano icona, spessore del bordo e comando disponibile.
+ */
+const MESSAGGI = {
+  info: { cornice: 'border-border border-l-border-strong text-ink-muted', sintesi: 'Nota' },
+  attenzione: { cornice: 'border-warn border-l-warn bg-warn-wash text-warn-ink', sintesi: 'Attenzione' },
+  errore: { cornice: 'border-danger border-l-danger bg-danger-wash text-danger-ink', sintesi: 'Da risolvere' },
+} as const
+
+export function Messaggio({ tono = 'info', titolo, chiudibile, children }: {
+  tono?: 'info' | 'errore' | 'attenzione'
+  /** La riga che resta visibile quando un errore viene richiuso. */
+  titolo?: string
+  /** Forza il comando di scarto: l'avviso giallo ce l'ha già di suo. */
+  chiudibile?: boolean
+  children: ReactNode
+}) {
+  // ponytail: lo scarto vive quanto la pagina. Un avviso rimosso torna al
+  // prossimo caricamento, ed è quel che serve: è un «l'ho letto», non una
+  // preferenza. Se un giorno dovrà sopravvivere al ricarico, la chiave sta qui.
+  const [scartato, setScartato] = useState(false)
+  const [aperto, setAperto] = useState(true)
+  const id = useId()
+
+  if (scartato) return null
+
+  const s = MESSAGGI[tono]
   const Icona = tono === 'info' ? Info : Attenzione
+  const intestazione = titolo ?? (aperto ? null : s.sintesi)
+  const comando = 'shrink-0 cursor-pointer rounded-r1 p-0.5 opacity-70 transition-opacity ' +
+    'duration-[120ms] ease-out hover:opacity-100'
+
   return (
     <div role={tono === 'errore' ? 'alert' : undefined}
-         className={`flex items-start gap-2 rounded-r2 border px-3 py-2 text-base ${stile}`}>
-      <Icona size={16} /><div className="min-w-0 flex-1">{children}</div>
+         className={`flex items-start gap-2 rounded-r2 border border-l-[3px] px-3 py-2 text-base ${s.cornice}`}>
+      <Icona size={16} className="mt-0.5" />
+      <div className="min-w-0 flex-1">
+        {intestazione && <p className="font-semibold">{intestazione}</p>}
+        <div id={id} hidden={!aperto} className={intestazione ? 'mt-0.5' : undefined}>{children}</div>
+      </div>
+
+      {tono === 'errore' && (
+        <button type="button" className={comando} onClick={() => setAperto((x) => !x)}
+                aria-expanded={aperto} aria-controls={id}
+                title={aperto ? 'Comprimi' : 'Espandi'}
+                aria-label={aperto ? 'Comprimi il messaggio' : 'Espandi il messaggio'}>
+          <Freccia size={15} className={aperto ? '-rotate-90' : 'rotate-90'} />
+        </button>
+      )}
+      {(chiudibile ?? tono === 'attenzione') && (
+        <button type="button" className={comando} onClick={() => setScartato(true)}
+                title="Scarta" aria-label="Scarta il messaggio">
+          <Chiudi size={15} />
+        </button>
+      )}
     </div>
   )
 }

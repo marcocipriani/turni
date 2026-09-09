@@ -303,13 +303,20 @@ async function stanze(righe: Riga[], e: Esito, opz: Opzioni) {
 
   for (const [i, r] of righe.entries()) {
     if (!r.stanza) { e.errore(i, 'manca la colonna «stanza».'); continue }
-    const troppo = lungo(r.stanza, 60, 'stanza') ?? lungo(r.piano ?? '', 40, 'piano')
+    // «101 · Sala nord» resta scrivibile in una colonna sola, come nei modelli
+    // già distribuiti: qui si separa nelle due che l'archivio tiene distinte.
+    const [codice = '', ...resto] = r.stanza.split('·')
+    const etichetta = codice.trim()
+    const soprannome = (r.soprannome ?? resto.join('·')).trim()
+    if (!etichetta) { e.errore(i, 'la colonna «stanza» non contiene un codice.'); continue }
+    const troppo = lungo(etichetta, 60, 'stanza') ?? lungo(soprannome, 60, 'soprannome')
+      ?? lungo(r.piano ?? '', 40, 'piano')
     if (troppo) { e.errore(i, troppo); continue }
 
     if (unita.ambigua(r.unita ?? '')) { e.errore(i, `«${r.unita}» è il nome di due unità diverse.`); continue }
     const unitId = unita.id(r.unita ?? '')
     if (!unitId) { e.errore(i, `unità «${r.unita}» non trovata.`); continue }
-    if (esistenti.has(`${unitId}|${r.stanza.toLowerCase()}`)) { e.saltati++; continue }
+    if (esistenti.has(`${unitId}|${etichetta.toLowerCase()}`)) { e.saltati++; continue }
 
     // «5» crea le scrivanie da 1 a 5; «1,2,5» crea esattamente quelle. Serve
     // quando la numerazione sul posto ha dei buchi, che è il caso normale.
@@ -325,14 +332,14 @@ async function stanze(righe: Riga[], e: Esito, opz: Opzioni) {
 
     if (!opz.prova) {
       const [ins] = await db.insert(schema.room)
-        .values({ unitId, etichetta: r.stanza, piano: r.piano || null })
+        .values({ unitId, etichetta, soprannome: soprannome || null, piano: r.piano || null })
       await db.insert(schema.desk).values(numeri.map((numero, n) => ({
         roomId: ins.insertId, numero, x: 40 + (n % 5) * 120, y: 60 + Math.floor(n / 5) * 140,
       })))
     }
-    esistenti.add(`${unitId}|${r.stanza.toLowerCase()}`)
+    esistenti.add(`${unitId}|${etichetta.toLowerCase()}`)
     e.aggiunti++
-    e.note.push(`${r.stanza} — ${numeri.length} scrivanie`)
+    e.note.push(`${etichetta} — ${numeri.length} scrivanie`)
   }
 }
 
@@ -492,10 +499,10 @@ Di Marco Luca;dipendente;Dipartimento esempio;;;Segreteria;si;si;
 Bianchi Paolo;dirigente;Ufficio esempio;UFFES;Dipartimento esempio;;;;
 Verdi Anna;dipendente;Ufficio esempio;;;Contabilità;;;anna.ver@esempio.it
 `,
-  stanze: `stanza;piano;scrivanie;unita
-101 · Sala nord;Primo piano;5;Dipartimento esempio
-102;Primo piano;2;Dipartimento esempio
-204 · Archivio;Secondo piano;1,2,5;Ufficio esempio
+  stanze: `stanza;soprannome;piano;scrivanie;unita
+101;Sala nord;Primo piano;5;Dipartimento esempio
+102;;Primo piano;2;Dipartimento esempio
+204 · Archivio;;Secondo piano;1,2,5;Ufficio esempio
 `,
   settori: `settore;unita;presidio;ordine
 Segreteria;Ufficio esempio;si;0

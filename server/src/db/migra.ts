@@ -76,6 +76,31 @@ async function main() {
   // Tonalità dell'avatar scelta dalla persona. Null = ricavata dall'identificativo.
   await colonna('user_preference', 'avatar_tinta', '`avatar_tinta` tinyint')
 
+  // Il soprannome della stanza stava dentro l'etichetta, dopo un «·». Ora ha una
+  // colonna sua: le righe vecchie si spacchettano una volta sola, qui.
+  if (!(await colonnaEsiste('room', 'soprannome'))) {
+    await db.execute(sql.raw('ALTER TABLE `room` ADD COLUMN `soprannome` varchar(60)'))
+    await db.execute(sql.raw(
+      "UPDATE `room` SET `soprannome` = TRIM(SUBSTRING_INDEX(`etichetta`, '·', -1)), " +
+      "`etichetta` = TRIM(SUBSTRING_INDEX(`etichetta`, '·', 1)) WHERE `etichetta` LIKE '%·%'",
+    ))
+    console.log('  + room.soprannome')
+  }
+
+  // L'ufficio di una persona sola: sta fuori dalla capienza condivisa.
+  await colonna('room', 'riservata_a', '`riservata_a` int DEFAULT NULL')
+
+  // Data dell'ultima pubblicazione, distinta dalla prima: «v2, aggiornata il…».
+  // Sui periodi già pubblicati le due date coincidono, che è la verità nota.
+  if (!(await colonnaEsiste('period', 'aggiornato_il'))) {
+    await db.execute(sql.raw('ALTER TABLE `period` ADD COLUMN `aggiornato_il` timestamp NULL'))
+    await db.execute(sql.raw('UPDATE `period` SET `aggiornato_il` = `pubblicato_il` WHERE `pubblicato_il` IS NOT NULL'))
+    console.log('  + period.aggiornato_il')
+  }
+
+  // Fin dove ciascuno ha guardato la programmazione.
+  await colonna('user_preference', 'programmazione_vista_il', '`programmazione_vista_il` timestamp NULL')
+
   // Una cella può ora nascere da uno scambio fra colleghi.
   await db.execute(sql.raw(
     "ALTER TABLE `assignment` MODIFY COLUMN `origine` enum('manuale','generata','copiata','scambio') NOT NULL",

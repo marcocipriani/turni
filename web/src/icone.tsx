@@ -36,7 +36,15 @@ export const Luna = (p: Props) => <Svg {...p}><path d="M20 14.5A8.5 8.5 0 0 1 9.
 export const Monitor = (p: Props) => <Svg {...p}><rect x="2.5" y="4" width="19" height="12.5" rx="2" /><path d="M8.5 20.5h7M12 16.5v4" /></Svg>
 export const Esci = (p: Props) => <Svg {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></Svg>
 export const Persona = (p: Props) => <Svg {...p}><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></Svg>
+export const Persone = (p: Props) => <Svg {...p}><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 5.2a3.5 3.5 0 0 1 0 6.6M18 20a6.5 6.5 0 0 0-2.6-5.2" /></Svg>
 export const Stanza = (p: Props) => <Svg {...p}><path d="M4 21V4a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v17M4 21h16M15 8h4a1 1 0 0 1 1 1v12" /><circle cx="11.5" cy="12.5" r="1" /></Svg>
+/* I tre stati di una giornata. Sono la stessa terna ovunque — elenco, griglia,
+   stampa — perché tre segni che si imparano una volta valgono più di tre
+   parole lette ogni volta: edificio in sede, casa da remoto, croce assenza. */
+export const Sede = (p: Props) => <Svg {...p}><path d="M4 21V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v16M15 10h3a2 2 0 0 1 2 2v9M3 21h18M7.5 7h2M7.5 11h2M7.5 15h2M11.5 18v3" /></Svg>
+export const Remoto = (p: Props) => <Svg {...p}><path d="M3 10.5 12 3l9 7.5M5.5 12.5V20a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-7.5M10 21v-5h4v5" /></Svg>
+export const Croce = (p: Props) => <Svg {...p}><circle cx="12" cy="12" r="9" /><path d="M9 9l6 6M15 9l-6 6" /></Svg>
+
 export const Info = (p: Props) => <Svg {...p}><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></Svg>
 export const Scambio = (p: Props) => <Svg {...p}><path d="M4 8h13l-3.5-3.5M20 16H7l3.5 3.5" /></Svg>
 export const Copia = (p: Props) => <Svg {...p}><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1" /></Svg>

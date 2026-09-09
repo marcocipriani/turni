@@ -10,7 +10,7 @@ import { hashPassword } from '../lib/password'
 type Dati = {
   radice: { nome: string; sigla: string; dirigente: string }
   figlia: { nome: string; sigla: string; dirigente: string }
-  stanze: { etichetta: string; piano: string; scrivanie: number }[]
+  stanze: { etichetta: string; soprannome: string | null; piano: string; scrivanie: number }[]
   settoriPresidio: string[]
   organizzatori: string[]
   persone: { persona: string; settore: string; assenze: string[] }[]
@@ -116,7 +116,7 @@ async function main() {
   // un periodo cerca la capienza fra le stanze della propria unità.
   for (const s of dati.stanze) {
     const [r] = await db.insert(schema.room)
-      .values({ unitId: figliaId, etichetta: s.etichetta, piano: s.piano })
+      .values({ unitId: figliaId, etichetta: s.etichetta, soprannome: s.soprannome, piano: s.piano })
     await db.insert(schema.desk).values(
       Array.from({ length: s.scrivanie }, (_, i) => ({
         roomId: r.insertId, numero: String(i + 1), x: 40 + i * 120, y: 60,

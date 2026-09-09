@@ -8,10 +8,10 @@
  */
 import { useEffect, useState } from 'react'
 import { api, ErroreApi } from '../api'
+import { pezziData } from '../date'
 import * as I from '../icone'
 import { Avatar, etichette } from '../persone'
 import { Bottone, Messaggio, Modale, Scheletro, Tag } from '../ui'
-import { pezziData } from './Mio'
 
 export type Proposta = {
   id: number

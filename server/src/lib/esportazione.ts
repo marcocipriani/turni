@@ -96,3 +96,55 @@ export async function esporta(sezione: Sezione): Promise<string> {
   return foglio(['data', 'descrizione', 'unita'],
     righe.map((h) => [h.data, h.descrizione, nomeUnita(h.unitId)]))
 }
+
+/* ── Il calendario di una persona ─────────────────────────────────────
+   È il solo scarico in cui la causale può comparire: sono giornate proprie, e
+   l'interessato la conosce già. Dei colleghi non esce niente — nemmeno chi era
+   in sede insieme: quello è un elenco di terzi, e un file che gira per posta
+   non è il posto dove metterlo. */
+
+export type GiornataPropria = {
+  data: string
+  stato: 'presenza' | 'smart'
+  roomId: number | null
+  deskId: number | null
+}
+
+const ETICHETTA = { presenza: 'In sede', smart: 'Da remoto', assenza: 'Assenza' } as const
+
+/**
+ * Le righe del calendario personale, in ordine di data.
+ *
+ * L'assenza dichiarata vince sulla cella, come ovunque nell'applicazione, e si
+ * porta via stanza e scrivania: una giornata in cui non ci sei non ha un posto
+ * assegnato da stampare. Le assenze fuori da ogni programmazione pubblicata
+ * entrano lo stesso — esistono anche dove nessuno ha ancora programmato.
+ */
+export function righeCalendario(
+  celle: GiornataPropria[],
+  causali: ReadonlyMap<string, string>,
+  stanze: ReadonlyMap<number, { etichetta: string; soprannome: string | null }>,
+  scrivanie: ReadonlyMap<number, string>,
+): string[][] {
+  const righe = celle
+    .slice()
+    .sort((a, b) => a.data.localeCompare(b.data))
+    .map((x) => {
+      const causale = causali.get(x.data)
+      const stato = causale ? 'assenza' : x.stato
+      const stanza = stato === 'presenza' && x.roomId != null ? stanze.get(x.roomId) : undefined
+      return [
+        x.data, ETICHETTA[stato], stanza?.etichetta ?? '', stanza?.soprannome ?? '',
+        stato === 'presenza' && x.deskId != null ? scrivanie.get(x.deskId) ?? '' : '',
+        causale ?? '',
+      ]
+    })
+
+  const programmate = new Set(celle.map((x) => x.data))
+  for (const data of [...causali.keys()].sort()) {
+    if (!programmate.has(data)) righe.push([data, ETICHETTA.assenza, '', '', '', causali.get(data)!])
+  }
+  return righe
+}
+
+export const INTESTAZIONE_CALENDARIO = ['data', 'stato', 'stanza', 'soprannome', 'scrivania', 'causale']

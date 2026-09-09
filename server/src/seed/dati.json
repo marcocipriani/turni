@@ -11,12 +11,14 @@
   },
   "stanze": [
     {
-      "etichetta": "101 · Sala nord",
+      "etichetta": "101",
+      "soprannome": "Sala nord",
       "piano": "Primo piano",
       "scrivanie": 5
     },
     {
       "etichetta": "102",
+      "soprannome": null,
       "piano": "Primo piano",
       "scrivanie": 2
     }

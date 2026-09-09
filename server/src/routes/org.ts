@@ -243,10 +243,25 @@ org.get('/unita/:id/stanze', async (c) => {
   })))
 })
 
+/**
+ * La persona a cui si riserva una stanza dev'essere dell'unità che possiede la
+ * stanza: un ufficio si assegna a chi ci lavora, non a un nome qualunque.
+ */
+async function verificaRiservata(userId: number | null | undefined, unitId: number) {
+  if (userId == null) return null
+  const [u] = await db.select().from(schema.user).where(eq(schema.user.id, userId)).limit(1)
+  if (!u || !u.attivo || u.ruolo === 'admin' || u.unitId !== unitId) {
+    throw new HttpError(422, 'La stanza si riserva a una persona in forza a questa unità')
+  }
+  return userId
+}
+
 /** Ogni unità ha le proprie stanze, e le gestisce il suo dirigente. */
 org.post('/stanze', async (c) => {
   const b = z.object({
-    unitId: z.number().int(), etichetta: z.string().min(1), piano: z.string().optional(),
+    unitId: z.number().int(), etichetta: z.string().min(1).max(60),
+    soprannome: z.string().max(60).optional(), piano: z.string().max(40).optional(),
+    riservataA: z.number().int().nullable().optional(),
     scrivanie: z.number().int().min(1).max(200),
   }).safeParse(await c.req.json())
   if (!b.success) throw new HttpError(422, 'Dati della stanza non validi')
@@ -256,7 +271,9 @@ org.post('/stanze', async (c) => {
     throw vietato('Le stanze le gestisce il dirigente dell\'unità')
   }
   const [ins] = await db.insert(schema.room).values({
-    unitId: b.data.unitId, etichetta: b.data.etichetta, piano: b.data.piano ?? null,
+    unitId: b.data.unitId, etichetta: b.data.etichetta,
+    soprannome: b.data.soprannome || null, piano: b.data.piano || null,
+    riservataA: await verificaRiservata(b.data.riservataA, b.data.unitId),
   })
   // Nascono numerate e disposte in fila: la planimetria arriverà a spostarle.
   await db.insert(schema.desk).values(
@@ -265,6 +282,53 @@ org.post('/stanze', async (c) => {
     })),
   )
   return c.json({ id: ins.insertId }, 201)
+})
+
+/** La stanza cambia nome, soprannome o piano; la capienza no, quella la fanno le scrivanie. */
+org.patch('/stanze/:rid', async (c) => {
+  const rid = Number(c.req.param('rid'))
+  const [r] = await db.select().from(schema.room).where(eq(schema.room.id, rid)).limit(1)
+  if (!r) throw nonTrovato('Stanza non trovata')
+  if (!puoAmministrareUnita(c.get('attore'), r.unitId)) throw vietato()
+  const b = z.object({
+    etichetta: z.string().min(1).max(60).optional(),
+    soprannome: z.string().max(60).nullable().optional(),
+    piano: z.string().max(40).nullable().optional(),
+    riservataA: z.number().int().nullable().optional(),
+    attiva: z.boolean().optional(),
+  }).safeParse(await c.req.json())
+  if (!b.success) throw new HttpError(422, 'Dati della stanza non validi')
+  if (b.data.riservataA != null) await verificaRiservata(b.data.riservataA, r.unitId)
+  await db.update(schema.room).set({
+    ...b.data,
+    soprannome: b.data.soprannome === undefined ? undefined : b.data.soprannome || null,
+    piano: b.data.piano === undefined ? undefined : b.data.piano || null,
+  }).where(eq(schema.room.id, rid))
+  await traccia({ entita: 'room', entitaId: rid, azione: 'modifica', utente: c.get('attore').id, dopo: b.data })
+  return c.json({ ok: true })
+})
+
+/**
+ * Una stanza si elimina finché nessuna programmazione ci ha mandato qualcuno.
+ * Cancellarla comunque riscriverebbe il passato: una giornata già pubblicata
+ * direbbe «in sede» senza più dire dove. Chi non serve più e non si può
+ * cancellare si disattiva, e sparisce dai conti senza perdere lo storico.
+ */
+org.delete('/stanze/:rid', async (c) => {
+  const rid = Number(c.req.param('rid'))
+  const [r] = await db.select().from(schema.room).where(eq(schema.room.id, rid)).limit(1)
+  if (!r) throw nonTrovato('Stanza non trovata')
+  if (!puoAmministrareUnita(c.get('attore'), r.unitId)) throw vietato()
+
+  const [usata] = await db.select({ data: schema.assignment.data })
+    .from(schema.assignment).where(eq(schema.assignment.roomId, rid)).limit(1)
+  if (usata) {
+    throw new HttpError(409, 'La stanza compare in una programmazione: disattivala invece di eliminarla.')
+  }
+  await db.delete(schema.desk).where(eq(schema.desk.roomId, rid))
+  await db.delete(schema.room).where(eq(schema.room.id, rid))
+  await traccia({ entita: 'room', entitaId: rid, azione: 'elimina', utente: c.get('attore').id, prima: r })
+  return c.json({ ok: true })
 })
 
 org.post('/stanze/:rid/scrivanie', async (c) => {

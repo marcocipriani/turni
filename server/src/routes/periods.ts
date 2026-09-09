@@ -11,6 +11,7 @@ import {
   type Albero, mascheraCella, puoApprovare, puoLeggereUnita, puoProgrammare, puoVedereCausale,
   radice, unitaDiProgrammazione,
 } from '../permissions'
+import { celleIstantanea, confronta, programmazioneNuova } from '../lib/differenze'
 import { giorniIndisponibili } from './absences'
 import { personeDellUnita, type PersonaUnita } from './org'
 
@@ -40,8 +41,11 @@ async function contesto(p: typeof schema.period.$inferSelect, alb: Albero) {
 
   // Le stanze sono quelle dell'unità che programma: due uffici sullo stesso
   // piano hanno stanze distinte, e la capienza dell'uno non è quella dell'altro.
+  // Le riservate restano fuori: la stanza di una persona sola non è capienza da
+  // distribuire, e metterla nel mucchio farebbe programmare qualcun altro lì.
   const stanzeRighe = await db.select().from(schema.room)
-    .where(and(eq(schema.room.unitId, p.unitId), eq(schema.room.attiva, true))).orderBy(asc(schema.room.id))
+    .where(and(eq(schema.room.unitId, p.unitId), eq(schema.room.attiva, true),
+               isNull(schema.room.riservataA))).orderBy(asc(schema.room.id))
   const scrivanie = stanzeRighe.length
     ? await db.select().from(schema.desk).where(
         and(inArray(schema.desk.roomId, stanzeRighe.map((s) => s.id)), eq(schema.desk.attiva, true)))
@@ -165,6 +169,45 @@ periods.get('/', async (c) => {
       ? and(eq(schema.period.unitId, unitId), eq(schema.period.stato, 'pubblicato'))
       : eq(schema.period.unitId, unitId))
     .orderBy(desc(schema.period.dataInizio)))
+})
+
+/**
+ * «C'è una programmazione nuova»: il periodo pubblicato più di recente per
+ * l'unità in cui la persona è programmata, e se l'ha già guardato o no.
+ *
+ * Il confronto è fra la data dell'ultima pubblicazione e il segno lasciato da
+ * chi legge: così l'avviso compare una volta, e ricompare quando esce una
+ * revisione — che è esattamente quando c'è di nuovo qualcosa da vedere.
+ */
+periods.get('/novita', async (c) => {
+  const a = c.get('attore'), alb = c.get('albero')
+  const unitId = unitaDiProgrammazione(alb, a.ruolo, a.unitId)
+  if (unitId == null) return c.json({ periodo: null })
+
+  const [p] = await db.select().from(schema.period)
+    .where(and(eq(schema.period.unitId, unitId), eq(schema.period.stato, 'pubblicato')))
+    .orderBy(desc(schema.period.aggiornatoIl)).limit(1)
+  if (!p) return c.json({ periodo: null })
+
+  const [pref] = await db.select({ visto: schema.userPreference.programmazioneVistaIl })
+    .from(schema.userPreference).where(eq(schema.userPreference.userId, a.id)).limit(1)
+  const nuova = programmazioneNuova(pref?.visto ?? null, p.aggiornatoIl ?? p.pubblicatoIl)
+
+  return c.json({
+    periodo: {
+      id: p.id, dataInizio: p.dataInizio, dataFine: p.dataFine, versione: p.versione,
+      pubblicatoIl: p.pubblicatoIl, aggiornatoIl: p.aggiornatoIl, nuova,
+    },
+  })
+})
+
+/** Il segno di «l'ho vista». Scartare l'avviso è dichiarare di averlo letto. */
+periods.post('/vista', async (c) => {
+  const a = c.get('attore')
+  await db.insert(schema.userPreference)
+    .values({ userId: a.id, programmazioneVistaIl: new Date() })
+    .onDuplicateKeyUpdate({ set: { programmazioneVistaIl: new Date() } })
+  return c.json({ ok: true })
 })
 
 periods.post('/', async (c) => {
@@ -464,8 +507,14 @@ periods.post('/:id/approva', async (c) => {
   if (!puoApprovare(a, p.unitId)) throw vietato('Solo il dirigente approva')
   if (p.stato !== 'in_approvazione') throw new HttpError(409, 'Il periodo non è in approvazione')
 
+  // La prima data di pubblicazione non si riscrive: una revisione aggiorna il
+  // periodo, non lo fa nascere una seconda volta.
+  const adesso = new Date()
   await db.update(schema.period)
-    .set({ stato: 'pubblicato', pubblicatoDa: a.id, pubblicatoIl: new Date(), notaApprovazione: null })
+    .set({
+      stato: 'pubblicato', pubblicatoDa: a.id, notaApprovazione: null,
+      pubblicatoIl: p.pubblicatoIl ?? adesso, aggiornatoIl: adesso,
+    })
     .where(eq(schema.period.id, p.id))
 
   // Prima pubblicazione: avvisa tutti. Revisione: solo chi ha una cella cambiata.
@@ -476,7 +525,7 @@ periods.post('/:id/approva', async (c) => {
       .where(and(eq(schema.periodSnapshot.periodId, p.id), eq(schema.periodSnapshot.versione, p.versione - 1)))
       .limit(1)
     const prima = new Map<string, string>()
-    for (const x of (snap?.assegnazioni ?? []) as { userId: number; data: string; stato: string; roomId: number | null }[]) {
+    for (const x of celleIstantanea(snap?.assegnazioni)) {
       prima.set(`${x.userId}|${x.data}`, `${x.stato}|${x.roomId ?? ''}`)
     }
     const ora = await db.select().from(schema.assignment).where(eq(schema.assignment.periodId, p.id))
@@ -506,6 +555,59 @@ periods.get('/:id/versioni', async (c) => {
   }).from(schema.periodSnapshot).where(eq(schema.periodSnapshot.periodId, p.id))
     .orderBy(desc(schema.periodSnapshot.versione))
   return c.json(righe)
+})
+
+/**
+ * Cosa è cambiato con una certa versione: l'istantanea precedente contro
+ * quella successiva — o contro le celle di adesso, se la versione chiesta è
+ * quella in vigore.
+ *
+ * Le istantanee non contengono assenze (vedi `lib/differenze`), quindi qui non
+ * c'è niente da mascherare: si dice «in sede» o «da remoto», che è quanto la
+ * griglia mostra già a chiunque possa leggerla.
+ */
+periods.get('/:id/differenze', async (c) => {
+  const p = await caricaPeriodo(Number(c.req.param('id')))
+  const a = c.get('attore'), alb = c.get('albero')
+  if (!puoLeggereUnita(alb, a, p.unitId)) throw vietato()
+  if (p.stato !== 'pubblicato' && !puoProgrammare(a, p.unitId)) {
+    throw vietato('Questa programmazione non è ancora pubblicata')
+  }
+
+  const versione = Number(c.req.query('versione') ?? p.versione)
+  if (!Number.isInteger(versione) || versione < 2) {
+    // La prima versione non ha un prima: non è un errore, è che non c'è niente
+    // da confrontare.
+    return c.json({ versione, cambiamenti: [], persone: [], stanze: [] })
+  }
+
+  const istantanee = await db.select().from(schema.periodSnapshot)
+    .where(and(eq(schema.periodSnapshot.periodId, p.id),
+               inArray(schema.periodSnapshot.versione, [versione - 1, versione])))
+  const istantaneaDi = (v: number) => {
+    const riga = istantanee.find((x) => x.versione === v)
+    return riga ? celleIstantanea(riga.assegnazioni) : null
+  }
+
+  const prima = istantaneaDi(versione - 1)
+  if (!prima) throw nonTrovato('Di quella versione non è rimasta un\'istantanea')
+  const dopo = istantaneaDi(versione)
+    ?? (await db.select().from(schema.assignment).where(eq(schema.assignment.periodId, p.id)))
+
+  const cambiamenti = confronta(prima, dopo)
+  const persone = await personeDellUnita(alb, p.unitId)
+  const coinvolti = new Set(cambiamenti.map((x) => x.userId))
+  const stanze = await db.select({
+    id: schema.room.id, etichetta: schema.room.etichetta, soprannome: schema.room.soprannome,
+  }).from(schema.room).where(eq(schema.room.unitId, p.unitId))
+
+  return c.json({
+    versione,
+    cambiamenti,
+    persone: persone.filter((u) => coinvolti.has(u.id))
+      .map((u) => ({ id: u.id, nome: u.nome, cognome: u.cognome, sectorId: u.sectorId })),
+    stanze,
+  })
 })
 
 /* ── Consultazione e export ─────────────────────────────────────── */

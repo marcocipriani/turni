@@ -12,6 +12,14 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
   if (temaSalvato() === 'auto') applicaTema('auto')
 })
 
+/* Il service worker serviva solo alle notifiche, e si registrava aprendo la
+   pagina delle notifiche. Ora tiene anche il guscio e l'ultimo «Mio» per
+   quando la rete non c'è: va registrato all'avvio, non quando qualcuno passa
+   di lì. Se fallisce non importa: l'applicazione funziona lo stesso. */
+if ('serviceWorker' in navigator) {
+  addEventListener('load', () => { void navigator.serviceWorker.register('/sw.js').catch(() => {}) })
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>

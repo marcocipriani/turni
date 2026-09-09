@@ -47,6 +47,9 @@ Turni fa quel lavoro sapendo tutte e quattro le cose.
 - **Stampa** su carta o PDF: griglia del periodo, giorno per giorno, calendario
   personale, occupazione delle stanze.
 - **Notifiche** in applicazione e push del browser. Nessuna posta elettronica.
+- **Funziona senza rete**: installata sul telefono, apre le tue giornate anche
+  in garage, dicendo a quando risalgono. Delle giornate conservate ci sono solo
+  le proprie, e uscendo si cancellano.
 
 ## Privacy per costruzione
 
@@ -153,7 +156,7 @@ anche se trova in archivio un solo indirizzo fuori dal dominio di prova.
 ## Verifiche
 
 ```bash
-npm test          # 144 test: motore, permessi, scambi, nomi, contrasti, accessibilità
+npm test          # 203 test: motore, permessi, scambi, nomi, contrasti, accessibilità
 npm run verifica  # 12 criteri di accettazione contro un'istanza avviata
 npm run carico    # motore fino a 1000 persone
 npm run build     # controllo dei tipi e build di produzione

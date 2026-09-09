@@ -12,7 +12,7 @@ const cella = (over: Partial<Cella>): Cella => ({
 describe('etichetta testuale della cella', () => {
   it('descrive la presenza con stanza e scrivania', () => {
     expect(descriviCella(p, '2026-09-07', cella({ stato: 'presenza', roomId: 3, deskId: 9 }), '101', '4'))
-      .toBe('Marchetti Elena, lun 7 settembre, presenza, stanza 101, scrivania 4')
+      .toBe('Marchetti Elena, lun 7 settembre, in sede, stanza 101, scrivania 4')
   })
 
   it('segnala una cella bloccata', () => {
@@ -20,9 +20,9 @@ describe('etichetta testuale della cella', () => {
       .toContain('cella bloccata')
   })
 
-  it('descrive il lavoro agile senza alcun riferimento allo spazio', () => {
+  it('descrive il lavoro da remoto senza alcun riferimento allo spazio', () => {
     expect(descriviCella(p, '2026-09-08', cella({}), null, null))
-      .toBe('Marchetti Elena, mar 8 settembre, lavoro agile')
+      .toBe('Marchetti Elena, mar 8 settembre, da remoto')
   })
 
   it('riporta la causale solo quando è stata fornita', () => {
