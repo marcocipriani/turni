@@ -32,9 +32,9 @@ export function Vista({ titolo, icona, aiuto, meta, azioni, caricando, denso, ch
             {aiuto && <p className="truncate text-xs text-ink-faint">{aiuto}</p>}
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-3">
+        <div className="flex shrink-0 items-center gap-3 max-sm:gap-1">
           {meta && <div className="hidden items-center gap-3 text-sm text-ink-faint lg:flex">{meta}</div>}
-          {azioni && <div className="flex items-center gap-2">{azioni}</div>}
+          {azioni && <div className="flex items-center gap-2 max-sm:gap-1">{azioni}</div>}
           {/* Sul telefono non c'è rail: campanella e menu utente vivono qui. */}
           <ControlliGlobali />
         </div>

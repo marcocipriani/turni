@@ -11,6 +11,7 @@ import { api, ErroreApi } from '../api'
 import { pezziData } from '../date'
 import * as I from '../icone'
 import { Avatar, etichette } from '../persone'
+import { APTICO, vibra } from '../tocco'
 import { Bottone, Messaggio, Modale, Scheletro, Tag } from '../ui'
 
 export type Proposta = {
@@ -62,8 +63,11 @@ export function Scambi({ elenco, onCambiato }: { elenco: Elenco; onCambiato: () 
 
   async function agisci(id: number, fn: () => Promise<unknown>) {
     setErrore(null); setInCorso(id)
-    try { await fn(); onCambiato() }
-    catch (e) { setErrore(e instanceof ErroreApi ? e.message : 'Operazione non riuscita.') }
+    try { await fn(); vibra(APTICO.conferma); onCambiato() }
+    catch (e) {
+      vibra(APTICO.errore)
+      setErrore(e instanceof ErroreApi ? e.message : 'Operazione non riuscita.')
+    }
     finally { setInCorso(null) }
   }
 
@@ -147,8 +151,10 @@ export function ModaleScambio({ data, aperta, onChiudi, onFatto }: {
         dataProponente: g.tipo === 'chiedo' ? g.data : data,
         dataDestinatario: g.data,
       })
+      vibra(APTICO.conferma)
       onFatto(); onChiudi()
     } catch (e) {
+      vibra(APTICO.errore)
       setErrore(e instanceof ErroreApi ? e.message : 'Proposta non riuscita.')
     } finally { setInCorso(false) }
   }

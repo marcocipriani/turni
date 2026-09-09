@@ -27,16 +27,20 @@ export default function App() {
   const casa = casaDi(utente)
 
   return (
+    /* Sul telefono il contenuto arriva ai bordi: la cornice dell'isola, su 390
+       pixel, è spazio tolto a quello che si legge. Dell'isola resta la barra in
+       basso, che flotta perché è un comando e non contenuto. Da tablet in su
+       torna la scrivania con le sue isole. */
     <div className="grid h-full grid-cols-1 grid-rows-[minmax(0,1fr)_auto] gap-2 overflow-hidden bg-surface
-                    p-2 pb-[max(8px,env(safe-area-inset-bottom))]
-                    md:grid-cols-[68px_minmax(0,1fr)] md:grid-rows-1 md:pb-2">
+                    pb-[max(8px,env(safe-area-inset-bottom))]
+                    md:grid-cols-[68px_minmax(0,1fr)] md:grid-rows-1 md:p-2 md:pb-2">
       <a href="#contenuto" className="solo-lettori-schermo salta">Salta al contenuto</a>
 
       <Rail sezioni={sezioni} casa={casa} />
 
       <main id="contenuto"
-            className="grid min-h-0 min-w-0 grid-rows-[52px_minmax(0,1fr)] overflow-hidden rounded-r4
-                       border border-border bg-bg shadow-float">
+            className="grid min-h-0 min-w-0 grid-rows-[56px_minmax(0,1fr)] overflow-hidden bg-bg
+                       md:grid-rows-[52px_minmax(0,1fr)] md:rounded-r4 md:border md:border-border md:shadow-float">
         <Suspense fallback={<><div className="border-b border-border" /><div className="p-6"><Scheletro righe={4} /></div></>}>
           <Routes>
             <Route path="/mio" element={<Mio />} />
@@ -58,7 +62,7 @@ export default function App() {
         </Suspense>
       </main>
 
-      <BarraBasso sezioni={sezioni} />
+      <div className="px-2 md:contents"><BarraBasso sezioni={sezioni} /></div>
     </div>
   )
 }

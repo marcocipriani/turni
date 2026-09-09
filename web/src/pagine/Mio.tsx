@@ -5,7 +5,8 @@ import { descriviSettimana, lunediDi, oggiISO, pezziData } from '../date'
 import * as I from '../icone'
 import { Avatar, FilaAvatar, perEsteso } from '../persone'
 import { SegnoStato, STATI, type Stato } from '../stati'
-import { Bottone, Chip, Messaggio, Scheletro, StatoVuoto, Tag } from '../ui'
+import { vibra } from '../tocco'
+import { Bottone, Chip, Messaggio, Scheletro, stileBottone, StatoVuoto, Tag } from '../ui'
 import { Toolbar, Vista } from '../Vista'
 import { AvvisoNovita, quando } from './novita'
 import { ModaleScambio, type Proposta, Scambi } from './Scambio'
@@ -51,10 +52,10 @@ function Filtri({ attivi, onCambia, conteggi }: {
         const Icona = STATI[f].icona
         return (
           <button
-            key={f} type="button" onClick={() => onCambia(f)} aria-pressed={on}
+            key={f} type="button" onClick={() => { vibra(); onCambia(f) }} aria-pressed={on}
             /* `whitespace-nowrap`: «In sede» e «Da remoto» sono due parole, e
                dentro una pillola stretta andavano a capo spezzandosi in mezzo. */
-            className={`inline-flex min-h-[32px] cursor-pointer items-center gap-1.5 whitespace-nowrap
+            className={`inline-flex min-h-[32px] max-sm:min-h-[44px] cursor-pointer items-center gap-1.5 whitespace-nowrap
                         rounded-full border px-2.5 text-sm transition-colors duration-[120ms] ease-out ${on
               ? 'border-action bg-action text-action-ink'
               : 'border-border-controllo bg-bg text-ink-muted hover:bg-surface-2 hover:text-ink'}`}
@@ -128,9 +129,7 @@ export default function Mio() {
           {/* Lo scarico è un link, non un bottone: è una risorsa che il browser
               va a prendere, e il tasto destro deve funzionarci sopra. */}
           <a href="/api/mio/export.csv" title="Scarica il tuo calendario in CSV"
-             aria-label="Scarica il tuo calendario in CSV"
-             className="inline-flex cursor-pointer items-center gap-2 rounded-r1 p-[5px] text-ink-faint
-                        transition-colors duration-[120ms] ease-out hover:bg-surface-2 hover:text-ink">
+             aria-label="Scarica il tuo calendario in CSV" className={stileBottone('icona')}>
             <I.Scarica size={17} />
           </a>
           <Bottone variante="icona" title="Stampa il tuo calendario" aria-label="Stampa il tuo calendario"
