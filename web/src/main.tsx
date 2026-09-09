@@ -20,6 +20,22 @@ if ('serviceWorker' in navigator) {
   addEventListener('load', () => { void navigator.serviceWorker.register('/sw.js').catch(() => {}) })
 }
 
+/* Chiusa l'anteprima di stampa, Chrome su Android non sempre ridisegna la
+   pagina: la shell è alta `100svh`, il documento non scorre, e quello che
+   resta sullo schermo è bianco finché non si riavvia l'applicazione. Durante
+   la stampa il foglio di stile sfila via l'altezza e gli scorrimenti — è il
+   blocco `@media print` — e al ritorno il ricalcolo non riparte da solo.
+
+   Qui glielo si chiede: si toglie l'altezza, si legge una misura (che obbliga
+   il browser a ricalcolare subito il layout invece di rimandarlo), e la si
+   rimette. Fuori dalla stampa non fa niente e non costa niente. */
+addEventListener('afterprint', () => {
+  const radice = document.documentElement
+  radice.style.height = 'auto'
+  void radice.offsetHeight
+  radice.style.height = ''
+})
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>

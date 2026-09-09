@@ -119,6 +119,7 @@ export default function Mio() {
 
   return (
     <Vista
+      denso
       titolo="Mio"
       icona={<I.Calendario size={17} />}
       aiuto="Le tue giornate, da oggi in avanti"
