@@ -2,7 +2,9 @@
 <html lang="it">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- viewport-fit=cover: senza, env(safe-area-inset-*) vale zero e il padding
+         che tiene la barra in basso sopra la tacca non fa niente. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <!-- La barra di sistema segue le superfici dell'app, che sono neutre:
          la croma qui è riservata agli stati, e una barra blu sarebbe
          l'unico colore vivo dell'interfaccia senza dire niente.

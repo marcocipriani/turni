@@ -1,6 +1,7 @@
 import { type ButtonHTMLAttributes, type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { Attenzione, Chiudi, Copia, Freccia, Info, Spunta } from './icone'
 import { Marchio } from './Marchio'
+import { vibra } from './tocco'
 
 /* ── Bottoni ─────────────────────────────────────────────────────── */
 
@@ -9,12 +10,18 @@ type VarianteBottone = 'normale' | 'primario' | 'piccolo' | 'icona' | 'distrutti
 const BASE = 'inline-flex items-center gap-2 transition-colors duration-[120ms] ease-out ' +
   'disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer'
 
+/* Sul telefono il bersaglio cresce fino a 44px in altezza, la misura del
+   polpastrello. Solo in altezza: nell'header della vista possono starci otto
+   comandi, e allargarli tutti li spingerebbe fuori da uno schermo da 390px.
+   Da 640px in su non cambia niente, perché lì il puntatore è una punta. */
+const TOCCO = 'max-sm:min-h-[44px]'
+
 const VARIANTI: Record<VarianteBottone, string> = {
-  normale: `${BASE} rounded-r2 border border-border-controllo bg-bg px-3 py-1.5 text-base text-ink hover:bg-surface-2`,
-  primario: `${BASE} rounded-r2 border border-action bg-action px-3 py-1.5 text-base text-action-ink hover:bg-action-hover`,
-  piccolo: `${BASE} rounded-r2 border border-border-controllo bg-bg px-2 py-[3px] text-sm text-ink hover:bg-surface-2`,
-  icona: `${BASE} rounded-r1 p-[5px] text-ink-faint hover:bg-surface-2 hover:text-ink`,
-  distruttivo: `${BASE} rounded-r2 border border-border-controllo bg-bg px-3 py-1.5 text-base text-ink hover:bg-danger-wash hover:text-danger-ink hover:border-danger`,
+  normale: `${BASE} ${TOCCO} rounded-r2 border border-border-controllo bg-bg px-3 py-1.5 text-base text-ink hover:bg-surface-2`,
+  primario: `${BASE} ${TOCCO} rounded-r2 border border-action bg-action px-3 py-1.5 text-base text-action-ink hover:bg-action-hover`,
+  piccolo: `${BASE} max-sm:min-h-[36px] rounded-r2 border border-border-controllo bg-bg px-2 py-[3px] text-sm text-ink hover:bg-surface-2`,
+  icona: `${BASE} max-sm:size-11 max-sm:justify-center rounded-r1 p-[5px] text-ink-faint hover:bg-surface-2 hover:text-ink`,
+  distruttivo: `${BASE} ${TOCCO} rounded-r2 border border-border-controllo bg-bg px-3 py-1.5 text-base text-ink hover:bg-danger-wash hover:text-danger-ink hover:border-danger`,
 }
 
 /** Le stesse classi, per quando il comando non è un bottone ma un link o una
@@ -40,8 +47,9 @@ export function Segmented<T extends string>({ valore, opzioni, onCambia, etichet
       {opzioni.map((o, i) => (
         <button
           key={o.v} type="button" role="radio" aria-checked={valore === o.v} title={o.titolo}
-          aria-label={o.titolo} onClick={() => onCambia(o.v)}
+          aria-label={o.titolo} onClick={() => { vibra(); onCambia(o.v) }}
           className={`inline-flex cursor-pointer items-center gap-1.5 px-2.5 py-1 text-sm transition-colors
+            max-sm:min-h-[44px] max-sm:px-4
             duration-[120ms] ease-out ${i > 0 ? 'border-l border-border' : ''}
             ${valore === o.v ? 'bg-action text-action-ink' : 'bg-bg text-ink-muted hover:bg-surface-2 hover:text-ink'}`}
         >

@@ -5,19 +5,20 @@
  * passa alla griglia del periodo. Chi non programma la vede in sola lettura:
  * una destinazione sola, nessun bivio da capire prima di cliccare.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api, ErroreApi, type Griglia as DatiGriglia, type Periodo } from '../api'
 import { addDays, lunediDi, oggiISO } from '../date'
 import * as I from '../icone'
 import { puoProgrammare, useSessione } from '../sessione'
-import { Bottone, Messaggio, Pill, Scheletro, StatoVuoto } from '../ui'
+import { APTICO, direzioneSwipe, vibra } from '../tocco'
+import { Bottone, Messaggio, Pill, Scheletro, stileBottone, StatoVuoto } from '../ui'
 import { Drawer, Toolbar, Vista } from '../Vista'
 import { ModaleCambiamenti } from './cambiamenti'
 import { Giorni } from './Giorni'
 import Griglia, { Legenda } from './Griglia'
 import { AvvisoNovita, quando } from './novita'
-import { EditorCella, type EsitoGenerazione, EsitoProposta, NuovoPeriodo, StatoPeriodo } from './periodo'
+import { EditorCella, type EsitoGenerazione, EsitoProposta, NuovoPeriodo, periodoDiRiferimento, StatoPeriodo } from './periodo'
 
 const gg = (iso: string) => `${iso.slice(8)}/${iso.slice(5, 7)}`
 
@@ -79,8 +80,37 @@ export default function Turni() {
 
   async function azione(fn: () => Promise<unknown>) {
     setErrore(null); setInCorso(true)
-    try { await fn() } catch (e) { setErrore(e instanceof ErroreApi ? e.message : 'Operazione non riuscita.') }
+    // Passano di qui tutte le azioni della pagina — genera, proponi, approva,
+    // rimanda indietro: la conferma al dito si mette una volta sola, qui.
+    try { await fn(); vibra(APTICO.conferma) }
+    catch (e) {
+      vibra(APTICO.errore)
+      setErrore(e instanceof ErroreApi ? e.message : 'Operazione non riuscita.')
+    }
     finally { setInCorso(false) }
+  }
+
+  /* Sfogliare col dito. Le frecce restano — sono l'unico appiglio da tastiera
+     e col mouse — ma su un calendario il gesto che viene in mente è trascinare.
+     Solo col dito: col mouse un trascinamento è una selezione di testo.
+     `touch-action` lascia lo scorrimento verticale e la pinza, e toglie al
+     browser il pan orizzontale, che qui è il nostro. */
+  const partenzaTocco = useRef<{ x: number; y: number } | null>(null)
+  const appenaScorso = useRef(false)
+
+  function sposta(passi: number) {
+    vibra(APTICO.spostamento)
+    setInizio((d) => addDays(d, passi * settimane * 7))
+  }
+
+  function fineTocco(e: React.PointerEvent) {
+    const da = partenzaTocco.current
+    partenzaTocco.current = null
+    if (!da) return
+    const verso = direzioneSwipe(e.clientX - da.x, e.clientY - da.y)
+    if (verso === 0) return
+    appenaScorso.current = true
+    sposta(verso)
   }
 
   if (!utente) return null
@@ -94,13 +124,6 @@ export default function Turni() {
 
   const scrivibile = puoProgrammare(utente, unita)
   const inGriglia = Boolean(id)
-
-  /** Il periodo su cui atterrare passando alla griglia: quello di oggi, o il più recente. */
-  const periodoDiRiferimento = () => {
-    const oggi = oggiISO()
-    const lista = periodi ?? []
-    return lista.find((p) => p.dataInizio <= oggi && p.dataFine >= oggi) ?? lista[0] ?? null
-  }
 
   const p = dati?.periodo
   const modificabile = dati?.permessi.scrivere ?? false
@@ -141,7 +164,7 @@ export default function Turni() {
                      })}>Genera</Comando>
           )}
           {inGriglia && p && modificabile && p.stato !== 'pubblicato' && (
-            <Comando titolo="Invia in approvazione" disabled={inCorso}
+            <Comando titolo="Invia in approvazione" disabled={inCorso} icona={<I.Freccia size={15} />}
                      onClick={() => void azione(async () => {
                        await api.post(`/periodi/${p.id}/invia`); await caricaGriglia(p.id); await caricaPeriodi()
                      })}>Invia</Comando>
@@ -149,6 +172,7 @@ export default function Turni() {
           {inGriglia && p && dati?.permessi.approvare && p.stato === 'in_approvazione' && (
             <>
               <Comando variante="distruttivo" titolo="Rimanda indietro" disabled={inCorso}
+                       icona={<I.Croce size={15} />}
                        onClick={() => void azione(async () => {
                          const nota = prompt('Perché lo rimandi indietro?')
                          if (!nota) return
@@ -166,9 +190,7 @@ export default function Turni() {
           )}
           {inGriglia && p && (
             <a href={`/api/periodi/${p.id}/export.csv`} title="Scarica il periodo in CSV"
-               aria-label="Scarica il periodo in CSV"
-               className="inline-flex cursor-pointer items-center gap-2 rounded-r1 p-[5px] text-ink-faint
-                          transition-colors duration-[120ms] ease-out hover:bg-surface-2 hover:text-ink">
+               aria-label="Scarica il periodo in CSV" className={stileBottone('icona')}>
               <I.Scarica size={17} />
             </a>
           )}
@@ -186,7 +208,7 @@ export default function Turni() {
           <BottoneVista
             attivo={inGriglia}
             disabled={(periodi?.length ?? 0) === 0}
-            onClick={() => { const r = periodoDiRiferimento(); if (r) navigate(`/turni/${r.id}`) }}
+            onClick={() => { const r = periodoDiRiferimento(periodi ?? []); if (r) navigate(`/turni/${r.id}`) }}
           >Griglia</BottoneVista>
         </div>
 
@@ -223,15 +245,16 @@ export default function Turni() {
 
             <div className="inline-flex items-center gap-1">
               <Bottone variante="icona" title="Indietro" aria-label="Settimane precedenti"
-                       onClick={() => setInizio((d) => addDays(d, -settimane * 7))}>
+                       onClick={() => sposta(-1)}>
                 <I.Freccia size={16} className="rotate-180" />
               </Bottone>
               <Bottone variante="icona" title="Avanti" aria-label="Settimane successive"
-                       onClick={() => setInizio((d) => addDays(d, settimane * 7))}>
+                       onClick={() => sposta(1)}>
                 <I.Freccia size={16} />
               </Bottone>
               {inizio !== lunediDi(oggiISO()) && (
-                <Bottone title="Torna a questa settimana" onClick={() => setInizio(lunediDi(oggiISO()))}>
+                <Bottone title="Torna a questa settimana"
+                         onClick={() => { vibra(APTICO.spostamento); setInizio(lunediDi(oggiISO())) }}>
                   Oggi
                 </Bottone>
               )}
@@ -247,7 +270,7 @@ export default function Turni() {
           <input
             type="checkbox" className="size-3.5 cursor-pointer"
             checked={inGriglia ? raggruppaGriglia : raggruppaGiorni}
-            onChange={(e) => (inGriglia ? setRaggruppaGriglia : setRaggruppaGiorni)(e.target.checked)}
+            onChange={(e) => { vibra(); (inGriglia ? setRaggruppaGriglia : setRaggruppaGiorni)(e.target.checked) }}
           />
           Raggruppa per settore
         </label>
@@ -284,7 +307,26 @@ export default function Turni() {
 
       <div className="px-4 pt-2 empty:hidden"><AvvisoNovita /></div>
 
-      {!inGriglia && <Giorni settimane={settimane} da={inizio} raggruppa={raggruppaGiorni} />}
+      {!inGriglia && (
+        <div
+          style={{ touchAction: 'pan-y pinch-zoom' }}
+          onPointerDown={(e) => {
+            appenaScorso.current = false
+            partenzaTocco.current = e.pointerType === 'touch' ? { x: e.clientX, y: e.clientY } : null
+          }}
+          onPointerUp={fineTocco}
+          onPointerCancel={() => { partenzaTocco.current = null }}
+          onClickCapture={(e) => {
+            // Il clic arriva dopo il gesto e sullo stesso elemento: senza
+            // questo, sfogliare partendo da un «chi manca» lo aprirebbe anche.
+            if (!appenaScorso.current) return
+            appenaScorso.current = false
+            e.preventDefault(); e.stopPropagation()
+          }}
+        >
+          <Giorni settimane={settimane} da={inizio} raggruppa={raggruppaGiorni} />
+        </div>
+      )}
 
       {inGriglia && !dati && !errore && <div className="p-4 md:p-6"><Scheletro righe={6} /></div>}
 
@@ -359,7 +401,8 @@ function BottoneVista({ attivo, children, ...resto }: {
   return (
     <button
       type="button" role="radio" aria-checked={attivo} {...resto}
-      className={`min-h-[32px] cursor-pointer px-2.5 text-sm transition-colors duration-[120ms] ease-out
+      onClick={(e) => { vibra(); resto.onClick?.(e) }}
+      className={`min-h-[32px] max-sm:min-h-[44px] max-sm:px-4 cursor-pointer px-2.5 text-sm transition-colors duration-[120ms] ease-out
                   disabled:cursor-not-allowed disabled:opacity-50
                   ${attivo ? 'bg-action text-action-ink' : 'bg-bg text-ink-muted hover:bg-surface-2 hover:text-ink'}`}
     >

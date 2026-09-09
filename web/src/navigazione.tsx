@@ -13,6 +13,7 @@ import * as I from './icone'
 import { COPYRIGHT, Marchio } from './Marchio'
 import { useSessione } from './sessione'
 import { applicaTema, type Tema, temaSalvato } from './tema'
+import { apticoAcceso, apticoDisponibile, impostaAptico, vibra } from './tocco'
 import { Segmented, Stato } from './ui'
 
 export type Sezione = { a: string; t: string; Icona: (p: { size?: number }) => ReactNode }
@@ -82,9 +83,9 @@ export function BarraBasso({ sezioni }: { sezioni: Sezione[] }) {
                     px-1 py-1 shadow-float md:hidden">
       {sezioni.map(({ a, t, Icona }) => (
         <NavLink
-          key={a} to={a}
+          key={a} to={a} onClick={() => vibra()}
           className={({ isActive }) =>
-            `flex min-h-[48px] min-w-[56px] flex-1 cursor-pointer flex-col items-center justify-center gap-0.5
+            `flex min-h-[52px] min-w-[56px] flex-1 cursor-pointer flex-col items-center justify-center gap-0.5
              rounded-r2 px-1 py-1 transition-colors duration-[120ms] ease-out ${isActive
               ? 'bg-surface-2 font-semibold text-ink'
               : 'text-ink-faint active:bg-surface-2'}`}
@@ -134,7 +135,7 @@ function Campanella() {
       to="/notifiche"
       aria-label={daLeggere > 0 ? `Notifiche, ${daLeggere} da leggere` : 'Notifiche'}
       className={({ isActive }) =>
-        `relative grid size-9 cursor-pointer place-items-center rounded-r1 ${isActive
+        `relative grid size-9 max-sm:size-11 cursor-pointer place-items-center rounded-r1 ${isActive
           ? 'bg-surface-2 text-ink' : 'text-ink-faint hover:bg-surface-2 hover:text-ink'}`}
     >
       <I.Campana size={18} />
@@ -151,6 +152,7 @@ function MenuUtente({ ancoraggio }: { ancoraggio: 'rail' | 'header' }) {
   const { utente, esci } = useSessione()
   const [aperto, setAperto] = useState(false)
   const [tema, setTema] = useState<Tema>(temaSalvato)
+  const [aptico, setAptico] = useState<'si' | 'no'>(() => apticoAcceso() ? 'si' : 'no')
   const rif = useRef<HTMLDivElement>(null)
   const posizione = useLocation()
 
@@ -176,7 +178,7 @@ function MenuUtente({ ancoraggio }: { ancoraggio: 'rail' | 'header' }) {
       <button
         onClick={() => setAperto((v) => !v)} aria-expanded={aperto} aria-haspopup="menu"
         aria-label={`Menu di ${utente.nome} ${utente.cognome}`}
-        className="mono grid size-9 cursor-pointer place-items-center rounded-full border border-border-controllo
+        className="mono grid size-9 max-sm:size-11 cursor-pointer place-items-center rounded-full border border-border-controllo
                    bg-surface text-xs font-semibold text-ink-muted hover:bg-surface-2 hover:text-ink"
       >
         {iniziali}
@@ -210,6 +212,23 @@ function MenuUtente({ ancoraggio }: { ancoraggio: 'rail' | 'header' }) {
               ]}
             />
           </div>
+
+          {/* L'interruttore compare solo dove la vibrazione esiste davvero:
+              su iPhone l'API non c'è, e un comando che non fa niente è
+              peggio di un comando che manca. */}
+          {apticoDisponibile() && (
+            <div className="flex items-center justify-between gap-2 px-2 py-2">
+              <span className="text-sm text-ink-muted">Vibrazione</span>
+              <Segmented
+                etichetta="Vibrazione al tocco" valore={aptico}
+                onCambia={(v) => { setAptico(v); impostaAptico(v === 'si') }}
+                opzioni={[
+                  { v: 'si', testo: 'Sì', titolo: 'Vibrazione accesa' },
+                  { v: 'no', testo: 'No', titolo: 'Vibrazione spenta' },
+                ]}
+              />
+            </div>
+          )}
 
           <NavLink to="/password" role="menuitem"
                    className="flex items-center gap-2 rounded-r2 px-2 py-1.5 text-base text-ink-muted hover:bg-surface-2 hover:text-ink">
