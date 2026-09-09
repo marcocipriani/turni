@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="web/public/marchio/icona-512.png" width="88" height="88" alt="Il marchio di Turni: una T stilizzata">
+</p>
+
 <h1 align="center">Turni</h1>
 
 <p align="center">
@@ -10,6 +14,14 @@
 </p>
 
 <p align="center">
+  <img src="https://img.shields.io/badge/licenza-MIT-2b2b2b?style=flat-square" alt="Licenza MIT">
+  <img src="https://img.shields.io/badge/test-229-2b2b2b?style=flat-square" alt="229 test automatici">
+  <img src="https://img.shields.io/badge/WCAG_2.1-AA-2b2b2b?style=flat-square" alt="Nessuna violazione WCAG 2.1 AA">
+  <img src="https://img.shields.io/badge/PWA-funziona_offline-2b2b2b?style=flat-square" alt="Applicazione installabile, funziona senza rete">
+  <img src="https://img.shields.io/badge/React_19-Hono_su_Node-2b2b2b?style=flat-square" alt="React 19 sul davanti, Hono su Node dietro">
+</p>
+
+<p align="center">
   <img src="docs/schermate/mio-mobile-light.png" width="240" alt="La pagina Mio, da telefono">
   &nbsp;&nbsp;
   <img src="docs/schermate/mio-mobile-dark.png" width="240" alt="La pagina Mio, tema scuro">
@@ -18,6 +30,24 @@
 ![La griglia dei turni](docs/schermate/turni-griglia-dark.png)
 
 ---
+
+<details>
+<summary><strong>Indice</strong></summary>
+
+- [Il problema](#il-problema)
+- [Cosa fa](#cosa-fa)
+- [Avvio in locale](#avvio-in-locale)
+- [Privacy per costruzione](#privacy-per-costruzione)
+- [Misurato, non sperato](#misurato-non-sperato)
+- [Com'è fatta](#comè-fatta)
+- [Verifiche](#verifiche)
+- [Rilascio](#rilascio)
+- [Documentazione](#documentazione)
+- [Contribuire](#contribuire)
+- [Stato](#stato)
+- [Licenza](#licenza)
+
+</details>
 
 ## Il problema
 
@@ -50,6 +80,39 @@ Turni fa quel lavoro sapendo tutte e quattro le cose.
 - **Funziona senza rete**: installata sul telefono, apre le tue giornate anche
   in garage, dicendo a quando risalgono. Delle giornate conservate ci sono solo
   le proprie, e uscendo si cancellano.
+- **Fatta per il telefono quanto per il monitor**: scala tipografica propria
+  sotto i 640px, bersagli da polpastrello, giorni che si sfogliano col dito e
+  vibrazione di conferma dove il sistema la offre.
+
+## Avvio in locale
+
+Serve Node 20 o successivo e un MySQL 8 (o MariaDB) in ascolto.
+
+```bash
+# 1. database
+mysql -u root -e "CREATE DATABASE turni CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+
+# 2. configurazione
+cp .env.example .env      # compila DATABASE_URL e SEED_PASSWORD
+
+# 3. dipendenze e schema
+npm install
+npm run migra
+
+# 4. dati di prova
+npm run seed
+
+# 5. API su 8787, interfaccia su 5173 con proxy verso l'API
+npm run dev
+```
+
+Le utenze di prova hanno tutte la password indicata in `SEED_PASSWORD`, e nomi
+inventati: `admin@turni.test` per l'amministratore, `marco.fab@turni.test` per
+l'organizzatore, `serena.fer@turni.test` per il dirigente, ogni altra
+`nome.sig@turni.test` per i dipendenti.
+
+Il popolamento di prova **si rifiuta di girare** con `NODE_ENV=production`, e
+anche se trova in archivio un solo indirizzo fuori dal dominio di prova.
 
 ## Privacy per costruzione
 
@@ -82,13 +145,13 @@ e utenti. Non è una limitazione dell'interfaccia: le rotte rispondono 403.
 | Rotte API | mediana **3–10 ms**, la più pesante 51 kB → **2,7 kB** compressi |
 | Motore, 1000 persone | **81 ms** per 21 giornate lavorative |
 | Pagina, 4G scarsa | primo testo **390 ms**, elemento più grande **880 ms**, scarti di impaginazione **0.000** |
-| Peso di una pagina | **63 kB** |
+| Primo caricamento di «Mio» | **212 kB** compressi, di cui **92 kB** di caratteri self-ospitati |
 
 Ogni riga è prodotta da uno strumento che si riesegue, non da una stima:
 axe-core su Chrome headless, i tempi misurati sulle rotte vere, il motore
-lanciato su archivi sintetici fino a mille persone. `npm run carico` sta nel
-repository; il resto della strumentazione vive fuori, insieme al materiale di
-rilascio.
+lanciato su archivi sintetici fino a mille persone, il peso sommato dai file
+che escono dalla build. `npm run carico` sta nel repository; il resto della
+strumentazione vive fuori, insieme al materiale di rilascio.
 
 ## Com'è fatta
 
@@ -103,8 +166,9 @@ di misura, materiale di rilascio e design system di riferimento stanno fuori
 dal repository.
 
 Un processo solo serve l'API e il frontend compilato: sull'hosting serve un
-solo slot applicativo. Il server esegue TypeScript direttamente con `tsx`, così
-nel percorso di rilascio non c'è una compilazione che può fallire.
+solo slot applicativo. Tutto si compila prima del rilascio — il server in un
+file solo con esbuild, il frontend con Vite — e in produzione gira JavaScript,
+non TypeScript interpretato a ogni avvio.
 
 Alcune scelte che meritano una riga:
 
@@ -125,42 +189,22 @@ barra in basso sul telefono. I token stanno in
 contrasto che il design system non copriva stanno in
 [`app.css`](web/src/styles/app.css), con la misura accanto.
 
-## Avvio in locale
-
-```bash
-# 1. database
-mysql -u root -e "CREATE DATABASE turni CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
-
-# 2. configurazione
-cp .env.example .env      # compila DATABASE_URL e SEED_PASSWORD
-
-# 3. dipendenze e schema
-npm install
-npm run migra
-
-# 4. dati di prova
-npm run seed
-
-# 5. API su 8787, interfaccia su 5173 con proxy verso l'API
-npm run dev
-```
-
-Le utenze di prova hanno tutte la password indicata in `SEED_PASSWORD`, e nomi
-inventati: `admin@turni.test` per l'amministratore, `marco.fab@turni.test` per
-l'organizzatore, `serena.fer@turni.test` per il dirigente, ogni altra
-`nome.sig@turni.test` per i dipendenti.
-
-Il popolamento di prova **si rifiuta di girare** con `NODE_ENV=production`, e
-anche se trova in archivio un solo indirizzo fuori dal dominio di prova.
+Il movimento è parte del design system, non decorazione: si animano solo
+`opacity` e `transform` — le due proprietà che il compositor muove senza rifare
+il layout — e a farlo rispettare c'è un test che legge i fotogrammi chiave.
 
 ## Verifiche
 
 ```bash
-npm test          # 203 test: motore, permessi, scambi, nomi, contrasti, accessibilità
-npm run verifica  # 12 criteri di accettazione contro un'istanza avviata
+npm test          # 229 test: motore, permessi, scambi, nomi, contrasti, telefono, movimento
+npm run verifica  # 13 criteri di accettazione contro un'istanza avviata
 npm run carico    # motore fino a 1000 persone
 npm run build     # controllo dei tipi e build di produzione
 ```
+
+I 229 girano ovunque. Altri sette — caricamento ed esportazione — parlano con
+il database di prova: senza `DATABASE_URL` nel `.env` quei due file si fermano
+prima di partire, e il conto si ferma a 229.
 
 Le verifiche che parlano con un browser — accessibilità, tempi di
 caricamento, schermate — pilotano Chrome headless dal protocollo di sviluppo,
@@ -171,9 +215,9 @@ repository con il resto della strumentazione.
 
 Il rilascio è un archivio di circa 1 MB: server, frontend già compilato,
 configurazione da riempire. Fuori restano test, popolamento di prova,
-strumenti di misura e ogni traccia di dati del personale. Il frontend si
-compila prima, non sul server: su un piano condiviso la compilazione è il
-punto in cui ci si arena.
+strumenti di misura e ogni traccia di dati del personale. Tutto si compila
+prima, non sul server: su un piano condiviso la compilazione è il punto in cui
+ci si arena.
 
 Sul server: `npm install --omit=dev`, il `.env`, `npm run migra`, e
 `npm run avvio -- persone.csv` la prima volta — che crea le utenze reali e
@@ -188,6 +232,13 @@ tabelle si carica con `npm run importa`, a partire dai
 - [Modelli di caricamento](docs/modelli/) — sei file CSV, uno per tabella:
   persone, stanze, settori, assenze, causali, giornate non lavorative. Si
   aprono con un foglio di calcolo, e `--prova` li verifica senza scrivere.
+
+## Contribuire
+
+Le segnalazioni e le proposte sono benvenute. [CONTRIBUTING.md](CONTRIBUTING.md)
+dice in due pagine come è scritto il codice — commenti in italiano, che
+spiegano il perché e non il cosa — cosa deve passare prima di una proposta di
+modifica, e le poche regole che i test fanno rispettare da soli.
 
 ## Stato
 
