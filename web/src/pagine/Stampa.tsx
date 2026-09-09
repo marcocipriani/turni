@@ -7,7 +7,7 @@
  */
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { api, type Griglia as DatiGriglia } from '../api'
+import { api, type Griglia as DatiGriglia, type Periodo } from '../api'
 import { addDays, esteso, oggiISO, pezziData } from '../date'
 import * as I from '../icone'
 import { etichette } from '../persone'
@@ -17,6 +17,7 @@ import { Bottone, Messaggio, Scheletro } from '../ui'
 import { Vista } from '../Vista'
 import { type DatiGiorni, perStanza } from './Giorni'
 import type { DatiMio } from './Mio'
+import { periodoDiRiferimento } from './periodo'
 
 type Cosa = 'periodo' | 'giorno' | 'mio' | 'stanze'
 
@@ -98,7 +99,7 @@ export default function Stampa() {
 
       <div className="p-4 md:p-6">
         {scelta === 'periodo' && (
-          <FoglioPeriodo id={Number(query.get('id')) || null} raggruppa={query.get('gruppi') === '1'} />
+          <FoglioPeriodo id={Number(query.get('id')) || null} unita={unita} raggruppa={query.get('gruppi') === '1'} />
         )}
         {scelta === 'giorno' && <FoglioGiorni da={query.get('da') ?? oggiISO()} />}
         {scelta === 'stanze' && <FoglioStanze da={query.get('da') ?? oggiISO()} />}
@@ -133,14 +134,27 @@ const Orientamento = ({ orizzontale }: { orizzontale?: boolean }) => (
 
 /* ── Griglia del periodo: il foglio da bacheca ───────────────────── */
 
-function FoglioPeriodo({ id, raggruppa }: { id: number | null; raggruppa: boolean }) {
+function FoglioPeriodo({ id, unita, raggruppa }: { id: number | null; unita: number | null; raggruppa: boolean }) {
   const [dati, setDati] = useState<DatiGriglia | null>(null)
   const [errore, setErrore] = useState<string | null>(null)
 
+  /**
+   * Passando qui da un'altra scheda — o da «Stampa» aperta sui giorni — l'id
+   * non c'è: si stampa lo stesso periodo su cui atterra Turni, quello di oggi
+   * o il più recente. Chiedere di tornare indietro e ristampare era una scusa.
+   */
   useEffect(() => {
-    if (id == null) { setErrore('Nessun periodo indicato. Aprine uno da Turni e ristampa.'); return }
-    void api.get<DatiGriglia>(`/periodi/${id}/griglia`).then(setDati).catch((e) => setErrore(e.message))
-  }, [id])
+    setErrore(null)
+    const griglia = (pid: number) => api.get<DatiGriglia>(`/periodi/${pid}/griglia`).then(setDati)
+    const carica = async () => {
+      if (id != null) return griglia(id)
+      if (unita == null) throw new Error('Nessun periodo indicato. Aprine uno da Turni e ristampa.')
+      const r = periodoDiRiferimento(await api.get<Periodo[]>(`/periodi?unitId=${unita}`))
+      if (!r) throw new Error('Nessun periodo da stampare: non ce n\'è ancora uno per la tua unità.')
+      return griglia(r.id)
+    }
+    void carica().catch((e) => setErrore(e.message))
+  }, [id, unita])
 
   const nomi = useMemo(() => etichette(dati?.persone ?? []), [dati])
   const stanze = useMemo(() => new Map((dati?.stanze ?? []).map((s) => [s.id, s.etichetta])), [dati])
