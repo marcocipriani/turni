@@ -5,6 +5,7 @@
  */
 import { type FormEvent, useEffect, useState } from 'react'
 import { api, ErroreApi, type Griglia as DatiGriglia, type Periodo } from '../api'
+import { oggiISO } from '../date'
 import { EtichettaStato } from '../stati'
 import { Badge, Bottone, Campo, inputCls, Messaggio, Modale, Pill } from '../ui'
 
@@ -15,6 +16,12 @@ export type EsitoGenerazione = {
 }
 
 const oggi = () => new Date().toISOString().slice(0, 10)
+
+/** Il periodo su cui atterrare quando non ne è indicato uno: quello di oggi, o il più recente. */
+export function periodoDiRiferimento(lista: Periodo[]): Periodo | null {
+  const oggi = oggiISO()
+  return lista.find((p) => p.dataInizio <= oggi && p.dataFine >= oggi) ?? lista[0] ?? null
+}
 
 export function StatoPeriodo({ periodo }: { periodo: Periodo }) {
   if (periodo.stato === 'pubblicato') return <Pill tono="ok">Pubblicato</Pill>
