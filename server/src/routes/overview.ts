@@ -3,7 +3,9 @@ import { Hono } from 'hono'
 import { type Env, HttpError } from '../context'
 import { db, schema } from '../db/index'
 import { addDays, eachDay, type ISODate, weekday } from '../lib/dates'
-import { radice, sottoalbero, unitaDiProgrammazione } from '../permissions'
+import { dividiGiornata } from '../lib/giornata'
+import { puoVedereCausale, radice, sottoalbero, unitaDiProgrammazione } from '../permissions'
+import { giorniIndisponibili } from './absences'
 
 export const overview = new Hono<Env>()
 
@@ -25,7 +27,12 @@ overview.get('/', async (c) => {
   const unitaVisibili = a.ruolo === 'dirigente' && a.unitId != null
     ? [...sottoalbero(alb, a.unitId)]
     : [unitaDiProgrammazione(alb, a.ruolo, a.unitId)].filter((n): n is number => n != null)
-  if (unitaVisibili.length === 0) return c.json({ giorni: [], persone: [], stanze: [], unita: [] })
+  if (unitaVisibili.length === 0) {
+    return c.json({
+      da, a: aData, giorni: [], persone: [], stanze: [], stanzeRiservate: [],
+      settori: [], unita: [], periodiPubblicati: 0,
+    })
+  }
 
   const periodi = await db.select().from(schema.period).where(
     and(inArray(schema.period.unitId, unitaVisibili), eq(schema.period.stato, 'pubblicato'),
@@ -46,15 +53,26 @@ overview.get('/', async (c) => {
       or(isNull(schema.holiday.unitId), inArray(schema.holiday.unitId, radici)))),
   ])
 
+  // Presenze e lavoro agile insieme: la giornata si racconta per intero, e chi
+  // manca da entrambe le liste non è programmato, non è «fuori».
   const celle = periodi.length
     ? await db.select().from(schema.assignment).where(
         and(inArray(schema.assignment.periodId, periodi.map((p) => p.id)),
-            eq(schema.assignment.stato, 'presenza'),
             gte(schema.assignment.data, da), lte(schema.assignment.data, aData)),
       )
     : []
 
-  // Le assenze proprie sono visibili; quelle altrui non lasciano il server.
+  /**
+   * Le assenze si vedono solo di chi si ha titolo a vederle — l'interessato, i
+   * suoi organizzatori, il suo dirigente. Per tutti gli altri il collega resta
+   * fra chi lavora da remoto: è la stessa regola di `mascheraCella`, applicata
+   * qui prima che i nomi lascino il server, e non una scelta dell'interfaccia.
+   */
+  const conCausaleVisibile = persone.filter((p) => puoVedereCausale(alb, a, { id: p.id, unitId: p.unitId }))
+  const assenze = await giorniIndisponibili(conCausaleVisibile.map((p) => p.id), da, aData)
+
+  // Le assenze proprie servono anche fuori dalla programmazione: la propria
+  // giornata si segnala pure dove nessun periodo pubblicato la copre.
   const mieAssenze = await db.select().from(schema.absence).where(
     and(eq(schema.absence.userId, a.id), lte(schema.absence.dataInizio, aData), gte(schema.absence.dataFine, da)),
   )
@@ -63,9 +81,20 @@ overview.get('/', async (c) => {
   const perPersona = new Map(persone.map((p) => [p.id, p]))
   const capienzaPerStanza = new Map<number, number>()
   for (const d of scrivanie) capienzaPerStanza.set(d.roomId, (capienzaPerStanza.get(d.roomId) ?? 0) + 1)
-  const stanze = stanzeRighe
-    .map((s) => ({ id: s.id, etichetta: s.etichetta, piano: s.piano, capienza: capienzaPerStanza.get(s.id) ?? 0 }))
-    .filter((s) => s.capienza > 0)
+  const descrivi = (s: typeof stanzeRighe[number]) => ({
+    id: s.id, etichetta: s.etichetta, soprannome: s.soprannome, piano: s.piano,
+    capienza: capienzaPerStanza.get(s.id) ?? 0,
+  })
+  // La stanza riservata a una persona non è capienza condivisa: esce dal conto
+  // e viaggia a parte, col nome di chi ci si trova. Chi cerca quella persona
+  // sa dove andare senza che nessun altro venga programmato lì.
+  const stanze = stanzeRighe.filter((s) => s.riservataA == null).map(descrivi).filter((s) => s.capienza > 0)
+  const stanzeRiservate = stanzeRighe
+    .filter((s) => s.riservataA != null)
+    .map((s) => {
+      const p = perPersona.get(s.riservataA!)
+      return { ...descrivi(s), persona: p ? { id: p.id, nome: p.nome, cognome: p.cognome, ruolo: p.ruolo } : null }
+    })
   const capienzaTotale = stanze.reduce((n, s) => n + s.capienza, 0)
   const numeroScrivania = new Map(scrivanie.map((d) => [d.id, d.numero]))
 
@@ -77,23 +106,18 @@ overview.get('/', async (c) => {
   const giorniFestivi = new Map(festivi.map((f) => [f.data, f.descrizione]))
 
   const giorni = eachDay(da, aData).map((g) => {
-    const presenti = (perGiorno.get(g) ?? [])
-      .map((x) => {
-        const p = perPersona.get(x.userId)
-        return p ? {
-          userId: x.userId, nome: p.nome, cognome: p.cognome,
-          unitId: p.unitId, sectorId: p.sectorId,
-          roomId: x.roomId, scrivania: x.deskId != null ? numeroScrivania.get(x.deskId) ?? null : null,
-        } : null
-      })
-      .filter((x): x is NonNullable<typeof x> => x != null)
-      .sort((x, y) => x.cognome.localeCompare(y.cognome, 'it'))
+    // La divisione — e con lei la precedenza dell'assenza sulla cella — sta in
+    // `lib/giornata`, dove si può provare senza un archivio davanti.
+    const { presenti, remoti, assenti } =
+      dividiGiornata(g, perGiorno.get(g) ?? [], perPersona, assenze, numeroScrivania)
 
     return {
       data: g,
       feriale: weekday(g) <= 5,
       festivo: giorniFestivi.get(g) ?? null,
       presenti,
+      remoti,
+      assenti,
       capienza: capienzaTotale,
       ioCiSono: presenti.some((p) => p.userId === a.id),
       ioAssente: mieiGiorniAssenti.has(g),
@@ -103,7 +127,7 @@ overview.get('/', async (c) => {
   const settori = await db.select().from(schema.sector).where(inArray(schema.sector.unitId, unitaVisibili))
 
   return c.json({
-    da, a: aData, giorni, stanze, settori,
+    da, a: aData, giorni, stanze, stanzeRiservate, settori,
     unita: unitaRighe.map((u) => ({ id: u.id, nome: u.nome, sigla: u.sigla })),
     persone: persone.map((p) => ({ id: p.id, nome: p.nome, cognome: p.cognome, unitId: p.unitId, sectorId: p.sectorId })),
     periodiPubblicati: periodi.length,

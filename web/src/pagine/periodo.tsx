@@ -5,6 +5,7 @@
  */
 import { type FormEvent, useEffect, useState } from 'react'
 import { api, ErroreApi, type Griglia as DatiGriglia, type Periodo } from '../api'
+import { EtichettaStato } from '../stati'
 import { Badge, Bottone, Campo, inputCls, Messaggio, Modale, Pill } from '../ui'
 
 export type EsitoGenerazione = {
@@ -101,10 +102,10 @@ export function EditorCella({ dati, selezione, abilitato, onSalvato }: {
           <fieldset>
             <legend className="mb-1.5 text-xs font-medium text-ink-muted">Stato della giornata</legend>
             <div className="flex flex-col gap-1.5">
-              {([['presenza', 'In sede'], ['smart', 'Lavoro agile']] as const).map(([v, t]) => (
+              {(['presenza', 'smart'] as const).map((v) => (
                 <label key={v} className="flex cursor-pointer items-center gap-2 text-base">
                   <input type="radio" name="stato" value={v} checked={stato === v} onChange={() => setStato(v)} />
-                  {t}
+                  <EtichettaStato stato={v} />
                 </label>
               ))}
             </div>

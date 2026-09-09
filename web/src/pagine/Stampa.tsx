@@ -8,14 +8,15 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, type Griglia as DatiGriglia } from '../api'
+import { addDays, esteso, oggiISO, pezziData } from '../date'
 import * as I from '../icone'
 import { etichette } from '../persone'
 import { puoProgrammare, useSessione } from '../sessione'
+import { EtichettaStato } from '../stati'
 import { Bottone, Messaggio, Scheletro } from '../ui'
 import { Vista } from '../Vista'
-import type { DatiGiorni } from './Giorni'
+import { type DatiGiorni, perStanza } from './Giorni'
 import type { DatiMio } from './Mio'
-import { pezziData } from './Mio'
 
 type Cosa = 'periodo' | 'giorno' | 'mio' | 'stanze'
 
@@ -25,15 +26,6 @@ const ETICHETTE: Record<Cosa, string> = {
   mio: 'Il mio calendario',
   stanze: 'Occupazione delle stanze',
 }
-
-const oggiISO = () => new Date().toISOString().slice(0, 10)
-const addDays = (iso: string, n: number) => {
-  const d = new Date(`${iso}T00:00:00Z`)
-  d.setUTCDate(d.getUTCDate() + n)
-  return d.toISOString().slice(0, 10)
-}
-const esteso = (iso: string) => new Date(`${iso}T00:00:00Z`)
-  .toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
 
 export default function Stampa() {
   const { cosa } = useParams()
@@ -223,7 +215,7 @@ function FoglioPeriodo({ id, raggruppa }: { id: number | null; raggruppa: boolea
                             className={`mono border border-border px-1 py-0.5 text-center text-2xs
                                         ${inSede ? 'font-semibold' : 'text-ink-faint'}`}>
                           {inSede
-                            ? (c!.roomId != null ? stanze.get(c!.roomId)?.split('·')[0]?.trim() ?? 'S' : 'S')
+                            ? (c!.roomId != null ? stanze.get(c!.roomId) ?? 'S' : 'S')
                             : c?.stato === 'assenza' ? '×' : '·'}
                         </td>
                       )
@@ -251,43 +243,78 @@ function FoglioGiorni({ da }: { da: string }) {
   }, [da])
 
   const nomi = useMemo(() => etichette(dati?.persone ?? []), [dati])
-  const stanze = useMemo(() => new Map((dati?.stanze ?? []).map((s) => [s.id, s.etichetta])), [dati])
 
   if (errore) return <Messaggio tono="errore">{errore}</Messaggio>
   if (!dati) return <Scheletro righe={6} />
   const feriali = dati.giorni.filter((g) => g.feriale && !g.festivo)
 
+  /**
+   * Una scheda per giornata, non una tabella. Il foglio serve alla reception,
+   * che cerca una persona in una stanza: le stanze sono i blocchi, e la scheda
+   * non si spezza mai a cavallo di due pagine. Chi è da remoto non ha una
+   * scrivania da guardare, quindi sta in fondo, in una riga sola.
+   */
   return (
     <div>
       <Orientamento />
-      <Testata titolo="Chi è in sede" sottotitolo={`dal ${esteso(da)}`} />
+      <Testata titolo="Chi è in sede" sottotitolo={`da ${esteso(da)}`} />
 
-      <div className="flex flex-col gap-4">
-        {feriali.map((g) => (
-          <section key={g.data} className="break-inside-avoid">
-            <h3 className="mb-1 border-b border-border pb-0.5 text-base font-semibold capitalize">
-              {esteso(g.data)}
-              <span className="mono ml-2 text-sm font-normal text-ink-faint">
-                {g.presenti.length}/{g.capienza}
-              </span>
-            </h3>
-            {g.presenti.length === 0
-              ? <p className="text-sm text-ink-faint">Nessuno in sede.</p>
-              : (
-                <ul className="columns-2 gap-6 text-sm md:columns-3">
-                  {g.presenti.map((p) => (
-                    <li key={p.userId} className="flex justify-between gap-2 break-inside-avoid py-px">
-                      <span>{nomi.get(p.userId) ?? p.cognome}</span>
-                      <span className="mono text-ink-faint">
-                        {p.roomId != null ? stanze.get(p.roomId)?.split('·')[0]?.trim() ?? '' : ''}
-                        {p.scrivania ? `/${p.scrivania}` : ''}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+      <div className="flex flex-col gap-3">
+        {feriali.map((g) => {
+          const { gruppi, senza } = perStanza(g.presenti, dati.stanze)
+          return (
+            <section key={g.data} className="break-inside-avoid rounded-r2 border border-border-controllo p-2.5">
+              <h3 className="mb-1.5 flex items-baseline justify-between gap-2 border-b border-border pb-1
+                             text-base font-semibold first-letter:uppercase">
+                {esteso(g.data)}
+                <span className="mono shrink-0 text-sm font-normal text-ink-faint">
+                  {g.presenti.length}/{g.capienza} in sede
+                </span>
+              </h3>
+
+              {gruppi.length === 0 && senza.length === 0
+                ? <p className="text-sm text-ink-faint">Nessuno in sede.</p>
+                : (
+                  <div className="grid gap-2 text-sm sm:grid-cols-2 md:grid-cols-3">
+                    {gruppi.map(({ stanza, dentro }) => (
+                      <div key={stanza.id} className="break-inside-avoid">
+                        <p className="border-b border-border pb-px font-semibold">
+                          {stanza.etichetta}
+                          {stanza.soprannome && <span className="font-normal text-ink-muted"> {stanza.soprannome}</span>}
+                          <span className="mono float-right font-normal text-ink-faint">
+                            {dentro.length}/{stanza.capienza}
+                          </span>
+                        </p>
+                        <ul>
+                          {dentro.map((p) => (
+                            <li key={p.userId} className="flex justify-between gap-2 py-px">
+                              <span>{nomi.get(p.userId) ?? p.cognome}</span>
+                              {p.scrivania && <span className="mono text-ink-faint">/{p.scrivania}</span>}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                    {senza.length > 0 && (
+                      <div className="break-inside-avoid">
+                        <p className="border-b border-border pb-px font-semibold">Senza stanza</p>
+                        <ul>
+                          {senza.map((p) => <li key={p.userId} className="py-px">{nomi.get(p.userId) ?? p.cognome}</li>)}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+              {g.remoti.length > 0 && (
+                <p className="mt-1.5 border-t border-border pt-1 text-sm text-ink-muted">
+                  <span className="font-semibold">Da remoto</span>{' '}
+                  {g.remoti.map((p) => nomi.get(p.userId) ?? p.cognome).join(', ')}.
+                </p>
               )}
-          </section>
-        ))}
+            </section>
+          )
+        })}
       </div>
     </div>
   )
@@ -311,7 +338,7 @@ function FoglioStanze({ da }: { da: string }) {
   return (
     <div>
       <Orientamento orizzontale />
-      <Testata titolo="Occupazione delle stanze" sottotitolo={`dal ${esteso(da)} · ${feriali.length} giornate`} />
+      <Testata titolo="Occupazione delle stanze" sottotitolo={`da ${esteso(da)} · ${feriali.length} giornate`} />
 
       <table className="w-full text-sm">
         <thead>
@@ -335,7 +362,10 @@ function FoglioStanze({ da }: { da: string }) {
               ? Math.round((perGiorno.reduce((a, b) => a + b, 0) / perGiorno.length) * 10) / 10 : 0
             return (
               <tr key={s.id}>
-                <td className="border border-border px-1.5 py-0.5 whitespace-nowrap">{s.etichetta}</td>
+                <td className="border border-border px-1.5 py-0.5 whitespace-nowrap">
+                  {s.etichetta}
+                  {s.soprannome && <span className="text-ink-faint"> · {s.soprannome}</span>}
+                </td>
                 {perGiorno.map((n, i) => (
                   <td key={i} className={`mono border border-border px-1 py-0.5 text-center
                                           ${n >= s.capienza ? 'font-semibold' : n === 0 ? 'text-ink-faint' : ''}`}>
@@ -387,9 +417,10 @@ function FoglioMio() {
         <tbody>
           {dati.giorni.map((g) => (
             <tr key={g.data}>
-              <td className="border-b border-border py-1 capitalize">{esteso(g.data)}</td>
+              <td className="border-b border-border py-1 first-letter:uppercase">{esteso(g.data)}</td>
               <td className="border-b border-border py-1">
-                {g.stato === 'presenza' ? 'In sede' : g.stato === 'smart' ? 'Lavoro agile' : `Assente${g.causale ? ` · ${g.causale}` : ''}`}
+                <EtichettaStato stato={g.stato} size={13} />
+                {g.stato === 'assenza' && g.causale && <span className="text-ink-muted"> · {g.causale}</span>}
               </td>
               <td className="mono border-b border-border py-1">
                 {g.stato === 'presenza'

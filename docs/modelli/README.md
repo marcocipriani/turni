@@ -59,7 +59,8 @@ persone dopo: `npm run avvio -- nuovi.csv --aggiungi`.
 
 | Colonna | |
 |---|---|
-| `stanza` | l'etichetta come la chiamano le persone. Se contiene un `·`, la parte prima è il codice breve che compare in griglia |
+| `stanza` | il codice breve che compare in griglia: `101`. Se contiene un `·`, la parte dopo diventa il soprannome |
+| `soprannome` | facoltativo: come la chiamano davvero, `Sala nord` |
 | `piano` | facoltativo |
 | `scrivanie` | `5` crea le scrivanie da 1 a 5; `1,2,5,8` crea esattamente quelle |
 | `unita` | l'unità **radice** che possiede gli spazi |

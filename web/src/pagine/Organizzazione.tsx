@@ -19,6 +19,7 @@ export default function Organizzazione() {
   const [settori, setSettori] = useState<Settore[]>([])
   const [delegati, setDelegati] = useState<Delegato[]>([])
   const [stanze, setStanze] = useState<StanzaVista[]>([])
+  const [modifica, setModifica] = useState<number | null>(null)
   const [errore, setErrore] = useState<string | null>(null)
 
   const ricarica = useCallback(async () => {
@@ -35,10 +36,23 @@ export default function Organizzazione() {
 
   useEffect(() => { void ricarica().catch((e) => setErrore(String(e.message))) }, [ricarica])
 
+  /** Vero se l'operazione è andata: chi apre un editor lo chiude solo allora. */
   async function prova(fn: () => Promise<unknown>) {
     setErrore(null)
-    try { await fn(); await ricarica() }
-    catch (e) { setErrore(e instanceof ErroreApi ? e.message : 'Operazione non riuscita.') }
+    try { await fn(); await ricarica(); return true }
+    catch (e) {
+      setErrore(e instanceof ErroreApi ? e.message : 'Operazione non riuscita.')
+      return false
+    }
+  }
+
+  // La stanza si riserva a chi è in forza all'unità che la possiede: è la
+  // stessa regola che il server fa rispettare, qui solo per non proporre nomi
+  // che verrebbero rifiutati.
+  const riservabili = persone.filter((p) => p.unitId === unitId)
+  const nomeDi = (id: number) => {
+    const p = riservabili.find((x) => x.id === id)
+    return p ? `${p.cognome} ${p.nome}` : 'una persona non più in forza'
   }
 
   if (unitId == null || !unita) {
@@ -135,24 +149,43 @@ export default function Organizzazione() {
 
             {settori.length === 0 ? <p className="text-base text-ink-faint">Nessun settore.</p> : (
               <ul className="divide-y divide-border overflow-hidden rounded-r2 border border-border bg-bg">
-                {settori.map((s) => (
-                  <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
-                    <span className="text-base">
-                      {s.nome}
-                      <span className="mono ml-2 text-sm text-ink-faint">
-                        {persone.filter((p) => p.sectorId === s.id).length}
+                {settori.map((s) => {
+                  const quante = persone.filter((p) => p.sectorId === s.id).length
+                  return (
+                    <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+                      <span className="text-base">
+                        {s.nome}
+                        <span className="mono ml-2 text-sm text-ink-faint">{quante}</span>
                       </span>
-                    </span>
-                    <div className="flex items-center gap-2">
-                      {s.richiedePresidio && <Badge>presidio</Badge>}
-                      <Bottone variante="piccolo"
-                               onClick={() => void prova(() => api.patch(`/org/settori/${s.id}`, { richiedePresidio: !s.richiedePresidio }))}>
-                        {s.richiedePresidio ? 'Togli presidio' : 'Imponi presidio'}
-                      </Bottone>
-                      <Bottone variante="piccolo" onClick={() => void prova(() => api.del(`/org/settori/${s.id}`))}>Elimina</Bottone>
-                    </div>
-                  </li>
-                ))}
+                      <div className="flex items-center gap-2">
+                        {s.richiedePresidio && <Badge>presidio</Badge>}
+                        <Bottone variante="piccolo" title={`Rinomina ${s.nome}`}
+                                 onClick={() => {
+                                   const nome = prompt('Nuovo nome del settore', s.nome)?.trim()
+                                   if (nome && nome !== s.nome) void prova(() => api.patch(`/org/settori/${s.id}`, { nome }))
+                                 }}>
+                          <I.Matita size={13} />Rinomina
+                        </Bottone>
+                        <Bottone variante="piccolo"
+                                 onClick={() => void prova(() => api.patch(`/org/settori/${s.id}`, { richiedePresidio: !s.richiedePresidio }))}>
+                          {s.richiedePresidio ? 'Togli presidio' : 'Imponi presidio'}
+                        </Bottone>
+                        <Bottone variante="distruttivo" className="px-2 py-[3px] text-sm"
+                                 title={`Elimina ${s.nome}`}
+                                 onClick={() => {
+                                   // Le persone non si perdono: restano senza settore, e il
+                                   // server lo fa da sé. Ma vale la pena dirlo prima.
+                                   const avviso = quante
+                                     ? `Elimini «${s.nome}»? ${quante} ${quante === 1 ? 'persona resta' : 'persone restano'} senza settore.`
+                                     : `Elimini «${s.nome}»?`
+                                   if (confirm(avviso)) void prova(() => api.del(`/org/settori/${s.id}`))
+                                 }}>
+                          <I.Cestino size={13} />Elimina
+                        </Bottone>
+                      </div>
+                    </li>
+                  )
+                })}
               </ul>
             )}
           </Pannello>
@@ -221,22 +254,31 @@ export default function Organizzazione() {
 
         <section id="stanze">
           <Pannello titolo="Stanze e scrivanie" icona={<I.Stanza size={18} />}
-                    piede="La capienza di una stanza è il numero di scrivanie attive.">
+                    piede="La capienza di una stanza è il numero di scrivanie attive. Una stanza usata da una programmazione non si elimina: si disattiva, e lo storico resta leggibile.">
             <form
               onSubmit={(e: FormEvent<HTMLFormElement>) => {
                 e.preventDefault()
                 const form = e.currentTarget
                 const f = new FormData(form)
                 void prova(() => api.post('/org/stanze', {
-                  unitId, etichetta: f.get('etichetta'), piano: f.get('piano') || undefined,
+                  unitId, etichetta: f.get('etichetta'),
+                  soprannome: f.get('soprannome') || undefined, piano: f.get('piano') || undefined,
+                  riservataA: f.get('riservataA') ? Number(f.get('riservataA')) : null,
                   scrivanie: Number(f.get('scrivanie')),
                 }))
                 form.reset()
               }}
-              className="grid items-end gap-3 sm:grid-cols-[1fr_1fr_120px_auto]"
+              className="grid items-end gap-3 sm:grid-cols-[.7fr_1fr_1fr_1fr_100px_auto]"
             >
-              <Campo etichetta="Etichetta"><input name="etichetta" className={inputCls} required placeholder="101" /></Campo>
+              <Campo etichetta="Codice"><input name="etichetta" className={inputCls} required placeholder="101" /></Campo>
+              <Campo etichetta="Soprannome"><input name="soprannome" className={inputCls} placeholder="Sala nord" /></Campo>
               <Campo etichetta="Piano"><input name="piano" className={inputCls} placeholder="Primo piano" /></Campo>
+              <Campo etichetta="Riservata a" aiuto="Fuori dalla capienza condivisa">
+                <select name="riservataA" className={inputCls} defaultValue="">
+                  <option value="">Nessuno: stanza condivisa</option>
+                  {riservabili.map((p) => <option key={p.id} value={p.id}>{p.cognome} {p.nome}</option>)}
+                </select>
+              </Campo>
               <Campo etichetta="Scrivanie"><input name="scrivanie" type="number" min={1} max={200} defaultValue={4} className={inputCls} required /></Campo>
               <Bottone type="submit" variante="primario">Crea</Bottone>
             </form>
@@ -244,9 +286,48 @@ export default function Organizzazione() {
             {stanze.length === 0 ? <p className="text-base text-ink-faint">Nessuna stanza.</p> : (
               <ul className="grid gap-3 sm:grid-cols-2">
                 {stanze.map((s) => (
-                  <li key={s.id} className="rounded-r2 border border-border bg-bg p-3">
-                    <p className="text-base font-medium">{s.etichetta}</p>
-                    <p className="mono text-sm text-ink-faint">{s.piano ?? 'piano non indicato'} · capienza {s.capienza}</p>
+                  <li key={s.id} className={`rounded-r2 border border-border bg-bg p-3 ${s.attiva ? '' : 'opacity-60'}`}>
+                    {modifica === s.id ? (
+                      <FormaStanza stanza={s} riservabili={riservabili} onChiudi={() => setModifica(null)}
+                                   onSalva={(dati) => void prova(() => api.patch(`/org/stanze/${s.id}`, dati))
+                                     .then((ok) => { if (ok) setModifica(null) })} />
+                    ) : (
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-base font-medium">
+                            {s.etichetta}
+                            {s.soprannome && <span className="ml-1.5 font-normal text-ink-muted">{s.soprannome}</span>}
+                            {!s.attiva && <Badge>disattivata</Badge>}
+                          </p>
+                          <p className="mono text-sm text-ink-faint">
+                            {s.piano ?? 'piano non indicato'} · capienza {s.capienza}
+                          </p>
+                          {s.riservataA != null && (
+                            <p className="text-sm text-ink-muted">
+                              riservata a {nomeDi(s.riservataA)} · fuori dalla capienza condivisa
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <Bottone variante="icona" title={`Modifica la stanza ${s.etichetta}`}
+                                   aria-label={`Modifica la stanza ${s.etichetta}`}
+                                   onClick={() => setModifica(s.id)}><I.Matita size={15} /></Bottone>
+                          <Bottone variante="icona"
+                                   title={s.attiva ? 'Disattiva: esce dai conti, lo storico resta' : 'Riattiva'}
+                                   aria-label={s.attiva ? `Disattiva la stanza ${s.etichetta}` : `Riattiva la stanza ${s.etichetta}`}
+                                   onClick={() => void prova(() => api.patch(`/org/stanze/${s.id}`, { attiva: !s.attiva }))}>
+                            <I.Presa size={15} />
+                          </Bottone>
+                          <Bottone variante="icona" title={`Elimina la stanza ${s.etichetta}`}
+                                   aria-label={`Elimina la stanza ${s.etichetta}`}
+                                   onClick={() => {
+                                     if (confirm(`Elimini la stanza «${s.etichetta}» e le sue ${s.scrivanie.length} scrivanie?`)) {
+                                       void prova(() => api.del(`/org/stanze/${s.id}`))
+                                     }
+                                   }}><I.Cestino size={15} /></Bottone>
+                        </div>
+                      </div>
+                    )}
                     <ul className="mt-2 flex flex-wrap gap-1.5">
                       {s.scrivanie.map((d) => (
                         <li key={d.id}>
@@ -312,5 +393,56 @@ export default function Organizzazione() {
         </section>
       </div>
     </Vista>
+  )
+}
+
+/**
+ * Modifica di una stanza, in loco dentro la sua scheda: nessuna modale per tre
+ * campi di testo, e le scrivanie restano visibili sotto mentre si scrive.
+ */
+function FormaStanza({ stanza, riservabili, onSalva, onChiudi }: {
+  stanza: StanzaVista
+  riservabili: Persona[]
+  onSalva: (dati: {
+    etichetta: string; soprannome: string | null; piano: string | null; riservataA: number | null
+  }) => void
+  onChiudi: () => void
+}) {
+  return (
+    <form
+      onSubmit={(e: FormEvent<HTMLFormElement>) => {
+        e.preventDefault()
+        const f = new FormData(e.currentTarget)
+        onSalva({
+          etichetta: String(f.get('etichetta') ?? '').trim(),
+          soprannome: String(f.get('soprannome') ?? '').trim() || null,
+          piano: String(f.get('piano') ?? '').trim() || null,
+          riservataA: f.get('riservataA') ? Number(f.get('riservataA')) : null,
+        })
+      }}
+      className="flex flex-col gap-2"
+    >
+      <div className="grid gap-2 sm:grid-cols-[.7fr_1fr]">
+        <Campo etichetta="Codice">
+          <input name="etichetta" className={inputCls} required maxLength={60} defaultValue={stanza.etichetta} />
+        </Campo>
+        <Campo etichetta="Soprannome">
+          <input name="soprannome" className={inputCls} maxLength={60} defaultValue={stanza.soprannome ?? ''} />
+        </Campo>
+      </div>
+      <Campo etichetta="Piano">
+        <input name="piano" className={inputCls} maxLength={40} defaultValue={stanza.piano ?? ''} />
+      </Campo>
+      <Campo etichetta="Riservata a" aiuto="Una stanza riservata esce dalla capienza da distribuire.">
+        <select name="riservataA" className={inputCls} defaultValue={stanza.riservataA ?? ''}>
+          <option value="">Nessuno: stanza condivisa</option>
+          {riservabili.map((p) => <option key={p.id} value={p.id}>{p.cognome} {p.nome}</option>)}
+        </select>
+      </Campo>
+      <div className="flex gap-2">
+        <Bottone type="submit" variante="primario">Salva</Bottone>
+        <Bottone onClick={onChiudi}>Annulla</Bottone>
+      </div>
+    </form>
   )
 }

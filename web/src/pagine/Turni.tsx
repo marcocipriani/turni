@@ -8,15 +8,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api, ErroreApi, type Griglia as DatiGriglia, type Periodo } from '../api'
+import { addDays, lunediDi, oggiISO } from '../date'
 import * as I from '../icone'
 import { puoProgrammare, useSessione } from '../sessione'
 import { Bottone, Messaggio, Pill, Scheletro, StatoVuoto } from '../ui'
 import { Drawer, Toolbar, Vista } from '../Vista'
-import { addDays, Giorni, lunediDi } from './Giorni'
+import { ModaleCambiamenti } from './cambiamenti'
+import { Giorni } from './Giorni'
 import Griglia, { Legenda } from './Griglia'
+import { AvvisoNovita, quando } from './novita'
 import { EditorCella, type EsitoGenerazione, EsitoProposta, NuovoPeriodo, StatoPeriodo } from './periodo'
-
-const oggiISO = () => new Date().toISOString().slice(0, 10)
 
 const gg = (iso: string) => `${iso.slice(8)}/${iso.slice(5, 7)}`
 
@@ -40,7 +41,18 @@ export default function Turni() {
   const [esito, setEsito] = useState<EsitoGenerazione | null>(null)
   const [inCorso, setInCorso] = useState(false)
   const [nuovoAperto, setNuovoAperto] = useState(false)
-  const [settimane, setSettimane] = useState(2)
+  const [cambiamentiAperti, setCambiamentiAperti] = useState(false)
+  // Una settimana: è la domanda che si fa entrando — «questa settimana chi
+  // c'è» — e a una sola le colonne si allargano invece di scorrere.
+  const [settimane, setSettimane] = useState(1)
+  /* Il raggruppamento per settore serve a due domande diverse, e ha due
+     risposte diverse di partenza: nella griglia il settore è il criterio con
+     cui si costruiscono i turni — il presidio si legge lì — mentre nei giorni
+     si cerca una persona, e un elenco solo per cognome è più corto da
+     scorrere. Due stati, così passare da una vista all'altra non ribalta la
+     scelta appena fatta nell'altra. */
+  const [raggruppaGriglia, setRaggruppaGriglia] = useState(true)
+  const [raggruppaGiorni, setRaggruppaGiorni] = useState(false)
   const [inizio, setInizio] = useState(() => lunediDi(oggiISO()))
 
   const unita = useMemo(() => {
@@ -106,7 +118,19 @@ export default function Turni() {
       aiuto={inGriglia && p
         ? `${p.dataInizio} → ${p.dataFine} · ${dati!.persone.length} persone`
         : 'Chi è in sede, e la programmazione per esteso'}
-      meta={inGriglia && p ? <><StatoPeriodo periodo={p} /><span className="mono">v{p.versione}</span></> : undefined}
+      meta={inGriglia && p
+        ? <>
+            <StatoPeriodo periodo={p} />
+            <span className="mono">v{p.versione}</span>
+            {/* Una versione senza la sua data non dice niente: sapere che è la
+                seconda serve solo se si sa da quando. */}
+            {p.aggiornatoIl && (
+              <span title={`Ultimo aggiornamento: ${quando(p.aggiornatoIl)}`}>
+                {p.versione > 1 ? 'aggiornata' : 'pubblicata'} il {quando(p.aggiornatoIl)}
+              </span>
+            )}
+          </>
+        : undefined}
       azioni={
         <>
           {inGriglia && p && modificabile && p.stato !== 'pubblicato' && (
@@ -173,6 +197,14 @@ export default function Turni() {
               value={id ?? ''} onChange={(e) => navigate(`/turni/${e.target.value}`)}
               className="min-h-[32px] cursor-pointer rounded-r2 border border-border-controllo bg-bg px-2 text-sm text-ink"
             >
+              {/* Si può arrivare da un collegamento a un periodo che non sta in
+                  questo elenco — il dirigente è programmato nell'unità del
+                  padre, e l'avviso di una nuova programmazione porta lì. Senza
+                  questa voce il menu mostrerebbe un periodo diverso da quello
+                  che si sta guardando. */}
+              {p && !(periodi ?? []).some((x) => x.id === p.id) && (
+                <option value={p.id}>{etichettaPeriodo(p)}</option>
+              )}
               {(periodi ?? []).map((x) => (
                 <option key={x.id} value={x.id}>{etichettaPeriodo(x)}</option>
               ))}
@@ -209,10 +241,32 @@ export default function Turni() {
           </>
         )}
 
+        {/* Il cognome ordina sempre, in tutte e due le viste: non è una scelta.
+            L'unica scelta è se spezzare gli elenchi per settore. */}
+        <label className="flex cursor-pointer items-center gap-1.5 text-sm text-ink-muted">
+          <input
+            type="checkbox" className="size-3.5 cursor-pointer"
+            checked={inGriglia ? raggruppaGriglia : raggruppaGiorni}
+            onChange={(e) => (inGriglia ? setRaggruppaGriglia : setRaggruppaGiorni)(e.target.checked)}
+          />
+          Raggruppa per settore
+        </label>
+
         {inGriglia && dati && (
           <>
             <span className="hidden lg:block"><Legenda /></span>
             <span className="ml-auto flex items-center gap-3 text-sm">
+              {/* Dalla seconda versione in poi la domanda che segue è sempre
+                  «cosa è cambiato»: la risposta era già in archivio, e non la
+                  guardava nessuno. Sta qui e non in testata perché la testata
+                  sotto i 1024px non si vede. */}
+              {p && p.versione > 1 && (
+                <button type="button" onClick={() => setCambiamentiAperti(true)}
+                        className="mono cursor-pointer rounded-r1 px-1 text-ink-muted underline
+                                   underline-offset-2 hover:bg-surface-2 hover:text-ink">
+                  Cosa è cambiato
+                </button>
+              )}
               {scambiate > 0 && (
                 <span className="text-ink-muted" title="Giornate nate da uno scambio fra colleghi">
                   <span className="mono">{scambiate}</span> da scambi
@@ -228,7 +282,9 @@ export default function Turni() {
 
       {errore && <div className="px-4 py-2"><Messaggio tono="errore">{errore}</Messaggio></div>}
 
-      {!inGriglia && <Giorni settimane={settimane} da={inizio} />}
+      <div className="px-4 pt-2 empty:hidden"><AvvisoNovita /></div>
+
+      {!inGriglia && <Giorni settimane={settimane} da={inizio} raggruppa={raggruppaGiorni} />}
 
       {inGriglia && !dati && !errore && <div className="p-4 md:p-6"><Scheletro righe={6} /></div>}
 
@@ -236,15 +292,29 @@ export default function Turni() {
         <div className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_auto]">
           <div className="grid min-h-0 grid-rows-[auto_1fr]">
             <div className="flex flex-col gap-2 px-4 py-2 empty:hidden">
-              {p.notaApprovazione && <Messaggio tono="attenzione">Rimandato indietro: {p.notaApprovazione}</Messaggio>}
+              {/* In ordine di peso: prima quello che blocca la pubblicazione,
+                  poi quello che va guardato, per ultimo l'esito di una scelta. */}
               {errori.length > 0 && (
-                <Messaggio tono="errore">
+                <Messaggio tono="errore"
+                           titolo={`${errori.length} ${errori.length === 1 ? 'conflitto' : 'conflitti'} da risolvere`}>
                   <ul className="list-inside list-disc">{errori.slice(0, 5).map((x, i) => <li key={i}>{x.messaggio}</li>)}</ul>
+                  {errori.length > 5 && <p className="mt-0.5">e altri {errori.length - 5}.</p>}
+                </Messaggio>
+              )}
+              {p.notaApprovazione && (
+                <Messaggio tono="attenzione" titolo="Rimandato indietro">{p.notaApprovazione}</Messaggio>
+              )}
+              {attenzioni.length > 0 && (
+                <Messaggio tono="attenzione"
+                           titolo={`${attenzioni.length} ${attenzioni.length === 1 ? 'segnalazione' : 'segnalazioni'}`}>
+                  <ul className="list-inside list-disc">{attenzioni.slice(0, 5).map((x, i) => <li key={i}>{x.messaggio}</li>)}</ul>
+                  {attenzioni.length > 5 && <p className="mt-0.5">e altre {attenzioni.length - 5}.</p>}
                 </Messaggio>
               )}
               {esito && <EsitoProposta esito={esito} />}
             </div>
-            <Griglia dati={dati} selezione={selezione} onSeleziona={setSelezione} />
+            <Griglia dati={dati} selezione={selezione} onSeleziona={setSelezione}
+                     raggruppa={raggruppaGriglia} />
           </div>
 
           {selezione && (
@@ -260,6 +330,13 @@ export default function Turni() {
         aperto={nuovoAperto} onChiudi={() => setNuovoAperto(false)} unitId={unita}
         periodi={periodi ?? []} onCreato={(pid) => { setNuovoAperto(false); navigate(`/turni/${pid}`) }}
       />
+
+      {p && (
+        <ModaleCambiamenti
+          periodId={p.id} versioneCorrente={p.versione}
+          aperta={cambiamentiAperti} onChiudi={() => setCambiamentiAperti(false)}
+        />
+      )}
     </Vista>
   )
 }

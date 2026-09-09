@@ -43,6 +43,16 @@ ricevere le notifiche push.
 - **iPhone** — Safari, tasto Condividi, «Aggiungi alla schermata Home».
 - **Android** — Chrome, menu, «Installa app».
 
+**Senza rete** l'applicazione si apre lo stesso e mostra le tue giornate come
+le aveva viste l'ultima volta, con in cima una riga che dice a quando risalgono.
+Serve per il tratto che conta: davanti al portone, in garage, in ascensore. Ciò
+che richiede la rete — scambiare un turno, dichiarare un'assenza — resta fermo
+finché la rete non torna.
+
+Delle giornate conservate sul telefono ci sono **solo le tue**: la panoramica
+dell'unità intera non viene tenuta da parte. E **uscendo si cancellano**, così
+su un telefono prestato non resta il calendario di chi l'ha usato prima.
+
 ---
 
 ## Mio — la tua pagina
@@ -50,15 +60,40 @@ ricevere le notifiche push.
 È la pagina che si apre entrando. Una lista sola, dalla giornata di oggi in
 avanti, fino a dove arriva la programmazione pubblicata.
 
-In cima ci sono tre filtri. **Sede** è acceso; **Agile** e **Assenze** si
-accendono toccandoli. Almeno uno resta sempre acceso.
+Una giornata può essere in tre stati, e in tutta l'applicazione si chiamano
+sempre così e portano sempre lo stesso segno:
 
-Ogni riga in sede dice la stanza e la scrivania, e mostra i pallini con le
-iniziali di chi ci sarà con te. Toccandoli si apre l'elenco per esteso, con la
-stanza di ciascuno.
+| | | |
+|---|---|---|
+| 🏢 | **In sede** | sei in ufficio: la riga dice stanza e scrivania |
+| 🏠 | **Da remoto** | lavori da casa |
+| ⊗ | **Assenza** | assenza dichiarata, con la sua causale |
+
+I tre si distinguono a colpo d'occhio anche senza leggere: segno diverso, peso
+diverso, fondo diverso. In cima ci sono i tre filtri, **In sede** acceso; gli
+altri due si accendono toccandoli, e almeno uno resta sempre acceso.
+
+Le settimane sono separate da una riga che dice **quale settimana è** e da
+quando a quando va — «Settimana 37 · 7 – 13 settembre» — così si sa sempre di
+che settimana si sta parlando quando la si legge al telefono o la si detta a
+qualcuno. La separazione resta anche quando i filtri tolgono delle giornate.
+
+Su una riga in sede compaiono subito i pallini con le iniziali dei **colleghi
+del tuo settore** che ci saranno con te, e accanto quanti sono tutti gli altri.
+Se del tuo settore quel giorno ci sei solo tu, al posto dei pallini c'è l'icona
+delle persone col numero di chi è in sede: non ci sono volti da anticipare, ma
+la riga si apre lo stesso.
+
+Aprendo la riga si vedono per esteso — prima il tuo settore, poi il resto — con
+**nome e cognome per intero**, il **settore** di ciascuno e la sua stanza.
 
 Le tue assenze dichiarate stanno nella stessa lista, non da un'altra parte:
 la giornata è una sola, e si legge in un colpo d'occhio.
+
+In alto a destra ci sono **stampa** e **scarico in CSV** del tuo calendario. Il
+file contiene le tue giornate e, per le assenze, la tua causale: sono dati tuoi.
+Dei colleghi non contiene niente, nemmeno chi era in sede con te — quello è un
+elenco di terzi, e un file che gira per posta non è il posto dove metterlo.
 
 ---
 
@@ -66,9 +101,31 @@ la giornata è una sola, e si legge in un colpo d'occhio.
 
 Due modi di guardare la stessa cosa, con l'interruttore in alto.
 
-**Giorni** — una colonna per giornata, con chi è in sede, la stanza e quante
-postazioni sono occupate. È la vista per la domanda di tutti i giorni: *chi
-trovo mercoledì?* Sotto, l'occupazione di ciascuna stanza sul periodo.
+**Giorni** — si apre sulla **settimana in corso**; con l'interruttore in alto si
+passa a due o quattro settimane. Una giornata per colonna, e dentro ciascuna: chi è **in sede**
+diviso stanza per stanza, con quante postazioni di quella stanza sono occupate;
+chi lavora **da remoto**; e in fondo, richiuso, chi è **assente**. È la vista
+per la domanda di tutti i giorni: *chi trovo mercoledì, e in che stanza?*
+L'occupazione è quella del giorno, non una media del periodo.
+
+Il tuo nome è evidenziato in ogni elenco. Le persone sono **sempre in ordine
+di cognome**, in tutte e due le viste: non è una scelta, è come si cerca un
+nome. L'unica scelta è la casella **Raggruppa per settore**, che spezza gli
+elenchi in blocchi — spenta nei Giorni, accesa nella Griglia, dove il settore
+è il criterio con cui si costruiscono i turni. Su una settimana sola le colonne
+si allargano fino a riempire la scheda; dal telefono le giornate si impilano
+una sotto l'altra.
+
+In cima c'è una riga che dice **dove sono le stanze**, come si chiamano e
+quanti posti hanno, più gli uffici riservati a una persona sola:
+
+> Le due stanze disponibili sono al primo piano: la Stanza del Protocollo
+> (1028, cinque postazioni) e la stanza 1032 (due postazioni).
+> Dirigente Sonia Sanzo — stanza 2087.
+
+Non la scrive nessuno e nessuno deve ricordarsi di aggiornarla: è l'elenco
+delle stanze messo in italiano. Si aggiunge una scrivania, si cambia un
+soprannome, e la riga cambia da sé. Se dà fastidio, si scarta con la ×.
 
 **Griglia** — persone in riga, giornate in colonna. Ogni cella dice stanza e
 scrivania, `–` per il lavoro agile, `×` per un'assenza. Si sfoglia da tastiera
@@ -81,7 +138,33 @@ comunicazione.
 > **Le assenze altrui non si distinguono.** Un collega che non è in sede può
 > essere in lavoro agile o assente: per te è la stessa cosa, e la causale non
 > esce mai dal server. Vale anche al contrario: la tua causale la vedono solo
-> chi organizza e il tuo dirigente.
+> chi organizza e il tuo dirigente. Per questo l'elenco **Assenti** della vista
+> Giorni compare solo a loro, e solo per le persone di cui hanno titolo: a tutti
+> gli altri quei colleghi risultano da remoto, come è sempre stato.
+
+### Quando esce una programmazione nuova
+
+Una programmazione vale su un **periodo di date** e porta con sé la propria
+data di pubblicazione. Se viene rivista dopo essere stata pubblicata, cambia
+**versione** — v1, v2, v3 — e ognuna ha la sua **data di ultimo aggiornamento**:
+in alto nella Griglia trovi sempre a che versione sei e da quando vale.
+
+Appena ne esce una nuova, o ne esce una revisione, in cima a **Mio** e a
+**Turni** compare una riga: *Una nuova programmazione è disponibile*, con le
+date, la versione e il collegamento per andarla a vedere. Non serve aprire la
+campanella per accorgersene.
+
+L'avviso resta finché non lo apri o non lo scarti — quello è il momento in cui
+l'applicazione registra che l'hai vista. Poi non torna più, salvo che esca
+un'altra revisione: allora c'è di nuovo qualcosa da guardare, e te lo ridice.
+
+Dalla seconda versione in poi, nella Griglia compare **«Cosa è cambiato»**: si
+apre l'elenco delle giornate toccate da quella revisione, persona per persona,
+con com'era e com'è — in sede, da remoto, e in che stanza. Le tue righe stanno
+in cima. Se la revisione porta un motivo scritto da chi l'ha fatta, si legge lì.
+
+Il confronto non può rivelare un'assenza: le versioni conservate contengono la
+programmazione, non le assenze, che sono una cosa a parte letta ogni volta.
 
 ---
 
@@ -137,7 +220,7 @@ di norma le 10:00. Dopo, il prospetto della giornata è fermo.
 Il tasto della stampante, in alto a destra, apre quattro fogli:
 
 - **Griglia del periodo** — il foglio da bacheca, A4 orizzontale.
-- **Giorno per giorno** — chi c'è, stanza e scrivania, una sezione per giornata.
+- **Giorno per giorno** — una scheda per giornata, divisa per stanza, con chi è da remoto in coda.
 - **Il mio calendario** — le tue giornate, da portarsi dietro.
 - **Occupazione delle stanze** — solo per chi organizza.
 
@@ -229,9 +312,10 @@ Solo tu puoi pubblicare, anche se hai delegato la costruzione.
 
 ### Struttura
 
-- **Settori** — crea, rinomina, decidi quali richiedono presidio quotidiano.
-  Chi non ha settore concorre normalmente alla programmazione ma non copre
-  nessun presidio.
+- **Settori** — crea, rinomina, elimina, decidi quali richiedono presidio
+  quotidiano. Chi non ha settore concorre normalmente alla programmazione ma non
+  copre nessun presidio; eliminando un settore le sue persone restano, senza
+  settore.
 - **Persone** — sposta le persone fra i settori.
 - **Organizzatori** — delega uno o più dipendenti a costruire i turni. Puoi
   revocare in qualunque momento; l'interessato viene avvisato.
@@ -240,9 +324,16 @@ Solo tu puoi pubblicare, anche se hai delegato la costruzione.
   riscrive il passato.
 - **Scambio dei turni** — interruttore e ora limite per la giornata in corso.
   Attivo di norma, con taglio alle 10:00.
-- **Stanze e scrivanie** — solo per il dirigente dell'unità che le possiede. La
-  capienza di una stanza è il numero di scrivanie attive: si aggiunge o si
-  disattiva una scrivania, e la capienza segue.
+- **Stanze e scrivanie** — solo per il dirigente dell'unità che le possiede. Si
+  creano, si modificano — **codice** (`101`), **soprannome** (`Sala nord`) e
+  **piano** — e si eliminano. La capienza di una stanza è il numero di scrivanie
+  attive: si aggiunge o si disattiva una scrivania, e la capienza segue.
+  Una stanza già comparsa in una programmazione non si elimina: si **disattiva**,
+  così esce dai conti e dalle proposte future senza cancellare il passato.
+- **Stanza riservata** — l'ufficio di una persona sola, il tuo per esempio. Si
+  indica col campo *Riservata a*. Non entra nella capienza da distribuire e non
+  ci viene programmato nessun altro: serve perché chi cerca quella persona sappia
+  dove trovarla. Compare nella riga in cima a **Turni**, col nome di chi ci sta.
 
 ### Cosa vedi in più
 

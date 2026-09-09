@@ -1,16 +1,8 @@
 import { Fragment, memo, useMemo, useRef, useState } from 'react'
 import type { Cella, Griglia as DatiGriglia, Persona } from '../api'
+import { pezziData } from '../date'
+import * as I from '../icone'
 import { etichette } from '../persone'
-
-const GIORNI_BREVI = ['lun', 'mar', 'mer', 'gio', 'ven', 'sab', 'dom']
-const MESI = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio',
-  'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre']
-
-function pezziData(iso: string) {
-  const [y, m, d] = iso.split('-').map(Number) as [number, number, number]
-  const gs = (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7
-  return { giorno: d, meseNome: MESI[m - 1]!, breve: GIORNI_BREVI[gs]!, lunedi: gs === 0 }
-}
 
 /** Il contratto di accessibilità della griglia: ogni cella si legge da sola. */
 export function descriviCella(p: Persona, iso: string, c: Cella | undefined, stanza: string | null, scrivania: string | null) {
@@ -19,19 +11,21 @@ export function descriviCella(p: Persona, iso: string, c: Cella | undefined, sta
   const chi = `${p.cognome} ${p.nome}`
   if (!c) return `${chi}, ${quando}, non programmato`
   if (c.stato === 'assenza') return `${chi}, ${quando}, assenza dichiarata${c.causale ? `, causale ${c.causale}` : ''}`
-  if (c.stato === 'smart') return `${chi}, ${quando}, lavoro agile`
+  if (c.stato === 'smart') return `${chi}, ${quando}, da remoto`
   const dove = [stanza && `stanza ${stanza}`, scrivania && `scrivania ${scrivania}`].filter(Boolean).join(', ')
   const blocco = c.daScambio ? ', cella bloccata da uno scambio fra colleghi'
     : c.bloccata ? ', cella bloccata' : ''
-  return `${chi}, ${quando}, presenza${dove ? `, ${dove}` : ''}${blocco}`
+  return `${chi}, ${quando}, in sede${dove ? `, ${dove}` : ''}${blocco}`
 }
 
 type Selezione = { userId: number; data: string } | null
 
-export default function Griglia({ dati, onSeleziona, selezione }: {
+export default function Griglia({ dati, onSeleziona, selezione, raggruppa = true }: {
   dati: DatiGriglia
   selezione: Selezione
   onSeleziona: (s: Selezione) => void
+  /** Spento: un elenco solo, nell'ordine di cognome che il server già dà. */
+  raggruppa?: boolean
 }) {
   const [fuoco, setFuoco] = useState({ riga: 0, colonna: 0 })
   const tabella = useRef<HTMLTableElement>(null)
@@ -43,20 +37,31 @@ export default function Griglia({ dati, onSeleziona, selezione }: {
   }, [dati.celle])
 
   const stanzaBreve = useMemo(
-    () => new Map(dati.stanze.map((s) => [s.id, s.etichetta.split('·')[0]!.trim()])), [dati.stanze])
+    () => new Map(dati.stanze.map((s) => [s.id, s.etichetta])), [dati.stanze])
   const scrivaniaNumero = useMemo(
     () => new Map(dati.stanze.flatMap((s) => s.scrivanie.map((d) => [d.id, d.numero] as const))), [dati.stanze])
 
+  /* Le persone arrivano già ordinate per cognome dal server, e restano così in
+     tutte e due i modi: senza raggruppamento sono un elenco solo, con il
+     raggruppamento diventano blocchi di settore ordinati per cognome dentro. */
   const gruppi = useMemo(() => {
-    const out: { settore: string | null; sectorId: number | null; presidio: boolean; persone: Persona[] }[] = []
+    if (!raggruppa) {
+      return [{ settore: null, sectorId: null, presidio: false, persone: dati.persone, intestato: false }]
+    }
+    const out: {
+      settore: string | null; sectorId: number | null; presidio: boolean
+      persone: Persona[]; intestato: boolean
+    }[] = []
     for (const s of dati.settori) {
       const persone = dati.persone.filter((p) => p.sectorId === s.id)
-      if (persone.length) out.push({ settore: s.nome, sectorId: s.id, presidio: s.richiedePresidio, persone })
+      if (persone.length) {
+        out.push({ settore: s.nome, sectorId: s.id, presidio: s.richiedePresidio, persone, intestato: true })
+      }
     }
     const orfani = dati.persone.filter((p) => p.sectorId == null || !dati.settori.some((s) => s.id === p.sectorId))
-    if (orfani.length) out.push({ settore: null, sectorId: null, presidio: false, persone: orfani })
+    if (orfani.length) out.push({ settore: null, sectorId: null, presidio: false, persone: orfani, intestato: true })
     return out
-  }, [dati.persone, dati.settori])
+  }, [dati.persone, dati.settori, raggruppa])
 
   const righe = useMemo(() => gruppi.flatMap((g) => g.persone), [gruppi])
   // In griglia si legge il cognome: il nome compare solo dove due persone
@@ -126,6 +131,7 @@ export default function Griglia({ dati, onSeleziona, selezione }: {
         <tbody>
           {gruppi.map((gr) => (
             <Fragment key={`gruppo-${gr.sectorId ?? 'nessuno'}`}>
+              {gr.intestato && (
               <tr>
                 <th scope="colgroup" colSpan={dati.giorni.length + 1}
                     className="sticky left-0 border-y border-border bg-surface-2 px-2.5 py-1 text-left">
@@ -139,6 +145,7 @@ export default function Griglia({ dati, onSeleziona, selezione }: {
                   </span>
                 </th>
               </tr>
+              )}
 
               {gr.persone.map((p) => {
                 const rigaIndice = righe.indexOf(p)
@@ -257,9 +264,11 @@ const RigaPersona = memo(function RigaPersona({
 export function Legenda() {
   return (
     <ul className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-ink-faint">
-      <li><span className="mono mr-1.5 font-semibold text-ink">101/3</span>presenza: stanza e scrivania</li>
-      <li><span className="mono mr-1.5">–</span>lavoro agile</li>
-      <li><span className="mono mr-1.5">×</span>assenza dichiarata</li>
+      <li className="inline-flex items-center gap-1.5">
+        <I.Sede size={13} /><span className="mono font-semibold text-ink">101/3</span>in sede: stanza e scrivania
+      </li>
+      <li className="inline-flex items-center gap-1.5"><I.Remoto size={13} /><span className="mono">–</span>da remoto</li>
+      <li className="inline-flex items-center gap-1.5"><I.Croce size={13} /><span className="mono">×</span>assenza dichiarata</li>
       <li><span className="mr-1.5 text-ink-faint">▪</span>cella bloccata: la generazione non la tocca</li>
       <li><span className="mr-1.5 text-ink-faint">⇄</span>scambio fra colleghi</li>
     </ul>

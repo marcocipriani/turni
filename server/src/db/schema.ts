@@ -67,8 +67,16 @@ export const sector = mysqlTable('sector', {
 export const room = mysqlTable('room', {
   id: id(),
   unitId: int('unit_id').notNull(),          // l'unità che la usa
-  etichetta: varchar('etichetta', { length: 60 }).notNull(),
+  etichetta: varchar('etichetta', { length: 60 }).notNull(),   // il codice: «101»
+  // Come la chiamano davvero: «Sala nord». Sta a parte dall'etichetta perché
+  // nelle colonne strette si stampa il codice e basta, e un soprannome dentro
+  // l'etichetta obbligherebbe ogni schermata a tagliarlo a mano.
+  soprannome: varchar('soprannome', { length: 60 }),
   piano: varchar('piano', { length: 40 }),
+  // Stanza di una persona sola — l'ufficio di un dirigente. Non entra nella
+  // capienza da distribuire e non la si assegna a nessun altro: esiste perché
+  // chi cerca quella persona sappia dove trovarla, non perché ci sia un posto.
+  riservataA: int('riservata_a'),
   larghezzaCm: int('larghezza_cm').default(600).notNull(),
   altezzaCm: int('altezza_cm').default(400).notNull(),
   attiva: boolean('attiva').default(true).notNull(),
@@ -117,7 +125,11 @@ export const period = mysqlTable('period', {
   notaApprovazione: text('nota_approvazione'),
   creatoDa: int('creato_da').notNull(),
   pubblicatoDa: int('pubblicato_da'),
+  // La prima pubblicazione non si riscrive: è la data da cui quel periodo
+  // esiste per le persone. Le revisioni successive muovono `aggiornatoIl`, e
+  // la coppia con `versione` racconta «v2, aggiornata il …».
   pubblicatoIl: timestamp('pubblicato_il'),
+  aggiornatoIl: timestamp('aggiornato_il'),
   creatoIl: now(),
 }, (t) => [index('ix_period_unit').on(t.unitId, t.dataInizio)])
 
@@ -175,6 +187,9 @@ export const userPreference = mysqlTable('user_preference', {
   nota: varchar('nota', { length: 500 }),
   // Tonalità dell'avatar, 0-7. Null = ricavata dall'identificativo.
   avatarTinta: tinyint('avatar_tinta'),
+  // Fin dove la persona ha guardato la programmazione. Serve a dire «ce n'è
+  // una nuova» una volta sola: null significa che non l'ha ancora aperta.
+  programmazioneVistaIl: timestamp('programmazione_vista_il'),
 })
 
 export const recurringRule = mysqlTable('recurring_rule', {

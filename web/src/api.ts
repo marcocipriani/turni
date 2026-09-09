@@ -2,7 +2,7 @@ export class ErroreApi extends Error {
   constructor(public stato: number, messaggio: string) { super(messaggio) }
 }
 
-async function richiesta<T>(metodo: string, percorso: string, corpo?: unknown): Promise<T> {
+async function grezza(metodo: string, percorso: string, corpo?: unknown): Promise<Response> {
   const r = await fetch(`/api${percorso}`, {
     method: metodo,
     credentials: 'include',
@@ -13,7 +13,30 @@ async function richiesta<T>(metodo: string, percorso: string, corpo?: unknown): 
     const dati = await r.json().catch(() => ({ errore: r.statusText }))
     throw new ErroreApi(r.status, dati.errore ?? 'Errore imprevisto')
   }
+  return r
+}
+
+async function richiesta<T>(metodo: string, percorso: string, corpo?: unknown): Promise<T> {
+  const r = await grezza(metodo, percorso, corpo)
   return r.status === 204 ? (undefined as T) : r.json()
+}
+
+/**
+ * Come `get`, ma dice anche se la risposta è quella conservata dal service
+ * worker e di quando è. Serve alle sole schermate che si possono guardare
+ * senza rete: mostrare dati vecchi senza dirlo sarebbe peggio che non
+ * mostrarli.
+ */
+export async function getConEta<T>(percorso: string): Promise<{ dati: T; copiaDel: Date | null }> {
+  const r = await grezza('GET', percorso)
+  const marca = r.headers.get('x-turni-copia')
+  return { dati: await r.json() as T, copiaDel: marca ? new Date(marca) : null }
+}
+
+/** Svuota i dati conservati offline: si chiama uscendo. */
+export async function dimenticaDatiOffline() {
+  if (!('caches' in globalThis)) return
+  for (const nome of await caches.keys()) if (nome.startsWith('turni-dati')) await caches.delete(nome)
 }
 
 export const api = {
@@ -46,14 +69,23 @@ export type Persona = {
 
 export type Settore = { id: number; unitId: number; nome: string; richiedePresidio: boolean; ordine: number }
 export type Scrivania = { id: number; roomId: number; numero: string; attiva: boolean }
-export type StanzaVista = { id: number; etichetta: string; piano: string | null; capienza: number; scrivanie: Scrivania[] }
+export type StanzaVista = {
+  id: number; etichetta: string; soprannome: string | null; piano: string | null
+  /** Ufficio di una persona sola: fuori dalla capienza condivisa. */
+  riservataA: number | null
+  attiva: boolean; capienza: number; scrivanie: Scrivania[]
+}
 
 export type Periodo = {
   id: number; unitId: number; dataInizio: string; dataFine: string
   stato: 'bozza' | 'in_approvazione' | 'pubblicato'
   versione: number; assegnaScrivanie: boolean
   smartMinSettimana: number | null; smartMaxSettimana: number | null
-  notaApprovazione: string | null; pubblicatoIl: string | null
+  notaApprovazione: string | null
+  /** Prima pubblicazione: non cambia più. */
+  pubblicatoIl: string | null
+  /** Ultima pubblicazione, cioè la data della versione in corso. */
+  aggiornatoIl: string | null
 }
 
 export type Cella = {

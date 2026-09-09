@@ -1,18 +1,22 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { api } from '../api'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { api, getConEta } from '../api'
+import { descriviSettimana, lunediDi, oggiISO, pezziData } from '../date'
 import * as I from '../icone'
-import { Avatar, etichette, FilaAvatar } from '../persone'
-import { Bottone, Messaggio, Scheletro, StatoVuoto, Tag } from '../ui'
+import { Avatar, FilaAvatar, perEsteso } from '../persone'
+import { SegnoStato, STATI, type Stato } from '../stati'
+import { Bottone, Chip, Messaggio, Scheletro, StatoVuoto, Tag } from '../ui'
 import { Toolbar, Vista } from '../Vista'
+import { AvvisoNovita, quando } from './novita'
 import { ModaleScambio, type Proposta, Scambi } from './Scambio'
 
 export type Collega = {
-  userId: number; nome: string; cognome: string
+  userId: number; nome: string; cognome: string; sectorId: number | null
   roomId: number | null; scrivania: string | null
 }
 export type GiornoMio = {
   data: string
-  stato: 'presenza' | 'smart' | 'assenza'
+  stato: Stato
   causale: string | null
   periodId: number | null
   roomId: number | null
@@ -23,28 +27,17 @@ export type GiornoMio = {
 export type DatiMio = {
   da: string; a?: string
   giorni: GiornoMio[]
-  stanze: { id: number; etichetta: string; piano: string | null; capienza: number }[]
+  stanze: { id: number; etichetta: string; soprannome: string | null; piano: string | null; capienza: number }[]
+  /** Il proprio settore: decide quali colleghi si vedono senza espandere. */
+  settore: { id: number; nome: string } | null
+  /** Tutti i settori dell'unità, per dire con che gruppo lavora un collega. */
+  settori: { id: number; nome: string }[]
   scambio: { attivo: boolean; oraLimite: string } | null
 }
 
-const GIORNI = ['lun', 'mar', 'mer', 'gio', 'ven', 'sab', 'dom']
-const MESI = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic']
-
-export function pezziData(iso: string) {
-  const [y, m, d] = iso.split('-').map(Number) as [number, number, number]
-  const gs = (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7
-  return { giorno: d, mese: MESI[m - 1]!, breve: GIORNI[gs]!, lunedi: gs === 0 }
-}
-
-const oggiISO = () => new Date().toISOString().slice(0, 10)
-
-/** «101 · Sala nord» → «101». Il codice basta a trovarla. */
-export const codiceStanza = (etichetta: string) => etichetta.split('·')[0]!.trim()
-
 /* ── Filtri: interruttori indipendenti, non una scelta esclusiva ──── */
 
-type Filtro = 'presenza' | 'smart' | 'assenza'
-const NOMI: Record<Filtro, string> = { presenza: 'Sede', smart: 'Agile', assenza: 'Assenze' }
+type Filtro = Stato
 
 function Filtri({ attivi, onCambia, conteggi }: {
   attivi: Set<Filtro>
@@ -52,18 +45,21 @@ function Filtri({ attivi, onCambia, conteggi }: {
   conteggi: Record<Filtro, number>
 }) {
   return (
-    <div className="flex items-center gap-1.5" role="group" aria-label="Cosa mostrare">
-      {(Object.keys(NOMI) as Filtro[]).map((f) => {
+    <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Cosa mostrare">
+      {(Object.keys(STATI) as Filtro[]).map((f) => {
         const on = attivi.has(f)
+        const Icona = STATI[f].icona
         return (
           <button
             key={f} type="button" onClick={() => onCambia(f)} aria-pressed={on}
-            className={`inline-flex min-h-[32px] cursor-pointer items-center gap-1.5 rounded-full border px-2.5
-                        text-sm transition-colors duration-[120ms] ease-out ${on
+            /* `whitespace-nowrap`: «In sede» e «Da remoto» sono due parole, e
+               dentro una pillola stretta andavano a capo spezzandosi in mezzo. */
+            className={`inline-flex min-h-[32px] cursor-pointer items-center gap-1.5 whitespace-nowrap
+                        rounded-full border px-2.5 text-sm transition-colors duration-[120ms] ease-out ${on
               ? 'border-action bg-action text-action-ink'
               : 'border-border-controllo bg-bg text-ink-muted hover:bg-surface-2 hover:text-ink'}`}
           >
-            {NOMI[f]}
+            <Icona size={14} />{STATI[f].plurale}
             <span className="mono text-2xs opacity-70">{conteggi[f]}</span>
           </button>
         )
@@ -77,16 +73,23 @@ function Filtri({ attivi, onCambia, conteggi }: {
 type ElencoScambi = { inArrivo: Proposta[]; inUscita: Proposta[]; conclusi: Proposta[] }
 
 export default function Mio() {
+  const navigate = useNavigate()
   const [dati, setDati] = useState<DatiMio | null>(null)
   const [scambi, setScambi] = useState<ElencoScambi | null>(null)
   const [errore, setErrore] = useState<string | null>(null)
+  const [copiaDel, setCopiaDel] = useState<Date | null>(null)
   const [attivi, setAttivi] = useState<Set<Filtro>>(new Set<Filtro>(['presenza']))
   const [aperto, setAperto] = useState<string | null>(null)
   const [daScambiare, setDaScambiare] = useState<string | null>(null)
 
   const carica = useCallback(() => {
-    void api.get<DatiMio>('/mio').then(setDati).catch((e) => setErrore(e.message))
-    void api.get<ElencoScambi>('/scambi').then(setScambi).catch(() => {})
+    void getConEta<DatiMio>('/mio')
+      .then(({ dati, copiaDel }) => { setDati(dati); setCopiaDel(copiaDel) })
+      .catch((e) => setErrore(e.message))
+    // Gli scambi non si conservano offline: senza rete non se ne può fare
+    // nessuno, e mostrarne di vecchi inviterebbe a rispondere a una proposta
+    // che magari è già chiusa.
+    void api.get<ElencoScambi>('/scambi').then(setScambi).catch(() => setScambi(null))
   }, [])
 
   useEffect(carica, [carica])
@@ -99,7 +102,9 @@ export default function Mio() {
 
   const visibili = (dati?.giorni ?? []).filter((g) => attivi.has(g.stato))
   const stanzaPerId = useMemo(
-    () => new Map((dati?.stanze ?? []).map((s) => [s.id, s.etichetta])), [dati])
+    () => new Map((dati?.stanze ?? []).map((s) => [s.id, s])), [dati])
+  const nomiSettore = useMemo(
+    () => new Map((dati?.settori ?? []).map((s) => [s.id, s.nome])), [dati])
 
   function alterna(f: Filtro) {
     setAttivi((v) => {
@@ -118,6 +123,22 @@ export default function Mio() {
       aiuto="Le tue giornate, da oggi in avanti"
       caricando={!dati && !errore}
       meta={dati && <span className="mono">{conteggi.presenza} giornate in sede</span>}
+      azioni={
+        <>
+          {/* Lo scarico è un link, non un bottone: è una risorsa che il browser
+              va a prendere, e il tasto destro deve funzionarci sopra. */}
+          <a href="/api/mio/export.csv" title="Scarica il tuo calendario in CSV"
+             aria-label="Scarica il tuo calendario in CSV"
+             className="inline-flex cursor-pointer items-center gap-2 rounded-r1 p-[5px] text-ink-faint
+                        transition-colors duration-[120ms] ease-out hover:bg-surface-2 hover:text-ink">
+            <I.Scarica size={17} />
+          </a>
+          <Bottone variante="icona" title="Stampa il tuo calendario" aria-label="Stampa il tuo calendario"
+                   onClick={() => navigate('/stampa/mio')}>
+            <I.Stampa size={17} />
+          </Bottone>
+        </>
+      }
     >
       <Toolbar>
         <Filtri attivi={attivi} onCambia={alterna} conteggi={conteggi} />
@@ -125,6 +146,20 @@ export default function Mio() {
 
       <div className="flex flex-col gap-6 p-4 md:p-6">
         {errore && <Messaggio tono="errore">{errore}</Messaggio>}
+
+        {/* Senza rete la pagina si apre lo stesso, con l'ultima risposta
+            riuscita. Dirlo non è un dettaglio: una giornata può essere stata
+            scambiata da allora, e chi legge deve sapere fin dove fidarsi. */}
+        {copiaDel && (
+          <Messaggio tono="attenzione" titolo="Senza rete">
+            Stai vedendo i dati conservati sul telefono, aggiornati al {quando(copiaDel.toISOString())}.
+            Riappena torna la rete si aggiornano da soli.
+          </Messaggio>
+        )}
+
+        {/* È la pagina su cui si atterra: se una programmazione è uscita
+            mentre non guardavi, lo sai qui, non aprendo la campanella. */}
+        <AvvisoNovita />
 
         {scambi && <Scambi elenco={scambi} onCambiato={carica} />}
 
@@ -141,16 +176,31 @@ export default function Mio() {
         )}
 
         {visibili.length > 0 && (
-          <ul className="divide-y divide-border overflow-hidden rounded-r3 border border-border bg-surface">
-            {visibili.map((g) => (
-              <Riga
-                key={g.data} g={g} stanze={stanzaPerId}
-                scambiabile={Boolean(dati?.scambio?.attivo) && g.data >= oggiISO() && g.stato !== 'assenza'}
-                onScambia={() => setDaScambiare(g.data)}
-                aperto={aperto === g.data}
-                onApri={() => setAperto((v) => v === g.data ? null : g.data)}
-              />
-            ))}
+          <ul className="overflow-hidden rounded-r3 border border-border bg-surface">
+            {visibili.map((g, i) => {
+              // Le settimane restano separate anche quando un filtro toglie di
+              // mezzo delle giornate: il salto si vede dal lunedì, non dal
+              // numero di righe che sono sopravvissute.
+              const nuovaSettimana = i === 0 || lunediDi(g.data) !== lunediDi(visibili[i - 1]!.data)
+              return (
+                <Fragment key={g.data}>
+                  {nuovaSettimana && (
+                    <li className="mono border-t-2 border-border-strong bg-surface-2 px-3 py-1
+                                   text-2xs uppercase tracking-[0.06em] text-ink-faint first:border-t-0 md:px-4">
+                      {descriviSettimana(g.data)}
+                    </li>
+                  )}
+                  <Riga
+                    g={g} stanze={stanzaPerId} mioSettore={dati?.settore ?? null}
+                    settori={nomiSettore} primaDellaSettimana={nuovaSettimana}
+                    scambiabile={Boolean(dati?.scambio?.attivo) && g.data >= oggiISO() && g.stato !== 'assenza'}
+                    onScambia={() => setDaScambiare(g.data)}
+                    aperto={aperto === g.data}
+                    onApri={() => setAperto((v) => v === g.data ? null : g.data)}
+                  />
+                </Fragment>
+              )
+            })}
           </ul>
         )}
       </div>
@@ -165,44 +215,68 @@ export default function Mio() {
 
 /* ── Riga: una giornata. Nessuna card: la cronologia è una lista sola ── */
 
-function Riga({ g, stanze, aperto, onApri, scambiabile, onScambia }: {
-  g: GiornoMio; stanze: Map<number, string>
+function Riga({ g, stanze, mioSettore, settori, primaDellaSettimana, aperto, onApri, scambiabile, onScambia }: {
+  g: GiornoMio; stanze: Map<number, { etichetta: string; soprannome: string | null }>
+  mioSettore: { id: number; nome: string } | null
+  settori: Map<number, string>
+  /** Segue la didascalia di settimana, che porta già il suo taglio marcato. */
+  primaDellaSettimana: boolean
   aperto: boolean; onApri: () => void
   scambiabile: boolean; onScambia: () => void
 }) {
   const stanza = g.roomId != null ? stanze.get(g.roomId) ?? null : null
-  const nomeStanza = stanza ? stanza.split('·').slice(1).join('·').trim() : ''
   const { giorno, mese, breve } = pezziData(g.data)
   const oggi = g.data === oggiISO()
+
+  /* Chi lavora con me viene prima di chi lavora nello stesso edificio: la
+     giornata la si guarda per sapere con chi la si passa. Senza un settore
+     proprio la distinzione non esiste, e i colleghi restano un elenco solo. */
+  const { miei, altri } = useMemo(() => {
+    if (mioSettore == null) return { miei: [] as Collega[], altri: g.colleghi }
+    return {
+      miei: g.colleghi.filter((c) => c.sectorId === mioSettore.id),
+      altri: g.colleghi.filter((c) => c.sectorId !== mioSettore.id),
+    }
+  }, [g.colleghi, mioSettore])
+
   const espandibile = g.colleghi.length > 0
-  const nomi = useMemo(
-    () => etichette(g.colleghi.map((c) => ({ id: c.userId, nome: c.nome, cognome: c.cognome }))),
-    [g.colleghi])
+  /* Gli avatar davanti sono quelli con cui si lavora. Se nel mio settore quel
+     giorno ci sono solo io, non c'è nessun volto da anticipare: mettere quelli
+     degli altri fingerebbe una vicinanza che non c'è, e allungare la fila a
+     tutta l'unità la renderebbe illeggibile. Resta il segno che apre. */
+  const soloIoDelSettore = mioSettore != null && miei.length === 0
+  const anteprima = mioSettore != null ? miei : g.colleghi
+  const stile = STATI[g.stato]
 
   return (
-    <li className={oggi ? 'shadow-[inset_2px_0_0_var(--ink)]' : ''}>
+    <li className={`${primaDellaSettimana ? '' : 'border-t border-border'} ${stile.fondo}
+                    ${oggi ? 'shadow-[inset_2px_0_0_var(--ink)]' : ''}`}>
       {/* Sul telefono i volti vanno a capo: schiacciati sulla stessa riga
           rubavano spazio alla stanza, che è l'informazione che serve. */}
       <div className="flex min-h-[52px] flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 md:flex-nowrap md:px-4">
         <div className="w-[52px] shrink-0">
-          <p className="mono text-md font-semibold leading-none">{giorno}</p>
+          <p className={`mono text-md font-semibold leading-none ${stile.inchiostro}`}>{giorno}</p>
           <p className="text-2xs uppercase tracking-[0.04em] text-ink-faint">{breve} {mese}</p>
         </div>
+
+        {/* Il segno dello stato in colonna propria: scorrendo l'elenco le tre
+            giornate si distinguono prima di leggere una sola parola. */}
+        <span className="shrink-0"><SegnoStato stato={g.stato} size={17} /></span>
 
         <div className="min-w-0 flex-1">
           {g.stato === 'presenza' && (
             <p className="mono truncate text-base">
-              {stanza ? codiceStanza(stanza) : 'da assegnare'}
+              {stanza ? stanza.etichetta : 'da assegnare'}
               {g.scrivania && <span className="text-ink-muted"> · scriv. {g.scrivania}</span>}
-              {/* La stanza può non avere un nome oltre al codice: senza questo
-                  controllo resterebbe un punto separatore che non separa niente. */}
-              {nomeStanza && <span className="hidden text-ink-faint lg:inline"> · {nomeStanza}</span>}
+              {/* La stanza può non avere un soprannome: senza questo controllo
+                  resterebbe un punto separatore che non separa niente. */}
+              {stanza?.soprannome && <span className="hidden text-ink-faint lg:inline"> · {stanza.soprannome}</span>}
             </p>
           )}
-          {g.stato === 'smart' && <p className="text-base text-ink-muted">Lavoro agile</p>}
+          {g.stato === 'smart' && <p className="text-base text-ink-muted">{STATI.smart.etichetta}</p>}
           {g.stato === 'assenza' && (
-            <p className="flex flex-wrap items-center gap-2 text-base text-ink-muted">
-              Assente {g.causale && <Tag>{g.causale}</Tag>}
+            <p className="flex flex-wrap items-center gap-2 text-base text-ink-faint">
+              {STATI.assenza.etichetta} {g.causale && <Tag>{g.causale}</Tag>}
             </p>
           )}
           {oggi && <p className="text-2xs uppercase tracking-[0.04em] text-ink-faint">oggi</p>}
@@ -220,9 +294,25 @@ function Riga({ g, stanze, aperto, onApri, scambiabile, onScambia }: {
             type="button" onClick={onApri} aria-expanded={aperto}
             className="order-last flex min-h-[36px] w-full cursor-pointer items-center gap-2 rounded-r2 px-1.5
                        hover:bg-surface-2 md:order-none md:w-auto"
-            aria-label={aperto ? 'Nascondi chi c\'è' : `Mostra chi c'è: ${g.colleghi.length} persone`}
+            aria-label={aperto
+              ? 'Nascondi chi c\'è'
+              : miei.length > 0
+                ? `Mostra chi c'è: ${miei.length} del tuo settore, ${altri.length} in tutto il resto`
+                : soloIoDelSettore
+                  ? `Nel tuo settore quel giorno ci sei solo tu. Mostra gli altri ${altri.length} in sede`
+                  : `Mostra chi c'è: ${altri.length} persone`}
           >
-            <FilaAvatar persone={g.colleghi.map((c) => ({ id: c.userId, nome: c.nome, cognome: c.cognome }))} />
+            {soloIoDelSettore
+              ? <span className="inline-flex items-center gap-1.5 text-ink-faint">
+                  <I.Persone size={17} />
+                  <span className="mono text-2xs">{altri.length}</span>
+                </span>
+              : <FilaAvatar persone={anteprima.map((c) => ({ id: c.userId, nome: c.nome, cognome: c.cognome }))} />}
+            {/* Il resto si conta, non si mostra: allungare la fila
+                annacquerebbe i volti che contano. */}
+            {miei.length > 0 && altri.length > 0 && (
+              <span className="mono shrink-0 text-2xs text-ink-faint">+{altri.length}</span>
+            )}
             <span className={`ml-auto text-ink-faint transition-transform duration-[120ms] ease-out ${aperto ? 'rotate-90' : ''}`}>
               <I.Freccia size={14} />
             </span>
@@ -231,19 +321,48 @@ function Riga({ g, stanze, aperto, onApri, scambiabile, onScambia }: {
       </div>
 
       {aperto && (
-        <ul className="entra border-t border-border bg-bg px-3 py-2 md:px-4">
-          {g.colleghi.map((c) => (
-            <li key={c.userId} className="flex min-h-[34px] items-center gap-2.5">
-              <Avatar persona={{ id: c.userId, nome: c.nome, cognome: c.cognome }} misura="piccolo" />
-              <span className="min-w-0 flex-1 truncate text-base">{nomi.get(c.userId)}</span>
-              <span className="mono shrink-0 text-sm text-ink-faint">
-                {c.roomId != null ? codiceStanza(stanze.get(c.roomId) ?? '') || '—' : '—'}
-                {c.scrivania && `/${c.scrivania}`}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <div className="entra border-t border-border bg-bg px-3 py-2 md:px-4">
+          {miei.length > 0 && (
+            <Colleghi titolo={mioSettore?.nome ?? 'Il tuo settore'} gente={miei} stanze={stanze} settori={settori} />
+          )}
+          {altri.length > 0 && (
+            <Colleghi titolo={miei.length > 0 || soloIoDelSettore ? 'Altri in sede' : 'In sede'}
+                      gente={altri} stanze={stanze} settori={settori} />
+          )}
+        </div>
       )}
     </li>
+  )
+}
+
+function Colleghi({ titolo, gente, stanze, settori }: {
+  titolo: string
+  gente: Collega[]
+  stanze: Map<number, { etichetta: string; soprannome: string | null }>
+  settori: Map<number, string>
+}) {
+  return (
+    <>
+      <p className="mono px-0.5 pb-0.5 pt-1 text-2xs uppercase tracking-[0.06em] text-ink-faint first:pt-0">
+        {titolo} <span className="mono">{gente.length}</span>
+      </p>
+      <ul>
+        {gente.map((c) => (
+          <li key={c.userId} className="flex min-h-[34px] flex-wrap items-center gap-x-2.5 gap-y-1 py-0.5">
+            <Avatar persona={{ id: c.userId, nome: c.nome, cognome: c.cognome }} misura="piccolo" />
+            {/* Qui il nome si scrive per intero: il pannello è aperto apposta,
+                e un cognome secco non basta a riconoscere chi non si frequenta. */}
+            <span className="min-w-0 flex-1 truncate text-base">
+              {perEsteso({ id: c.userId, nome: c.nome, cognome: c.cognome })}
+            </span>
+            {c.sectorId != null && settori.has(c.sectorId) && <Chip>{settori.get(c.sectorId)}</Chip>}
+            <span className="mono shrink-0 text-sm text-ink-faint">
+              {c.roomId != null ? stanze.get(c.roomId)?.etichetta ?? '—' : '—'}
+              {c.scrivania && `/${c.scrivania}`}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </>
   )
 }
