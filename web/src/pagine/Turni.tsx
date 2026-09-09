@@ -237,8 +237,13 @@ export default function Turni() {
             <div role="radiogroup" aria-label="Quante settimane mostrare"
                  className="inline-flex overflow-hidden rounded-r2 border border-border-controllo">
               {[1, 2, 4].map((n) => (
-                <BottoneVista key={n} attivo={settimane === n} onClick={() => setSettimane(n)}>
-                  {n === 1 ? '1 settimana' : `${n} settimane`}
+                <BottoneVista key={n} attivo={settimane === n} onClick={() => setSettimane(n)}
+                              aria-label={n === 1 ? '1 settimana' : `${n} settimane`}>
+                  {/* Sul telefono il numero basta: il gruppo dice già di che
+                      cosa si parla, e per esteso i due interruttori non stanno
+                      sulla stessa riga. */}
+                  <span className="sm:hidden">{n}</span>
+                  <span className="hidden sm:inline">{n === 1 ? '1 settimana' : `${n} settimane`}</span>
                 </BottoneVista>
               ))}
             </div>
@@ -402,7 +407,7 @@ function BottoneVista({ attivo, children, ...resto }: {
     <button
       type="button" role="radio" aria-checked={attivo} {...resto}
       onClick={(e) => { vibra(); resto.onClick?.(e) }}
-      className={`min-h-[32px] max-sm:min-h-[44px] max-sm:px-4 cursor-pointer px-2.5 text-sm transition-colors duration-[120ms] ease-out
+      className={`min-h-[32px] max-sm:min-h-[44px] cursor-pointer px-2.5 text-sm transition-colors duration-[120ms] ease-out
                   disabled:cursor-not-allowed disabled:opacity-50
                   ${attivo ? 'bg-action text-action-ink' : 'bg-bg text-ink-muted hover:bg-surface-2 hover:text-ink'}`}
     >

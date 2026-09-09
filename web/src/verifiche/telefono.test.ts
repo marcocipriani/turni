@@ -148,6 +148,21 @@ describe('bersagli da polpastrello', () => {
   })
 })
 
+describe('stampa', () => {
+  it("chiusa l'anteprima, qualcuno rimette in moto il ridisegno", () => {
+    /* La shell è alta 100svh e non scorre: se al ritorno dalla stampa il
+       browser non ricalcola il layout, resta una schermata bianca. Non è
+       codice morto: toglierlo riporta il bug. */
+    expect(leggi('../main.tsx')).toContain("addEventListener('afterprint'")
+  })
+
+  it('la carta annulla altezze e scorrimenti della shell', () => {
+    const stampa = app.slice(app.indexOf('@media print'))
+    expect(stampa).toMatch(/height:\s*auto\s*!important/)
+    expect(stampa).toMatch(/overflow:\s*visible\s*!important/)
+  })
+})
+
 describe('comandi dell\'header', () => {
   const turni = leggi('../pagine/Turni.tsx')
 

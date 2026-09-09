@@ -45,6 +45,7 @@ export default function Stampa() {
 
   return (
     <Vista
+      denso
       titolo="Stampa"
       icona={<I.Stampa size={17} />}
       aiuto="Scegli cosa mettere su carta, poi stampa o salva in PDF"
