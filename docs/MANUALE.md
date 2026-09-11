@@ -90,10 +90,19 @@ Aprendo la riga si vedono per esteso — prima il tuo settore, poi il resto — 
 Le tue assenze dichiarate stanno nella stessa lista, non da un'altra parte:
 la giornata è una sola, e si legge in un colpo d'occhio.
 
-In alto a destra ci sono **stampa** e **scarico in CSV** del tuo calendario. Il
-file contiene le tue giornate e, per le assenze, la tua causale: sono dati tuoi.
+Sotto ogni collega c'è anche **quando vi rivedete**: «di nuovo insieme 23, 30
+set» sono le prossime giornate in cui sarete in sede tutti e due.
+
+In alto a destra ci sono **stampa**, **scarico in CSV** e **immagine**. Il CSV
+contiene le tue giornate e, per le assenze, la tua causale: sono dati tuoi.
 Dei colleghi non contiene niente, nemmeno chi era in sede con te — quello è un
 elenco di terzi, e un file che gira per posta non è il posto dove metterlo.
+L'immagine è quella che vedi, coi filtri accesi: sul telefono si condivide o si
+salva in galleria.
+
+Dalle **preferenze** (in Assenze) scegli quali filtri partono accesi, e se ogni
+sera prima di una giornata in sede vuoi un **promemoria** con stanza e
+scrivania. Arriva alle 18 nella campanella, e come notifica se le hai attivate.
 
 ---
 
@@ -114,7 +123,14 @@ nome. L'unica scelta è la casella **Raggruppa per settore**, che spezza gli
 elenchi in blocchi — spenta nei Giorni, accesa nella Griglia, dove il settore
 è il criterio con cui si costruiscono i turni. Su una settimana sola le colonne
 si allargano fino a riempire la scheda; dal telefono le giornate si impilano
-una sotto l'altra.
+una sotto l'altra, e la pagina si apre sulla giornata di oggi.
+
+Sopra i giorni c'è la **ricerca**: scrivi un nome o un cognome, anche senza
+accenti, e negli elenchi resta solo chi corrisponde — si vede subito in quali
+giorni è in sede e in che stanza. **Solo il mio settore** fa lo stesso col tuo
+settore. I conteggi restano quelli della giornata intera: se una stanza è
+piena, lo è anche se cerchi una persona sola. I colleghi del tuo settore
+portano il pallino con le iniziali.
 
 In cima c'è una riga che dice **dove sono le stanze**, come si chiamano e
 quanti posti hanno, più gli uffici riservati a una persona sola:
@@ -123,13 +139,22 @@ quanti posti hanno, più gli uffici riservati a una persona sola:
 > (1028, cinque postazioni) e la stanza 1032 (due postazioni).
 > Dirigente Sonia Sanzo — stanza 2087.
 
+Se le stanze stanno in più **sedi**, la riga si divide per sede — «In via Roma
+1, …; in via Milano 5, …» — e ogni stanza porta la sua accanto al nome.
+
 Non la scrive nessuno e nessuno deve ricordarsi di aggiornarla: è l'elenco
 delle stanze messo in italiano. Si aggiunge una scrivania, si cambia un
 soprannome, e la riga cambia da sé. Se dà fastidio, si scarta con la ×.
 
 **Griglia** — persone in riga, giornate in colonna. Ogni cella dice stanza e
-scrivania, `–` per il lavoro agile, `×` per un'assenza. Si sfoglia da tastiera
-con le frecce. Il menu a tendina sceglie il periodo.
+scrivania, `–` per il lavoro agile, `×` per un'assenza, `⊗` per un'assenza
+registrata dall'organizzazione. Si sfoglia da tastiera con le frecce; sul
+telefono si apre sulla colonna di oggi. Il menu a tendina sceglie il periodo.
+La tua riga è evidenziata.
+
+Dalle preferenze scegli se **Turni** si apre sui giorni o sulla griglia.
+
+Senza rete Turni mostra l'ultima settimana guardata, e lo dice.
 
 Se non sei tu a costruire i turni, la griglia è in sola lettura, e vedi solo i
 periodi già pubblicati: una bozza è un ragionamento in corso, non una
@@ -273,27 +298,68 @@ Sotto la barra compare il resoconto: quante persone, chi è rimasto sotto la
 propria quota e perché, quali presidi non è riuscito a coprire. Un presidio
 scoperto va risolto a mano — l'applicazione lo segnala, non lo nasconde.
 
+La generazione mette **nella stessa stanza chi è dello stesso settore**, finché
+i posti lo permettono, e rigenerando lascia ciascuno dov'era quando può.
+
+### Modificare la griglia
+
+Premi **Modifica** nella barra della griglia. Fuori da questa modalità la
+griglia si legge e basta, anche per te.
+
+- **Trascinare** una cella su un'altra dello **stesso giorno** scambia le
+  giornate di due persone. Su un'altra della **stessa persona** scambia due
+  giorni: è così che si sposta lo smart da martedì a giovedì.
+- **Tasto destro** su una cella — sul telefono basta toccarla — apre il menu:
+  le stanze con quanti posti sono già presi quel giorno, *Da remoto*,
+  *Blocca* o *Sblocca*, *Registra un'assenza…*, *Dettagli…* per scegliere la
+  scrivania.
+- Le **assenze** non si trascinano e non si sovrascrivono. Quelle registrate
+  dall'organizzazione (`⊗`) si possono togliere dal menu; quelle dichiarate
+  dall'interessato (`×`) restano sue.
+
+In fondo alla griglia c'è l'**occupazione stanza per stanza**. Puoi sforare per
+un momento — sposti prima, sistemi dopo — ma la stanza diventa rossa, compare
+un conflitto da risolvere, e finché resta non si invia.
+
 ### Bloccare una cella
 
-Clicca una cella, sistema la giornata, spunta **Blocca**. Le celle bloccate
-sopravvivono a ogni rigenerazione: sono la tua ultima parola.
+Ogni cella che cambi a mano si **blocca da sola**: la generazione non la tocca
+più, è la tua ultima parola. Porta un piccolo lucchetto. **Sblocca** la
+restituisce al generatore, come se avessi cambiato idea: alla prossima
+**Genera** potrà cambiare.
 
-Portano il segno `▪`. Quelle nate da uno scambio fra colleghi portano `⇄` e
-sono bloccate anch'esse: la generazione ci lavora intorno. Se serve, si
-sbloccano come tutte le altre.
+Quelle nate da uno scambio fra colleghi portano `⇄` e sono bloccate anch'esse:
+la generazione ci lavora intorno. Se serve, si sbloccano come tutte le altre.
+
+### Registrare un'assenza per un collega
+
+Dal menu di una cella, **Registra un'assenza…**: date e causale. La persona
+riceve un avviso, la trova fra le sue assenze con la dicitura *registrata
+dall'organizzazione* e può toglierla lei stessa.
 
 Gli scambi **non ti mandano notifiche**. Il numero in alto — «*n* da scambi» —
 ti dice quanti ce ne sono nel periodo.
 
 ### Pubblicare
 
-**Invia** manda il periodo al dirigente. Se lo respinge, torna indietro con una
+**Invia** manda il periodo al dirigente, con una nota se vuoi. Con conflitti
+da risolvere non parte. Se il dirigente lo respinge, torna indietro con la sua
 nota. Se lo approva, viene pubblicato e tutte le persone programmate ricevono
 un avviso.
 
-Dopo la pubblicazione si può ancora correggere: una modifica apre una nuova
-versione, che richiede una motivazione e va riapprovata. Alla ripubblicazione
-l'avviso arriva **soltanto** a chi ha almeno una giornata cambiata.
+### Rivedere un periodo pubblicato
+
+Su un periodo pubblicato, **Modifica** apre una **revisione**: una copia su cui
+lavorare con tutto quanto sopra, mentre i colleghi continuano a vedere la
+versione pubblicata. Una riga in cima te lo ricorda. Quando hai finito,
+**Richiedi approvazione**, con una nota facoltativa; oppure **Scarta
+revisione** e non è successo niente.
+
+Finché la revisione è aperta **gli scambi fra colleghi sono sospesi** su quel
+periodo: rischierebbero di cambiare una giornata che stai rifacendo.
+
+Approvata, la revisione diventa la nuova versione. L'avviso arriva **soltanto**
+a chi ha almeno una giornata cambiata, e «Cosa è cambiato» mostra cosa.
 
 Ogni versione precedente resta conservata per intero.
 
@@ -305,8 +371,9 @@ Oltre a tutto quanto sopra:
 
 ### Approvare
 
-I periodi inviati arrivano nel centro notifiche. Aprili, guarda la griglia, poi
-**Pubblica** oppure **Respingi** con una nota che spieghi cosa non va.
+I periodi inviati arrivano nel centro notifiche, con la nota di chi li ha
+preparati. Aprili, guarda la griglia, poi **Pubblica** oppure **Respingi** con
+una nota che spieghi cosa non va. Una revisione si approva allo stesso modo.
 
 Solo tu puoi pubblicare, anche se hai delegato la costruzione.
 
@@ -325,8 +392,8 @@ Solo tu puoi pubblicare, anche se hai delegato la costruzione.
 - **Scambio dei turni** — interruttore e ora limite per la giornata in corso.
   Attivo di norma, con taglio alle 10:00.
 - **Stanze e scrivanie** — solo per il dirigente dell'unità che le possiede. Si
-  creano, si modificano — **codice** (`101`), **soprannome** (`Sala nord`) e
-  **piano** — e si eliminano. La capienza di una stanza è il numero di scrivanie
+  creano, si modificano — **codice** (`101`), **soprannome** (`Sala nord`),
+  **piano** e **sede** (`via Roma 1`) — e si eliminano. La capienza di una stanza è il numero di scrivanie
   attive: si aggiunge o si disattiva una scrivania, e la capienza segue.
   Una stanza già comparsa in una programmazione non si elimina: si **disattiva**,
   così esce dai conti e dalle proposte future senza cancellare il passato.

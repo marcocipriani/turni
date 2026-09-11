@@ -63,23 +63,35 @@ Turni fa quel lavoro sapendo tutte e quattro le cose.
 
 - **Programma per periodi** — una settimana, un mese, quattro settimane. Bozza,
   approvazione del dirigente, pubblicazione, versioni conservate per intero.
-- **Genera una proposta** e la lascia correggere. Le celle bloccate a mano
-  sopravvivono a ogni rigenerazione.
+  Un periodo pubblicato si rivede in una **revisione** che i colleghi non
+  vedono finché il dirigente non la approva.
+- **Genera una proposta** e la lascia correggere: trascinando due persone nello
+  stesso giorno o due giorni della stessa persona, col tasto destro — o col
+  tocco, sul telefono — su una cella. Una modifica a mano si blocca da sola e
+  sopravvive a ogni rigenerazione; sbloccata, torna al generatore. La
+  generazione tiene insieme nella stessa stanza chi è dello stesso settore.
 - **Non supera mai la capienza**: la capienza di una stanza è il numero di
   scrivanie attive, non un numero scritto da qualche parte che qualcuno deve
-  ricordarsi di aggiornare.
+  ricordarsi di aggiornare. A mano si può sforare per un momento, stanza per
+  stanza la griglia lo segna in rosso, e finché resta non si chiede
+  l'approvazione. Le stanze possono stare in **sedi** diverse.
 - **Copre i settori a presidio** prima di distribuire il resto.
 - **Assenze dichiarate dagli interessati**, anche ricorrenti, anche su
   programmazioni già pubblicate. Il calendario pubblicato non si riscrive da
-  solo: chi organizza viene avvisato.
+  solo: chi organizza viene avvisato. Chi organizza può registrarne una per un
+  collega, che lo viene a sapere; quelle dichiarate dall'interessato non le
+  tocca nessun altro.
 - **Scambio di turni fra colleghi** senza passare da nessuna approvazione, ma
   solo dove i conti tornano: presidio, postazioni, limiti di lavoro agile.
 - **Stampa** su carta o PDF: griglia del periodo, giorno per giorno, calendario
   personale, occupazione delle stanze.
 - **Notifiche** in applicazione e push del browser. Nessuna posta elettronica.
-- **Funziona senza rete**: installata sul telefono, apre le tue giornate anche
-  in garage, dicendo a quando risalgono. Delle giornate conservate ci sono solo
-  le proprie, e uscendo si cancellano.
+  Per chi lo chiede, un promemoria la sera prima di una giornata in sede.
+- **Funziona senza rete**: installata sul telefono, apre le tue giornate e chi
+  c'è in sede anche in garage, dicendo a quando risalgono. Delle assenze altrui
+  sul telefono non arriva mai una causale, e uscendo si cancella tutto.
+- **Parte da dove preferisci**: ciascuno sceglie se Turni si apre sui giorni o
+  sulla griglia, e quali filtri di Mio partono accesi.
 - **Fatta per il telefono quanto per il monitor**: scala tipografica propria
   sotto i 640px, bersagli da polpastrello, giorni che si sfogliano col dito e
   vibrazione di conferma dove il sistema la offre.
@@ -225,6 +237,18 @@ stampa una volta sola una password diversa per ciascuno. Il resto delle
 tabelle si carica con `npm run importa`, a partire dai
 [modelli](docs/modelli/).
 
+Il promemoria della sera lo lancia il cron del pannello di hosting, una volta
+al giorno, domenica compresa:
+
+```
+0 16 * * * cd ~/turni && npm run promemoria >> ~/turni/promemoria.log 2>&1
+```
+
+Il cron del server gira in UTC: `0 16` sono le 18 italiane con l'ora legale,
+d'inverno le 17. Per le 18 tutto l'anno si può mettere `0 16,17 * * *`: il
+secondo lancio non manda niente a chi l'ha già ricevuto. Aggiornando da una
+versione precedente, `npm run migra` aggiunge le colonne nuove.
+
 ## Documentazione
 
 - [Manuale d'uso](docs/MANUALE.md) — per tutti, con le parti dedicate a
@@ -249,6 +273,7 @@ Prima versione completa e provata. Rinviato per scelta, non per dimenticanza:
   collo di bottiglia è il DOM, non più il server
 - fasce orarie infragiornaliere e stanze condivise fra unità
 - accesso con identità istituzionale e importazione dal sistema del personale
+- server MCP locale per operare su Turni interrogando un assistente AI
 
 ## Licenza
 
