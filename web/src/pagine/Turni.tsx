@@ -47,6 +47,8 @@ export default function Turni() {
   const [nuovoAperto, setNuovoAperto] = useState(false)
   const [cambiamentiAperti, setCambiamentiAperti] = useState(false)
   const [respingiAperto, setRespingiAperto] = useState(false)
+  const [cerca, setCerca] = useState('')
+  const [soloSettore, setSoloSettore] = useState(false)
   // Una settimana: è la domanda che si fa entrando — «questa settimana chi
   // c'è» — e a una sola le colonne si allargano invece di scorrere.
   const [settimane, setSettimane] = useState(1)
@@ -255,6 +257,20 @@ export default function Turni() {
             </div>
 
             <span className="text-sm text-ink-muted">{finestra(inizio, settimane)}</span>
+
+            <input
+              type="search" value={cerca} onChange={(e) => setCerca(e.target.value)}
+              placeholder="Cerca una persona" aria-label="Cerca una persona"
+              className="min-h-[32px] w-full rounded-r2 border border-border-controllo bg-bg px-2 text-sm text-ink
+                         max-sm:min-h-[44px] sm:w-44"
+            />
+            {utente.sectorId != null && (
+              <label className="flex cursor-pointer items-center gap-1.5 text-sm text-ink-muted">
+                <input type="checkbox" className="size-3.5 cursor-pointer" checked={soloSettore}
+                       onChange={(e) => { vibra(); setSoloSettore(e.target.checked) }} />
+                Solo il mio settore
+              </label>
+            )}
           </>
         )}
 
@@ -318,7 +334,8 @@ export default function Turni() {
             e.preventDefault(); e.stopPropagation()
           }}
         >
-          <Giorni settimane={settimane} da={inizio} raggruppa={raggruppaGiorni} />
+          <Giorni settimane={settimane} da={inizio} raggruppa={raggruppaGiorni}
+                  filtro={{ testo: cerca, settore: soloSettore ? utente.sectorId : null }} />
         </div>
       )}
 
