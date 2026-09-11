@@ -8,9 +8,10 @@ import { type ISODate, weekKey, weekday, workingDays } from '../lib/dates'
 import { avvisa } from '../lib/notify'
 import { generate, type Persona, type Stanza } from '../generate'
 import {
-  type Albero, mascheraCella, puoApprovare, puoLeggereUnita, puoProgrammare, puoVedereCausale,
+  type Albero, type Attore, mascheraCella, puoApprovare, puoLeggereUnita, puoProgrammare, puoVedereCausale,
   radice, unitaDiProgrammazione,
 } from '../permissions'
+import { sforamenti } from '../lib/capienza'
 import { celleIstantanea, confronta, programmazioneNuova } from '../lib/differenze'
 import { giorniIndisponibili, giorniIndisponibiliDettaglio } from './absences'
 import { personeDellUnita, type PersonaUnita } from './org'
@@ -112,6 +113,15 @@ function validazioni(ctx: Contesto, p: typeof schema.period.$inferSelect) {
       const coperto = presenti.some((c) => ctx.persone.find((u) => u.id === c.userId)?.sectorId === s.id)
       if (!coperto) avvisi.push({ gravita: 'attenzione', data: g, messaggio: `${g}: settore ${s.nome} senza presidio` })
     }
+  }
+
+  // Stanza per stanza: il totale del giorno può tornare anche con una stanza
+  // piena oltre le scrivanie e un'altra vuota.
+  const etichette = new Map(ctx.stanzeRighe.map((s) => [s.id, s.etichetta]))
+  const conEtichetta = ctx.stanze.map((s) => ({ ...s, etichetta: etichette.get(s.roomId) ?? String(s.roomId) }))
+  for (const x of sforamenti(ctx.celle, conEtichetta, ctx.giorni)) {
+    avvisi.push({ gravita: 'errore', data: x.data,
+                  messaggio: `${x.data}: stanza ${x.etichetta} con ${x.presenti} persone per ${x.capienza} postazioni` })
   }
 
   for (const c of ctx.celle) {
@@ -340,51 +350,71 @@ periods.get('/:id/griglia', async (c) => {
 
 /* ── Modifica di una cella ──────────────────────────────────────── */
 
+const CellaIn = z.object({
+  userId: z.number().int(), data: ISO,
+  stato: z.enum(['presenza', 'smart']),
+  roomId: z.number().int().nullable().default(null),
+  deskId: z.number().int().nullable().default(null),
+  // Una modifica a mano si blocca da sola: la generazione non la rifà.
+  // Sbloccarla la restituisce al generatore, come se si fosse cambiata idea.
+  bloccata: z.boolean().default(true),
+})
+type CellaIn = z.infer<typeof CellaIn>
+
+/**
+ * Scrive una o più celle in una transazione: uno scambio fra due persone non
+ * resta mai a metà. Su un'assenza non si programma — nemmeno a mano.
+ */
+async function scriviCelle(p: typeof schema.period.$inferSelect, a: Attore, alb: Albero,
+                           celle: CellaIn[], motivazione: string | null) {
+  if (!puoProgrammare(a, p.unitId)) throw vietato()
+  // Il pubblicato non si tocca: lo si rivede nel suo gemello, che i colleghi non vedono.
+  if (p.stato === 'pubblicato') throw new HttpError(409, 'Per modificare un periodo pubblicato apri una revisione')
+
+  const persone = new Set((await personeDellUnita(alb, p.unitId)).map((u) => u.id))
+  for (const x of celle) {
+    if (!persone.has(x.userId)) throw new HttpError(422, 'Persona fuori da questa programmazione')
+    if (x.data < p.dataInizio || x.data > p.dataFine) throw new HttpError(422, 'Giornata fuori dal periodo')
+  }
+  const date = celle.map((x) => x.data).sort()
+  const assenze = await giorniIndisponibili([...new Set(celle.map((x) => x.userId))], date[0]!, date.at(-1)!)
+  if (celle.some((x) => assenze.has(`${x.userId}|${x.data}`))) {
+    throw new HttpError(409, 'Su un\'assenza non si programma')
+  }
+
+  await db.transaction(async (tx) => {
+    for (const x of celle) {
+      const valori = {
+        stato: x.stato,
+        roomId: x.stato === 'presenza' ? x.roomId : null,
+        deskId: x.stato === 'presenza' ? x.deskId : null,
+        bloccata: x.bloccata, origine: 'manuale' as const, motivazione,
+      }
+      await tx.insert(schema.assignment).values({ periodId: p.id, userId: x.userId, data: x.data, ...valori })
+        .onDuplicateKeyUpdate({ set: valori })
+    }
+  })
+  if (motivazione) {
+    await traccia({ entita: 'period', entitaId: p.id, azione: 'modifica_manuale', utente: a.id, dopo: celle, motivazione })
+  }
+}
+
 periods.put('/:id/cella', async (c) => {
   const p = await caricaPeriodo(Number(c.req.param('id')))
-  const a = c.get('attore'), alb = c.get('albero')
-  if (!puoProgrammare(a, p.unitId)) throw vietato()
-
-  const b = z.object({
-    userId: z.number().int(), data: ISO,
-    stato: z.enum(['presenza', 'smart']),
-    roomId: z.number().int().nullable().default(null),
-    deskId: z.number().int().nullable().default(null),
-    bloccata: z.boolean().default(false),
-    motivazione: z.string().max(500).optional(),
-  }).safeParse(await c.req.json())
+  const b = CellaIn.extend({ motivazione: z.string().max(500).optional() }).safeParse(await c.req.json())
   if (!b.success) throw new HttpError(422, 'Dati della cella non validi')
+  const { motivazione, ...cella } = b.data
+  await scriviCelle(p, c.get('attore'), c.get('albero'), [cella], motivazione?.trim() || null)
+  return c.json({ ok: true })
+})
 
-  // Il pubblicato non si tocca: lo si rivede nel suo gemello, che i colleghi non vedono.
-  if (p.stato === 'pubblicato') {
-    throw new HttpError(409, 'Per modificare un periodo pubblicato apri una revisione')
-  }
-
-  const precedente = await db.select().from(schema.assignment).where(
-    and(eq(schema.assignment.periodId, p.id), eq(schema.assignment.userId, b.data.userId),
-        eq(schema.assignment.data, b.data.data)),
-  ).limit(1)
-
-  await db.insert(schema.assignment).values({
-    periodId: p.id, userId: b.data.userId, data: b.data.data, stato: b.data.stato,
-    roomId: b.data.stato === 'presenza' ? b.data.roomId : null,
-    deskId: b.data.stato === 'presenza' ? b.data.deskId : null,
-    bloccata: b.data.bloccata, origine: 'manuale', motivazione: b.data.motivazione ?? null,
-  }).onDuplicateKeyUpdate({
-    set: {
-      stato: b.data.stato,
-      roomId: b.data.stato === 'presenza' ? b.data.roomId : null,
-      deskId: b.data.stato === 'presenza' ? b.data.deskId : null,
-      bloccata: b.data.bloccata, origine: 'manuale', motivazione: b.data.motivazione ?? null,
-    },
-  })
-
-  if (b.data.motivazione) {
-    await traccia({
-      entita: 'assignment', entitaId: `${p.id}:${b.data.userId}:${b.data.data}`, azione: 'modifica_manuale',
-      utente: a.id, prima: precedente[0] ?? null, dopo: b.data, motivazione: b.data.motivazione ?? null,
-    })
-  }
+/** Più celle insieme: lo scambio trascinando, o una giornata e il suo lucchetto. */
+periods.put('/:id/celle', async (c) => {
+  const p = await caricaPeriodo(Number(c.req.param('id')))
+  const b = z.object({ celle: z.array(CellaIn).min(1).max(50), motivazione: z.string().max(500).optional() })
+    .safeParse(await c.req.json())
+  if (!b.success) throw new HttpError(422, 'Dati delle celle non validi')
+  await scriviCelle(p, c.get('attore'), c.get('albero'), b.data.celle, b.data.motivazione?.trim() || null)
   return c.json({ ok: true })
 })
 
@@ -552,9 +582,14 @@ async function applicaRevisione(gemello: typeof schema.period.$inferSelect, auto
 
 periods.post('/:id/invia', async (c) => {
   const p = await caricaPeriodo(Number(c.req.param('id')))
-  const a = c.get('attore')
+  const a = c.get('attore'), alb = c.get('albero')
   if (!puoProgrammare(a, p.unitId)) throw vietato()
   if (p.stato === 'pubblicato') throw new HttpError(409, 'Il periodo è già pubblicato')
+  // I conflitti si risolvono prima: il dirigente approva un calendario, non un problema.
+  const errori = validazioni(await contesto(p, alb), p).filter((x) => x.gravita === 'errore')
+  if (errori.length) {
+    throw new HttpError(409, `Ci sono ${errori.length} conflitti da risolvere prima di chiedere l'approvazione`)
+  }
 
   const b = z.object({ nota: z.string().max(500).optional() }).safeParse(await c.req.json().catch(() => ({})))
   const nota = b.success ? b.data.nota?.trim() || null : null
