@@ -24,6 +24,8 @@ export type Chi = {
 export type Presente = Chi & { roomId: number | null; scrivania: string | null }
 export type Stanza = {
   id: number; etichetta: string; soprannome: string | null; piano: string | null; capienza: number
+  /** L'edificio: le stanze non stanno più tutte sotto lo stesso tetto. */
+  sede?: string | null
 }
 type Giorno = {
   data: string; feriale: boolean; festivo: string | null
@@ -80,6 +82,23 @@ const descriviStanza = (s: Stanza) => s.soprannome
 /** «Primo piano» → «al primo piano»: la maiuscola sta a inizio frase, non qui. */
 const alPiano = (piano: string) => `al ${piano.slice(0, 1).toLowerCase()}${piano.slice(1)}`
 
+/** La frase di un gruppo di stanze condivise, raggruppate per piano. */
+function fraseGruppo(stanze: Stanza[]): string {
+  const n = stanze.length
+  const piani = [...new Set(stanze.map((s) => s.piano ?? ''))]
+  const quante = n === 1 ? 'L\'unica stanza disponibile è' : `Le ${aParole(n)} stanze disponibili sono`
+
+  if (piani.length === 1 && piani[0]) return `${quante} ${alPiano(piani[0])}: ${elenco(stanze.map(descriviStanza))}.`
+  if (piani.length === 1) return `${quante}: ${elenco(stanze.map(descriviStanza))}.`
+  // Più piani: il piano guida il raggruppamento, perché è il primo dato che
+  // serve a chi deve arrivarci.
+  const parti = piani.map((piano) => {
+    const dentro = elenco(stanze.filter((s) => (s.piano ?? '') === piano).map(descriviStanza))
+    return piano ? `${alPiano(piano)} ${dentro}` : `senza piano indicato ${dentro}`
+  })
+  return `${quante}: ${parti.join('; ')}.`
+}
+
 /**
  * Le frasi dell'avviso: una per le stanze condivise, una per ogni ufficio
  * riservato. Funzione pura, così la si prova senza montare niente.
@@ -88,22 +107,16 @@ export function fraseStanze(stanze: Stanza[], riservate: StanzaRiservata[] = [])
   const frasi: string[] = []
 
   if (stanze.length > 0) {
-    const n = stanze.length
-    const piani = [...new Set(stanze.map((s) => s.piano ?? ''))]
-    const quante = n === 1 ? 'L\'unica stanza disponibile è' : `Le ${aParole(n)} stanze disponibili sono`
-
-    if (piani.length === 1 && piani[0]) {
-      frasi.push(`${quante} ${alPiano(piani[0])}: ${elenco(stanze.map(descriviStanza))}.`)
-    } else if (piani.length === 1) {
-      frasi.push(`${quante}: ${elenco(stanze.map(descriviStanza))}.`)
-    } else {
-      // Più piani: il piano guida il raggruppamento, perché è il primo dato
-      // che serve a chi deve arrivarci.
-      const parti = piani.map((piano) => {
-        const dentro = elenco(stanze.filter((s) => (s.piano ?? '') === piano).map(descriviStanza))
-        return piano ? `${alPiano(piano)} ${dentro}` : `senza piano indicato ${dentro}`
-      })
-      frasi.push(`${quante}: ${parti.join('; ')}.`)
+    const sedi = [...new Set(stanze.map((s) => s.sede ?? ''))]
+    if (sedi.length <= 1) frasi.push(fraseGruppo(stanze))
+    else {
+      // Più sedi: la sede è il primo dato che serve a chi deve arrivarci, prima
+      // ancora del piano. La frase di ogni gruppo resta quella di sempre.
+      for (const sede of sedi) {
+        const gruppo = fraseGruppo(stanze.filter((s) => (s.sede ?? '') === sede))
+        const minuscola = gruppo.slice(0, 1).toLowerCase() + gruppo.slice(1)
+        frasi.push(`${sede ? `In ${sede}` : 'Senza sede indicata'}, ${minuscola}`)
+      }
     }
   }
 
@@ -343,6 +356,8 @@ function ColonnaGiorno({ giorno, oggi, primo, fissa, ioId, mioSettore, stanze, s
   const remoti = filtraGente(giorno.remoti, filtro)
   const assenti = filtraGente(giorno.assenti, filtro)
   const { gruppi, senza, libere } = perStanza(presenti, stanze)
+  // La sede accanto alla stanza serve solo quando le sedi sono più di una.
+  const piuSedi = new Set(stanze.map((s) => s.sede ?? '')).size > 1
 
   /* Il bordo separa le settimane e nient'altro: fra due giorni della stessa
      settimana non c'è niente da dividere, ci pensa l'intestazione. In verticale
@@ -392,6 +407,9 @@ function ColonnaGiorno({ giorno, oggi, primo, fissa, ioId, mioSettore, stanze, s
                   {stanza.etichetta}
                   {stanza.soprannome && (
                     <span className="ml-1 font-normal text-ink-faint">{stanza.soprannome}</span>
+                  )}
+                  {piuSedi && stanza.sede && (
+                    <span className="ml-1 font-normal text-ink-faint">· {stanza.sede}</span>
                   )}
                 </span>
                 <span className="mono shrink-0 text-2xs text-ink-faint">
