@@ -168,11 +168,15 @@ periods.get('/', async (c) => {
   // Chi non programma vede solo il pubblicato: una bozza è un ragionamento in
   // corso, non una comunicazione, e leggerla come tale fa più danno che bene.
   const soloPubblicati = !puoProgrammare(a, unitId)
-  return c.json(await db.select().from(schema.period)
+  const tutti = await db.select().from(schema.period)
     .where(soloPubblicati
       ? and(eq(schema.period.unitId, unitId), eq(schema.period.stato, 'pubblicato'))
       : eq(schema.period.unitId, unitId))
-    .orderBy(desc(schema.period.dataInizio)))
+    .orderBy(desc(schema.period.dataInizio))
+  // Il gemello non è un periodo a sé: ci si arriva dall'originale, che dice di averlo.
+  const gemelli = new Map(tutti.filter((x) => x.revisioneDi != null).map((x) => [x.revisioneDi!, x.id]))
+  return c.json(tutti.filter((x) => x.revisioneDi == null)
+    .map((x) => ({ ...x, revisione: gemelli.get(x.id) ?? null })))
 })
 
 /**
@@ -228,7 +232,7 @@ periods.post('/', async (c) => {
   // I periodi della stessa unità non si sovrappongono.
   const collisioni = await db.select({ id: schema.period.id }).from(schema.period).where(
     and(eq(schema.period.unitId, b.data.unitId), lte(schema.period.dataInizio, b.data.dataFine),
-        gte(schema.period.dataFine, b.data.dataInizio)),
+        gte(schema.period.dataFine, b.data.dataInizio), isNull(schema.period.revisioneDi)),
   )
   if (collisioni.length) throw new HttpError(409, 'Esiste già un periodo che si sovrappone a queste date')
 
@@ -351,12 +355,9 @@ periods.put('/:id/cella', async (c) => {
   }).safeParse(await c.req.json())
   if (!b.success) throw new HttpError(422, 'Dati della cella non validi')
 
-  // Una modifica su un periodo pubblicato apre una nuova versione, con motivo obbligatorio.
+  // Il pubblicato non si tocca: lo si rivede nel suo gemello, che i colleghi non vedono.
   if (p.stato === 'pubblicato') {
-    if (!b.data.motivazione?.trim()) {
-      throw new HttpError(422, 'Modificare un periodo pubblicato richiede una motivazione')
-    }
-    await nuovaVersione(p, a.id, b.data.motivazione)
+    throw new HttpError(409, 'Per modificare un periodo pubblicato apri una revisione')
   }
 
   const precedente = await db.select().from(schema.assignment).where(
@@ -378,7 +379,7 @@ periods.put('/:id/cella', async (c) => {
     },
   })
 
-  if (p.stato === 'pubblicato' || b.data.motivazione) {
+  if (b.data.motivazione) {
     await traccia({
       entita: 'assignment', entitaId: `${p.id}:${b.data.userId}:${b.data.data}`, azione: 'modifica_manuale',
       utente: a.id, prima: precedente[0] ?? null, dopo: b.data, motivazione: b.data.motivazione ?? null,
@@ -457,14 +458,96 @@ periods.post('/:id/genera', async (c) => {
 
 /* ── Approvazione e pubblicazione ───────────────────────────────── */
 
-async function nuovaVersione(p: typeof schema.period.$inferSelect, autore: number, motivo: string) {
-  const celle = await db.select().from(schema.assignment).where(eq(schema.assignment.periodId, p.id))
-  await db.insert(schema.periodSnapshot).values({
-    periodId: p.id, versione: p.versione, assegnazioni: celle as never, motivo, autore,
+/* ── Revisione di un periodo pubblicato ─────────────────────────── */
+
+periods.post('/:id/revisione', async (c) => {
+  const p = await caricaPeriodo(Number(c.req.param('id')))
+  const a = c.get('attore')
+  if (!puoProgrammare(a, p.unitId)) throw vietato()
+  if (p.stato !== 'pubblicato' || p.revisioneDi != null) {
+    throw new HttpError(409, 'Si apre una revisione solo su un periodo pubblicato')
+  }
+  const esistente = async () => (await db.select({ id: schema.period.id }).from(schema.period)
+    .where(eq(schema.period.revisioneDi, p.id)).limit(1))[0]
+  const gia = await esistente()
+  if (gia) return c.json({ id: gia.id })
+
+  try {
+    const id = await db.transaction(async (tx) => {
+      const [ins] = await tx.insert(schema.period).values({
+        unitId: p.unitId, dataInizio: p.dataInizio, dataFine: p.dataFine, versione: p.versione,
+        assegnaScrivanie: p.assegnaScrivanie, smartMinSettimana: p.smartMinSettimana,
+        smartMaxSettimana: p.smartMaxSettimana, creatoDa: a.id, revisioneDi: p.id,
+      })
+      const celle = await tx.select().from(schema.assignment).where(eq(schema.assignment.periodId, p.id))
+      if (celle.length) {
+        await tx.insert(schema.assignment).values(celle.map(({ id: _, ...x }) => ({ ...x, periodId: ins.insertId })))
+      }
+      return ins.insertId
+    })
+    await traccia({ entita: 'period', entitaId: p.id, azione: 'apri_revisione', utente: a.id, dopo: { gemello: id } })
+    return c.json({ id }, 201)
+  } catch (e) {
+    // Due organizzatori nello stesso istante: l'indice unico ne lascia passare uno.
+    const vinto = await esistente()
+    if (vinto) return c.json({ id: vinto.id })
+    throw e
+  }
+})
+
+/** Scartare una revisione: il gemello sparisce, l'originale non è mai stato toccato. */
+periods.delete('/:id', async (c) => {
+  const p = await caricaPeriodo(Number(c.req.param('id')))
+  const a = c.get('attore')
+  if (!puoProgrammare(a, p.unitId)) throw vietato()
+  if (p.revisioneDi == null) throw new HttpError(409, 'Si scarta solo una revisione')
+  await db.transaction(async (tx) => {
+    await tx.delete(schema.assignment).where(eq(schema.assignment.periodId, p.id))
+    await tx.delete(schema.period).where(eq(schema.period.id, p.id))
   })
-  await db.update(schema.period)
-    .set({ versione: p.versione + 1, stato: 'in_approvazione' })
-    .where(eq(schema.period.id, p.id))
+  await traccia({ entita: 'period', entitaId: p.revisioneDi, azione: 'scarta_revisione', utente: a.id })
+  return c.json({ ok: true, originale: p.revisioneDi })
+})
+
+/**
+ * Il gemello approvato diventa la nuova versione dell'originale: istantanea di
+ * quella in vigore, celle sostituite, versione avanti, gemello eliminato. Tutto
+ * in una transazione: a metà strada i colleghi vedrebbero un periodo vuoto.
+ */
+async function applicaRevisione(gemello: typeof schema.period.$inferSelect, autore: number, alb: Albero) {
+  const orig = await caricaPeriodo(gemello.revisioneDi!)
+  const prima = await db.select().from(schema.assignment).where(eq(schema.assignment.periodId, orig.id))
+  const dopo = await db.select().from(schema.assignment).where(eq(schema.assignment.periodId, gemello.id))
+  const adesso = new Date()
+
+  await db.transaction(async (tx) => {
+    await tx.insert(schema.periodSnapshot).values({
+      periodId: orig.id, versione: orig.versione, assegnazioni: prima as never,
+      motivo: gemello.notaRichiesta, autore,
+    })
+    await tx.delete(schema.assignment).where(eq(schema.assignment.periodId, orig.id))
+    if (dopo.length) {
+      await tx.insert(schema.assignment).values(dopo.map(({ id: _, ...x }) => ({ ...x, periodId: orig.id })))
+    }
+    await tx.delete(schema.assignment).where(eq(schema.assignment.periodId, gemello.id))
+    await tx.delete(schema.period).where(eq(schema.period.id, gemello.id))
+    await tx.update(schema.period).set({
+      versione: orig.versione + 1, pubblicatoDa: autore, aggiornatoIl: adesso, notaApprovazione: null,
+    }).where(eq(schema.period.id, orig.id))
+  })
+
+  // Solo chi ha una giornata diversa riceve l'avviso: gli altri non hanno
+  // niente da riguardare.
+  const toccati = [...new Set(confronta(celleIstantanea(prima), celleIstantanea(dopo)).map((x) => x.userId))]
+  const inForza = new Set((await personeDellUnita(alb, orig.unitId)).map((u) => u.id))
+  const destinatari = toccati.filter((id) => inForza.has(id))
+  await avvisa(destinatari, {
+    tipo: 'revisione_pubblicata', titolo: 'La tua programmazione è cambiata',
+    corpo: `Periodo ${orig.dataInizio} – ${orig.dataFine}.`, link: '/mio',
+  })
+  await traccia({ entita: 'period', entitaId: orig.id, azione: 'pubblica_revisione', utente: autore,
+                  dopo: { versione: orig.versione + 1 } })
+  return { ok: true, destinatari: destinatari.length, id: orig.id }
 }
 
 periods.post('/:id/invia', async (c) => {
@@ -473,15 +556,19 @@ periods.post('/:id/invia', async (c) => {
   if (!puoProgrammare(a, p.unitId)) throw vietato()
   if (p.stato === 'pubblicato') throw new HttpError(409, 'Il periodo è già pubblicato')
 
-  await db.update(schema.period).set({ stato: 'in_approvazione' }).where(eq(schema.period.id, p.id))
+  const b = z.object({ nota: z.string().max(500).optional() }).safeParse(await c.req.json().catch(() => ({})))
+  const nota = b.success ? b.data.nota?.trim() || null : null
+  await db.update(schema.period).set({ stato: 'in_approvazione', notaRichiesta: nota })
+    .where(eq(schema.period.id, p.id))
   const [dir] = await db.select({ id: schema.user.id }).from(schema.user)
     .where(and(eq(schema.user.unitId, p.unitId), eq(schema.user.ruolo, 'dirigente'))).limit(1)
   if (dir) {
+    const revisione = p.revisioneDi != null
     await avvisa([dir.id], {
       tipo: 'periodo_in_approvazione',
-      titolo: 'Programmazione da approvare',
-      corpo: `Periodo ${p.dataInizio} – ${p.dataFine} in attesa della tua approvazione.`,
-      link: `/programmazione/${p.id}`,
+      titolo: revisione ? 'Revisione da approvare' : 'Programmazione da approvare',
+      corpo: `Periodo ${p.dataInizio} – ${p.dataFine} in attesa della tua approvazione.${nota ? ` Nota: ${nota}` : ''}`,
+      link: revisione ? `/turni/${p.id}` : `/programmazione/${p.id}`,
     })
   }
   await traccia({ entita: 'period', entitaId: p.id, azione: 'invia_approvazione', utente: a.id })
@@ -512,6 +599,7 @@ periods.post('/:id/approva', async (c) => {
   const a = c.get('attore'), alb = c.get('albero')
   if (!puoApprovare(a, p.unitId)) throw vietato('Solo il dirigente approva')
   if (p.stato !== 'in_approvazione') throw new HttpError(409, 'Il periodo non è in approvazione')
+  if (p.revisioneDi != null) return c.json(await applicaRevisione(p, a.id, alb))
 
   // La prima data di pubblicazione non si riscrive: una revisione aggiorna il
   // periodo, non lo fa nascere una seconda volta.

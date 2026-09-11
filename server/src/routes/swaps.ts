@@ -34,6 +34,13 @@ async function periodoDi(alb: Albero, ruolo: 'admin' | 'dirigente' | 'dipendente
   return p ?? null
 }
 
+/** Una revisione aperta riscriverà queste celle: uno scambio adesso andrebbe perso. */
+async function inRevisione(periodId: number) {
+  const [g] = await db.select({ id: schema.period.id }).from(schema.period)
+    .where(eq(schema.period.revisioneDi, periodId)).limit(1)
+  return Boolean(g)
+}
+
 /**
  * Il contesto di verifica di un periodo: stato programmato, assenze, presidio,
  * capienza, limiti settimanali e celle già impegnate.
@@ -221,6 +228,9 @@ swaps.post('/', async (c) => {
 
   const p = await periodoDi(alb, a.ruolo, a.unitId, b.data.dataProponente)
   if (!p) throw invalido('Quella giornata non è in un periodo pubblicato')
+  if (await inRevisione(p.id)) {
+    throw new HttpError(409, 'Programmazione in revisione: gli scambi riaprono dopo l\'approvazione')
+  }
 
   const { ctx, persone } = await contestoScambio(p, alb)
   if (!persone.some((u) => u.id === b.data.destinatarioId)) {
@@ -280,6 +290,9 @@ swaps.post('/:id/accetta', async (c) => {
 
   const [p] = await db.select().from(schema.period).where(eq(schema.period.id, s.periodId)).limit(1)
   if (!p || p.stato !== 'pubblicato') throw new HttpError(409, 'Il periodo non è più pubblicato')
+  if (await inRevisione(p.id)) {
+    throw new HttpError(409, 'Programmazione in revisione: gli scambi riaprono dopo l\'approvazione')
+  }
 
   // Si rivalida tutto: fra la proposta e l'accettazione il mondo può essere
   // cambiato — un'assenza dichiarata, un altro scambio accettato, la griglia

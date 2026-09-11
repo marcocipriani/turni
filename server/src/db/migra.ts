@@ -41,6 +41,9 @@ async function colonna(tabella: string, nome: string, ddl: string) {
   console.log(`  + ${tabella}.${nome}`)
 }
 
+const indiceEsiste = (t: string, i: string) =>
+  esiste('SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?', t, i)
+
 async function tabella(nome: string, ddl: string) {
   if (await tabellaEsiste(nome)) return
   await db.execute(sql.raw(ddl))
@@ -149,6 +152,14 @@ async function main() {
 
   // Assenze registrate da chi programma, per conto di un collega.
   await colonna('absence', 'registrata_da', '`registrata_da` int DEFAULT NULL')
+
+  // Le revisioni di un periodo pubblicato: il gemello e la nota di richiesta.
+  await colonna('period', 'revisione_di', '`revisione_di` int DEFAULT NULL')
+  await colonna('period', 'nota_richiesta', '`nota_richiesta` varchar(500) DEFAULT NULL')
+  if (!(await indiceEsiste('period', 'uk_period_revisione'))) {
+    await db.execute(sql.raw('ALTER TABLE `period` ADD UNIQUE INDEX `uk_period_revisione` (`revisione_di`)'))
+    console.log('  + period.uk_period_revisione')
+  }
 
   console.log('Fatto.')
   await pool.end()
