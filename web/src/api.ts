@@ -88,6 +88,12 @@ export type Periodo = {
   pubblicatoIl: string | null
   /** Ultima pubblicazione, cioè la data della versione in corso. */
   aggiornatoIl: string | null
+  /** Questo periodo è la revisione in corso di quello indicato. */
+  revisioneDi: number | null
+  /** Nota di chi ha chiesto l'approvazione. */
+  notaRichiesta: string | null
+  /** Solo nell'elenco: la revisione aperta di questo periodo, se c'è. */
+  revisione?: number | null
 }
 
 export type Cella = {

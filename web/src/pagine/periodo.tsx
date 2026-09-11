@@ -65,12 +65,13 @@ export function EditorCella({ dati, selezione, abilitato, onSalvato }: {
     setStato(cella?.stato === 'presenza' ? 'presenza' : 'smart')
     setRoomId(cella?.roomId ?? dati.stanze[0]?.id ?? null)
     setDeskId(cella?.deskId ?? null)
-    setBloccata(cella?.bloccata ?? false)
+    // Salvare a mano è una modifica a mano: parte bloccata. Per restituirla al
+    // generatore si toglie la spunta.
+    setBloccata(true)
     setMotivazione(''); setErrore(null)
   }, [selezione.userId, selezione.data, cella?.stato, cella?.roomId, cella?.deskId, cella?.bloccata, dati.stanze])
 
   if (!persona) return null
-  const pubblicato = dati.periodo.stato === 'pubblicato'
   const stanza = dati.stanze.find((s) => s.id === roomId)
 
   async function salva(e: FormEvent<HTMLFormElement>) {
@@ -101,7 +102,11 @@ export function EditorCella({ dati, selezione, abilitato, onSalvato }: {
       )}
 
       {!abilitato ? (
-        <p className="text-base text-ink-faint">Non hai i permessi per modificare questa programmazione.</p>
+        <p className="text-base text-ink-faint">
+          {dati.permessi.scrivere
+            ? 'Per cambiarla premi «Modifica» nella barra della griglia.'
+            : 'Non hai i permessi per modificare questa programmazione.'}
+        </p>
       ) : (
         <form onSubmit={salva} className="flex flex-col gap-4">
           {errore && <Messaggio tono="errore">{errore}</Messaggio>}
@@ -142,16 +147,14 @@ export function EditorCella({ dati, selezione, abilitato, onSalvato }: {
             <input type="checkbox" className="mt-1" checked={bloccata} onChange={(e) => setBloccata(e.target.checked)} />
             <span>
               Blocca la cella
-              <span className="block text-sm text-ink-faint">La generazione non la tocca più.</span>
+              <span className="block text-sm text-ink-faint">La generazione non la tocca. Toglila per restituirla al generatore.</span>
             </span>
           </label>
 
-          {pubblicato && (
-            <Campo etichetta="Motivazione" aiuto="Il periodo è pubblicato: la modifica apre una nuova versione da riapprovare.">
-              <textarea className={`${inputCls} min-h-[56px] resize-y`} rows={3} required
-                        value={motivazione} onChange={(e) => setMotivazione(e.target.value)} />
-            </Campo>
-          )}
+          <Campo etichetta="Motivazione" aiuto="Facoltativa: resta nello storico.">
+            <textarea className={`${inputCls} min-h-[56px] resize-y`} rows={2}
+                      value={motivazione} onChange={(e) => setMotivazione(e.target.value)} />
+          </Campo>
 
           <Bottone type="submit" variante="primario" className="justify-center">Salva</Bottone>
         </form>
@@ -201,6 +204,58 @@ export function ModaleNota({ titolo, etichetta, aperta, obbligatoria, conferma, 
         <Campo etichetta={etichetta} aiuto={obbligatoria ? undefined : 'Facoltativa.'}>
           <textarea className={`${inputCls} min-h-[80px] resize-y`} rows={3} maxLength={500}
                     value={nota} onChange={(e) => setNota(e.target.value)} />
+        </Campo>
+      </div>
+    </Modale>
+  )
+}
+
+/** Un'assenza registrata per un collega, dal menu della griglia. */
+export function ModaleAssenzaPerConto({ persona, data, aperta, onChiudi, onFatto }: {
+  persona: { id: number; nome: string; cognome: string } | null
+  data: string; aperta: boolean; onChiudi: () => void; onFatto: () => void
+}) {
+  const [causali, setCausali] = useState<{ codice: string; etichetta: string }[]>([])
+  const [causale, setCausale] = useState('')
+  const [dal, setDal] = useState(data)
+  const [al, setAl] = useState(data)
+  const [errore, setErrore] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!aperta) return
+    setDal(data); setAl(data); setErrore(null)
+    void api.get<{ codice: string; etichetta: string }[]>('/assenze/causali')
+      .then((c) => { setCausali(c); setCausale((x) => x || (c[0]?.codice ?? '')) })
+  }, [aperta, data])
+
+  async function registra() {
+    if (!persona) return
+    try {
+      await api.post('/assenze', { userId: persona.id, dataInizio: dal, dataFine: al, causale })
+      onFatto(); onChiudi()
+    } catch (e) { setErrore(e instanceof ErroreApi ? e.message : 'Registrazione non riuscita.') }
+  }
+
+  return (
+    <Modale titolo={`Assenza per ${persona ? `${persona.nome} ${persona.cognome}` : ''}`} aperta={aperta} onChiudi={onChiudi}
+            piede={<><Bottone onClick={onChiudi}>Annulla</Bottone>
+                     <Bottone variante="primario" onClick={() => void registra()}>Registra</Bottone></>}>
+      <div className="flex flex-col gap-3">
+        {errore && <Messaggio tono="errore">{errore}</Messaggio>}
+        <Messaggio tono="info">La persona riceve un avviso. Nella griglia l'assenza compare come ⊗.</Messaggio>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Campo etichetta="Dal">
+            <input type="date" className={inputCls} value={dal}
+                   onChange={(e) => { setDal(e.target.value); if (al < e.target.value) setAl(e.target.value) }} />
+          </Campo>
+          <Campo etichetta="Al">
+            <input type="date" className={inputCls} value={al} min={dal} onChange={(e) => setAl(e.target.value)} />
+          </Campo>
+        </div>
+        <Campo etichetta="Causale">
+          <select className={inputCls} value={causale} onChange={(e) => setCausale(e.target.value)}>
+            {causali.map((c) => <option key={c.codice} value={c.codice}>{c.etichetta}</option>)}
+          </select>
         </Campo>
       </div>
     </Modale>

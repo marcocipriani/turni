@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Cella, Persona } from '../api'
-import { descriviCella } from './Griglia'
+import { descriviCella, scambio } from './Griglia'
 
 const p: Persona = { id: 1, nome: 'Elena', cognome: 'Marchetti', ruolo: 'dipendente', unitId: 2, sectorId: 1, comeDirigenteDi: null }
 const cella = (over: Partial<Cella>): Cella => ({
@@ -35,5 +35,29 @@ describe('etichetta testuale della cella', () => {
       .toBe('Marchetti Elena, mer 9 settembre, assenza dichiarata, causale ferie')
     expect(descriviCella(p, '2026-09-09', cella({ stato: 'assenza' }), null, null))
       .toBe('Marchetti Elena, mer 9 settembre, assenza dichiarata')
+  })
+})
+
+describe('scambio trascinando', () => {
+  const a = cella({ userId: 1, data: '2026-09-14', stato: 'presenza', roomId: 3, deskId: 9 })
+  const b = cella({ userId: 2, data: '2026-09-14', stato: 'smart' })
+
+  it('in verticale scambia le giornate di due persone, e le blocca', () => {
+    expect(scambio(a, b)).toEqual([
+      { userId: 1, data: '2026-09-14', stato: 'smart', roomId: null, deskId: null, bloccata: true },
+      { userId: 2, data: '2026-09-14', stato: 'presenza', roomId: 3, deskId: 9, bloccata: true },
+    ])
+  })
+  it('in orizzontale sposta lo smart della stessa persona, senza portarsi dietro la scrivania', () => {
+    const c = cella({ userId: 1, data: '2026-09-16', stato: 'smart' })
+    expect(scambio(a, c)).toEqual([
+      { userId: 1, data: '2026-09-14', stato: 'smart', roomId: null, deskId: null, bloccata: true },
+      { userId: 1, data: '2026-09-16', stato: 'presenza', roomId: 3, deskId: null, bloccata: true },
+    ])
+  })
+  it('non tocca le assenze né incrocia persone e giorni diversi', () => {
+    expect(scambio(a, cella({ userId: 2, data: '2026-09-14', stato: 'assenza' }))).toBeNull()
+    expect(scambio(a, cella({ userId: 2, data: '2026-09-15', stato: 'smart' }))).toBeNull()
+    expect(scambio(a, a)).toBeNull()
   })
 })

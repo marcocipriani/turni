@@ -6,7 +6,7 @@ import { periodoDiRiferimento } from './periodo'
 const p = (id: number, dataInizio: string, dataFine: string): Periodo => ({
   id, unitId: 1, dataInizio, dataFine, stato: 'pubblicato', versione: 1, assegnaScrivanie: false,
   smartMinSettimana: null, smartMaxSettimana: null, notaApprovazione: null,
-  pubblicatoIl: null, aggiornatoIl: null,
+  pubblicatoIl: null, aggiornatoIl: null, revisioneDi: null, notaRichiesta: null,
 })
 
 // L'elenco arriva dal server ordinato per data di inizio decrescente.

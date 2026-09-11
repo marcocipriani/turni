@@ -23,8 +23,40 @@ export function descriviCella(p: Persona, iso: string, c: Cella | undefined, sta
 
 type Selezione = { userId: number; data: string } | null
 
-export default function Griglia({ dati, onSeleziona, selezione, raggruppa = true, ioId }: {
+export type CellaModifica = {
+  userId: number; data: string; stato: 'presenza' | 'smart'
+  roomId: number | null; deskId: number | null; bloccata: boolean
+}
+
+/**
+ * Cosa succede lasciando una cella su un'altra. Stesso giorno: due persone si
+ * scambiano la giornata. Stessa persona: si scambiano due giorni, che è come si
+ * sposta lo smart. La scrivania viaggia solo nello stesso giorno — in un altro
+ * giorno potrebbe essere di qualcun altro. Le assenze non si toccano.
+ */
+export function scambio(a: Cella, b: Cella): CellaModifica[] | null {
+  if (a.stato === 'assenza' || b.stato === 'assenza') return null
+  const stessoGiorno = a.data === b.data && a.userId !== b.userId
+  const stessaPersona = a.userId === b.userId && a.data !== b.data
+  if (!stessoGiorno && !stessaPersona) return null
+  const prende = (chi: Cella, da: Cella): CellaModifica => ({
+    userId: chi.userId, data: chi.data, stato: da.stato === 'presenza' ? 'presenza' : 'smart',
+    roomId: da.stato === 'presenza' ? da.roomId : null,
+    deskId: da.stato === 'presenza' && stessoGiorno ? da.deskId : null,
+    bloccata: true,
+  })
+  return [prende(a, b), prende(b, a)]
+}
+
+export default function Griglia({
+  dati, onSeleziona, selezione, raggruppa = true, ioId, modifica = false, onCambia, onMenu,
+}: {
   dati: DatiGriglia
+  /** Modalità modifica: trascinamento e menu. Fuori, la griglia si legge e basta. */
+  modifica?: boolean
+  onCambia?: (celle: CellaModifica[]) => void
+  /** Menu di una cella: alla posizione del tasto destro, o senza posizione col tocco. */
+  onMenu?: (s: { userId: number; data: string }, posizione: { x: number; y: number } | null) => void
   /** La propria riga si trova senza cercarla, come nei giorni. */
   ioId?: number
   selezione: Selezione
@@ -35,6 +67,8 @@ export default function Griglia({ dati, onSeleziona, selezione, raggruppa = true
   const [fuoco, setFuoco] = useState({ riga: 0, colonna: 0 })
   const tabella = useRef<HTMLTableElement>(null)
   const contenitore = useRef<HTMLDivElement>(null)
+  // La cella che si sta trascinando: condivisa fra le righe, che sono memoizzate.
+  const trascinata = useRef<Cella | null>(null)
 
   /* Un periodo di quattro settimane non sta in uno schermo: si apre dove si è,
      non al primo lunedì. La colonna dei nomi è appiccicata e copre quello che
@@ -86,6 +120,16 @@ export default function Griglia({ dati, onSeleziona, selezione, raggruppa = true
   const nomi = useMemo(() => etichette(dati.persone), [dati.persone])
   const capienza = dati.stanze.reduce((s, r) => s + r.capienza, 0)
 
+  const occupazioneStanza = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const c of dati.celle) {
+      if (c.stato !== 'presenza' || c.roomId == null) continue
+      const k = `${c.data}|${c.roomId}`
+      m.set(k, (m.get(k) ?? 0) + 1)
+    }
+    return m
+  }, [dati.celle])
+
   const occupazione = useMemo(() => {
     const m = new Map<string, number>()
     for (const c of dati.celle) if (c.stato === 'presenza') m.set(c.data, (m.get(c.data) ?? 0) + 1)
@@ -116,7 +160,10 @@ export default function Griglia({ dati, onSeleziona, selezione, raggruppa = true
   }
 
   return (
-    <div ref={contenitore} className="min-h-0 overflow-auto">
+    // `relative`: il testo per i lettori di schermo è posizionato in assoluto, e
+    // senza un riferimento qui dentro sfuggirebbe allo scorrimento — sul telefono
+    // allargava la pagina a tutta la griglia, e una finestra si apriva di lato.
+    <div ref={contenitore} className="relative min-h-0 overflow-auto">
       <table ref={tabella} className="border-separate border-spacing-0" onKeyDown={tasti}>
         <caption className="solo-lettori-schermo">
           Programmazione dal {dati.periodo.dataInizio} al {dati.periodo.dataFine}.
@@ -178,6 +225,7 @@ export default function Griglia({ dati, onSeleziona, selezione, raggruppa = true
                     stanzaBreve={stanzaBreve} scrivaniaNumero={scrivaniaNumero}
                     selezione={selezione} rigaIndice={rigaIndice} fuoco={fuoco}
                     onSeleziona={onSeleziona} onFuoco={setFuoco}
+                    modifica={modifica} trascinata={trascinata} onCambia={onCambia} onMenu={onMenu}
                   />
                 )
               })}
@@ -185,10 +233,12 @@ export default function Griglia({ dati, onSeleziona, selezione, raggruppa = true
           ))}
         </tbody>
 
-        <tfoot>
+        {/* Il piede resta in fondo tutto insieme: righe appiccicate una per una
+            si fermerebbero tutte allo stesso punto, una sopra l'altra. */}
+        <tfoot className="sticky bottom-0 z-[3]">
           <tr>
             <th scope="row"
-                className="sticky bottom-0 left-0 z-[3] border-r border-t border-border-controllo bg-surface px-2.5 py-1.5
+                className="sticky left-0 z-[3] border-r border-t border-border-controllo bg-surface px-2.5 py-1.5
                            text-left text-xs font-normal text-ink-muted">
               Postazioni occupate <span className="mono text-ink-faint">su {capienza}</span>
             </th>
@@ -196,7 +246,7 @@ export default function Griglia({ dati, onSeleziona, selezione, raggruppa = true
               const n = occupazione.get(g) ?? 0
               return (
                 <td key={g}
-                    className={`sticky bottom-0 z-[1] border-r border-t border-border-controllo bg-surface px-1 py-1.5
+                    className={`border-r border-t border-border-controllo bg-surface px-1 py-1.5
                                 text-center text-ink-muted`}>
                   <span className="mono text-xs" aria-hidden="true">{n}</span>
                   <span className="solo-lettori-schermo">{`${n} di ${capienza} postazioni occupate il ${g}`}</span>
@@ -204,6 +254,28 @@ export default function Griglia({ dati, onSeleziona, selezione, raggruppa = true
               )
             })}
           </tr>
+          {/* Stanza per stanza: il totale può tornare con una stanza oltre le
+              scrivanie e un'altra vuota. Rosso quando si sfora, pieno al limite. */}
+          {dati.stanze.filter((s) => s.capienza > 0).map((s) => (
+            <tr key={s.id}>
+              <th scope="row"
+                  className="sticky left-0 z-[3] border-r border-border bg-surface px-2.5 py-1
+                             text-left text-2xs font-normal text-ink-faint">
+                {s.etichetta} <span className="mono">/{s.capienza}</span>
+              </th>
+              {dati.giorni.map((g) => {
+                const n = occupazioneStanza.get(`${g}|${s.id}`) ?? 0
+                const tono = n > s.capienza ? 'bg-danger-wash text-danger-ink font-semibold'
+                  : n === s.capienza ? 'bg-surface text-ink font-semibold' : 'bg-surface text-ink-faint'
+                return (
+                  <td key={g} className={`mono border-r border-border px-1 py-1 text-center text-2xs ${tono}`}>
+                    <span aria-hidden="true">{n}</span>
+                    <span className="solo-lettori-schermo">{`${n} di ${s.capienza} nella stanza ${s.etichetta} il ${g}`}</span>
+                  </td>
+                )
+              })}
+            </tr>
+          ))}
         </tfoot>
       </table>
     </div>
@@ -213,7 +285,7 @@ export default function Griglia({ dati, onSeleziona, selezione, raggruppa = true
 /** Memoizzata: con 500 persone la selezione di una cella non ridisegna tutto. */
 const RigaPersona = memo(function RigaPersona({
   persona: p, etichetta, breve, io, giorni, indice, stanzaBreve, scrivaniaNumero, selezione, rigaIndice, fuoco,
-  onSeleziona, onFuoco,
+  onSeleziona, onFuoco, modifica, trascinata, onCambia, onMenu,
 }: {
   persona: Persona
   etichetta: string
@@ -228,7 +300,12 @@ const RigaPersona = memo(function RigaPersona({
   fuoco: { riga: number; colonna: number }
   onSeleziona: (s: Selezione) => void
   onFuoco: (f: { riga: number; colonna: number }) => void
+  modifica: boolean
+  trascinata: React.MutableRefObject<Cella | null>
+  onCambia?: (celle: CellaModifica[]) => void
+  onMenu?: (s: { userId: number; data: string }, posizione: { x: number; y: number } | null) => void
 }) {
+  const SOPRA = ['outline', 'outline-2', '-outline-offset-2', 'outline-ink']
   const dispari = rigaIndice % 2 === 1
   // Stessi segnali della propria riga nei giorni: fondo, peso, filetto.
   const fondo = io ? 'bg-surface-2' : dispari ? 'bg-[color-mix(in_oklch,var(--surface)_50%,var(--bg))]' : 'bg-bg'
@@ -264,13 +341,41 @@ const RigaPersona = memo(function RigaPersona({
               className={`h-[30px] border-b border-r border-border p-0
                           ${lunedi ? 'border-l-2 border-l-border-strong' : ''}
                           ${fondo}`}
-              style={scelta ? { boxShadow: 'inset 2px 0 0 var(--ink)' } : undefined}>
+              style={scelta ? { boxShadow: 'inset 2px 0 0 var(--ink)' } : undefined}
+              onDragOver={(e) => {
+                const da = trascinata.current
+                if (!modifica || !da || !c || !scambio(da, c)) return
+                e.preventDefault(); e.currentTarget.classList.add(...SOPRA)
+              }}
+              onDragLeave={(e) => e.currentTarget.classList.remove(...SOPRA)}
+              onDrop={(e) => {
+                e.currentTarget.classList.remove(...SOPRA)
+                const da = trascinata.current
+                trascinata.current = null
+                const esito = da && c ? scambio(da, c) : null
+                if (!esito) return
+                e.preventDefault(); onCambia?.(esito)
+              }}>
             <button
               type="button"
               data-cella={`${p.id}|${g}`}
               tabIndex={rigaIndice === fuoco.riga && ci === fuoco.colonna ? 0 : -1}
               onFocus={() => onFuoco({ riga: rigaIndice, colonna: ci })}
-              onClick={() => onSeleziona({ userId: p.id, data: g })}
+              draggable={modifica && c != null && c.stato !== 'assenza'}
+              onDragStart={(e) => {
+                trascinata.current = c ?? null
+                e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', '')
+              }}
+              onDragEnd={() => { trascinata.current = null }}
+              onContextMenu={(e) => {
+                if (!modifica) return
+                e.preventDefault(); onMenu?.({ userId: p.id, data: g }, { x: e.clientX, y: e.clientY })
+              }}
+              onClick={() => {
+                // Sul telefono non c'è tasto destro: in modifica il tocco apre il menu.
+                if (modifica && matchMedia('(pointer: coarse)').matches) onMenu?.({ userId: p.id, data: g }, null)
+                else onSeleziona({ userId: p.id, data: g })
+              }}
               aria-pressed={scelta}
               className={`h-[30px] w-full cursor-pointer px-1 text-center text-[11px] sm:text-[12.5px] leading-none
                           transition-colors duration-[120ms] ease-out hover:bg-surface-2 ${testo}`}
@@ -280,7 +385,9 @@ const RigaPersona = memo(function RigaPersona({
                   : c?.stato === 'assenza' ? (c.perConto ? '⊗' : '×') : '–'}
               </span>
               {c?.bloccata && (
-                <span className="ml-0.5 text-ink-faint" aria-hidden="true">{c.daScambio ? '⇄' : '▪'}</span>
+                <span className="ml-0.5 text-ink-faint" aria-hidden="true">
+                  {c.daScambio ? '⇄' : <I.Lucchetto size={9} className="inline-block align-[-1px]" />}
+                </span>
               )}
               <span className="solo-lettori-schermo">{descriviCella(p, g, c, stanza, scrivania)}</span>
             </button>
@@ -300,7 +407,9 @@ export function Legenda() {
       <li className="inline-flex items-center gap-1.5"><I.Remoto size={13} /><span className="mono">–</span>da remoto</li>
       <li className="inline-flex items-center gap-1.5"><I.Croce size={13} /><span className="mono">×</span>assenza dichiarata</li>
       <li className="inline-flex items-center gap-1.5"><span className="mono">⊗</span>assenza registrata dall'organizzazione</li>
-      <li><span className="mr-1.5 text-ink-faint">▪</span>cella bloccata: la generazione non la tocca</li>
+      <li className="inline-flex items-center gap-1.5">
+        <I.Lucchetto size={11} className="text-ink-faint" />bloccata: la generazione non la tocca, sbloccata torna al generatore
+      </li>
       <li><span className="mr-1.5 text-ink-faint">⇄</span>scambio fra colleghi</li>
     </ul>
   )
