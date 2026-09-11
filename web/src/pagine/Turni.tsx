@@ -19,7 +19,9 @@ import { ModaleCambiamenti } from './cambiamenti'
 import { Giorni } from './Giorni'
 import Griglia, { Legenda } from './Griglia'
 import { AvvisoNovita, quando } from './novita'
-import { EditorCella, type EsitoGenerazione, EsitoProposta, NuovoPeriodo, periodoDiRiferimento, StatoPeriodo } from './periodo'
+import {
+  EditorCella, type EsitoGenerazione, EsitoProposta, ModaleNota, NuovoPeriodo, periodoDiRiferimento, StatoPeriodo,
+} from './periodo'
 
 const gg = (iso: string) => `${iso.slice(8)}/${iso.slice(5, 7)}`
 
@@ -44,6 +46,7 @@ export default function Turni() {
   const [esito, setEsito] = useState<EsitoGenerazione | null>(null)
   const [nuovoAperto, setNuovoAperto] = useState(false)
   const [cambiamentiAperti, setCambiamentiAperti] = useState(false)
+  const [respingiAperto, setRespingiAperto] = useState(false)
   // Una settimana: è la domanda che si fa entrando — «questa settimana chi
   // c'è» — e a una sola le colonne si allargano invece di scorrere.
   const [settimane, setSettimane] = useState(1)
@@ -163,11 +166,7 @@ export default function Turni() {
             <>
               <Comando variante="distruttivo" titolo="Rimanda indietro" stato={azione.statoDi('respingi')} disabled={azione.inCorso}
                        icona={<I.Croce size={15} />}
-                       onClick={() => void azione.esegui(async () => {
-                         const nota = prompt('Perché lo rimandi indietro?')
-                         if (!nota) return
-                         await api.post(`/periodi/${p.id}/respingi`, { nota }); await caricaGriglia(p.id)
-                       }, 'respingi')}>Respingi</Comando>
+                       onClick={() => setRespingiAperto(true)}>Respingi</Comando>
               <Comando variante="primario" titolo="Approva e pubblica" stato={azione.statoDi('pubblica')} disabled={azione.inCorso} icona={<I.Spunta size={15} />}
                        onClick={() => void azione.esegui(async () => {
                          await api.post(`/periodi/${p.id}/approva`); await caricaGriglia(p.id); await caricaPeriodi()
@@ -361,6 +360,18 @@ export default function Turni() {
             </Drawer>
           )}
         </div>
+      )}
+
+      {p && (
+        <ModaleNota
+          titolo="Rimanda indietro" etichetta="Perché lo rimandi indietro?" obbligatoria
+          conferma="Respingi" variante="distruttivo"
+          aperta={respingiAperto} onChiudi={() => setRespingiAperto(false)}
+          onConferma={async (nota) => {
+            await api.post(`/periodi/${p.id}/respingi`, { nota })
+            await caricaGriglia(p.id); await caricaPeriodi()
+          }}
+        />
       )}
 
       <NuovoPeriodo
