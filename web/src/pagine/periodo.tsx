@@ -160,6 +160,53 @@ export function EditorCella({ dati, selezione, abilitato, onSalvato }: {
   )
 }
 
+/**
+ * Una nota da scrivere prima di un'azione sul periodo. Sostituisce `prompt()`,
+ * che sul telefono è un riquadro di sistema senza stile e senza «annulla»
+ * leggibile. Obbligatoria per il rinvio, facoltativa per la richiesta.
+ */
+export function ModaleNota({ titolo, etichetta, aperta, obbligatoria, conferma, variante = 'primario', onChiudi, onConferma }: {
+  titolo: string
+  etichetta: string
+  aperta: boolean
+  obbligatoria: boolean
+  conferma: string
+  variante?: 'primario' | 'distruttivo'
+  onChiudi: () => void
+  onConferma: (nota: string) => Promise<void>
+}) {
+  const [nota, setNota] = useState('')
+  const [errore, setErrore] = useState<string | null>(null)
+  const [inCorso, setInCorso] = useState(false)
+  useEffect(() => { if (aperta) { setNota(''); setErrore(null) } }, [aperta])
+
+  // Il server vuole almeno tre caratteri per un rinvio: lo si dice qui prima.
+  const valida = !obbligatoria || nota.trim().length >= 3
+
+  async function invia() {
+    setInCorso(true); setErrore(null)
+    try { await onConferma(nota.trim()); onChiudi() }
+    catch (e) { setErrore(e instanceof ErroreApi ? e.message : 'Operazione non riuscita.') }
+    finally { setInCorso(false) }
+  }
+
+  return (
+    <Modale titolo={titolo} aperta={aperta} onChiudi={onChiudi}
+            piede={<>
+              <Bottone onClick={onChiudi}>Annulla</Bottone>
+              <Bottone variante={variante} disabled={!valida || inCorso} onClick={() => void invia()}>{conferma}</Bottone>
+            </>}>
+      <div className="flex flex-col gap-3">
+        {errore && <Messaggio tono="errore">{errore}</Messaggio>}
+        <Campo etichetta={etichetta} aiuto={obbligatoria ? undefined : 'Facoltativa.'}>
+          <textarea className={`${inputCls} min-h-[80px] resize-y`} rows={3} maxLength={500}
+                    value={nota} onChange={(e) => setNota(e.target.value)} />
+        </Campo>
+      </div>
+    </Modale>
+  )
+}
+
 export function NuovoPeriodo({ aperto, onChiudi, unitId, periodi, onCreato }: {
   aperto: boolean; onChiudi: () => void; unitId: number; periodi: Periodo[]; onCreato: (id: number) => void
 }) {
