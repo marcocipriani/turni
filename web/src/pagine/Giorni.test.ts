@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  type Chi, didascalieSettore, fraseStanze, ordinaPersone, perStanza, type Presente, type Stanza,
+  type Chi, didascalieSettore, filtraGente, fraseStanze, ordinaPersone, perStanza, type Presente, type Stanza,
   type StanzaRiservata,
 } from './Giorni'
 
@@ -151,5 +151,25 @@ describe('didascalie di settore in un elenco raggruppato', () => {
 
   it('chiama «Senza settore» anche un settore che non esiste più', () => {
     expect(didascalieSettore(gente(99), settori)).toEqual(['Senza settore'])
+  })
+})
+
+describe('filtro delle persone', () => {
+  const gente = [chi(1, 'Rossi', 'Niccolò', 1), chi(2, 'Bianchi', 'Elena', 2), chi(3, 'Rossetti', 'Marco', null)]
+
+  it('senza filtro restituisce tutti', () => {
+    expect(filtraGente(gente, { testo: '', settore: null })).toHaveLength(3)
+  })
+  it('cerca nel cognome e nel nome, senza maiuscole né accenti', () => {
+    expect(filtraGente(gente, { testo: 'ross', settore: null }).map((p) => p.userId)).toEqual([1, 3])
+    expect(filtraGente(gente, { testo: 'NICCOLO', settore: null }).map((p) => p.userId)).toEqual([1])
+    expect(filtraGente(gente, { testo: 'rossi nic', settore: null }).map((p) => p.userId)).toEqual([1])
+    expect(filtraGente(gente, { testo: 'niccolò rossi', settore: null }).map((p) => p.userId)).toEqual([1])
+  })
+  it('tiene solo il settore indicato', () => {
+    expect(filtraGente(gente, { testo: '', settore: 2 }).map((p) => p.userId)).toEqual([2])
+  })
+  it('combina testo e settore', () => {
+    expect(filtraGente(gente, { testo: 'ross', settore: 1 }).map((p) => p.userId)).toEqual([1])
   })
 })

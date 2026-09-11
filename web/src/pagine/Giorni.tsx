@@ -145,6 +145,22 @@ export function ordinaPersone<T extends Chi>(
   })
 }
 
+export type Filtro = { testo: string; settore: number | null }
+
+/** «Niccolò» e «niccolo» sono la stessa ricerca: via maiuscole e accenti. */
+const piega = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+
+/**
+ * Chi resta negli elenchi con un filtro acceso. Si cerca in «nome cognome» e
+ * in «cognome nome»: la gente scrive nell'ordine in cui pensa il collega.
+ */
+export function filtraGente<T extends Chi>(gente: T[], f: Filtro): T[] {
+  const t = piega(f.testo.trim())
+  return gente.filter((p) =>
+    (f.settore == null || p.sectorId === f.settore)
+    && (!t || piega(`${p.nome} ${p.cognome}`).includes(t) || piega(`${p.cognome} ${p.nome}`).includes(t)))
+}
+
 /**
  * I presenti divisi per stanza. Le stanze restano nell'ordine in cui sono
  * censite — quello che chi lavora lì ha in testa — e quelle vuote si contano
@@ -181,12 +197,16 @@ export function didascalieSettore(
   })
 }
 
-export function Giorni({ settimane, da, raggruppa = false, onCaricato }: {
+const NESSUN_FILTRO: Filtro = { testo: '', settore: null }
+
+export function Giorni({ settimane, da, raggruppa = false, filtro = NESSUN_FILTRO, onCaricato }: {
   settimane: number
   /** Primo giorno da mostrare. Chi chiama decide dove si è, così le frecce funzionano. */
   da: string
   /** Spezza gli elenchi per settore. Spento: un elenco solo, per cognome. */
   raggruppa?: boolean
+  /** Ricerca e settore: restringono gli elenchi, non la giornata. */
+  filtro?: Filtro
   onCaricato?: (d: DatiGiorni | null) => void
 }) {
   const { utente } = useSessione()
@@ -274,7 +294,7 @@ export function Giorni({ settimane, da, raggruppa = false, onCaricato }: {
                 key={g.data} giorno={g} oggi={g.data === oggiISO()} primo={i === 0}
                 fissa={!unaSettimana}
                 ioId={utente?.id ?? -1} mioSettore={utente?.sectorId ?? null}
-                stanze={dati.stanze} settori={settori} raggruppa={raggruppa}
+                stanze={dati.stanze} settori={settori} raggruppa={raggruppa} filtro={filtro}
               />
             ))}
           </div>
@@ -289,7 +309,7 @@ export function Giorni({ settimane, da, raggruppa = false, onCaricato }: {
 }
 
 /** Una giornata: intestazione, occupazione, chi c'è e dove, chi non c'è. */
-function ColonnaGiorno({ giorno, oggi, primo, fissa, ioId, mioSettore, stanze, settori, raggruppa }: {
+function ColonnaGiorno({ giorno, oggi, primo, fissa, ioId, mioSettore, stanze, settori, raggruppa, filtro }: {
   giorno: Giorno
   oggi: boolean
   primo: boolean
@@ -300,10 +320,17 @@ function ColonnaGiorno({ giorno, oggi, primo, fissa, ioId, mioSettore, stanze, s
   stanze: Stanza[]
   settori: Map<number, string>
   raggruppa: boolean
+  filtro: Filtro
 }) {
   const { giorno: g, mese, breve, lunedi } = pezziData(giorno.data)
   const ordina = <T extends Chi>(gente: T[]) => ordinaPersone(gente, raggruppa ? 'settore' : 'cognome', settori)
-  const { gruppi, senza, libere } = perStanza(giorno.presenti, stanze)
+  /* Il filtro restringe gli elenchi; la barra e il conteggio restano quelli
+     della giornata intera, perché «c'è posto domani» non dipende da chi cerco. */
+  const attivo = filtro.testo.trim() !== '' || filtro.settore != null
+  const presenti = filtraGente(giorno.presenti, filtro)
+  const remoti = filtraGente(giorno.remoti, filtro)
+  const assenti = filtraGente(giorno.assenti, filtro)
+  const { gruppi, senza, libere } = perStanza(presenti, stanze)
 
   /* Il bordo separa le settimane e nient'altro: fra due giorni della stessa
      settimana non c'è niente da dividere, ci pensa l'intestazione. In verticale
@@ -344,7 +371,7 @@ function ColonnaGiorno({ giorno, oggi, primo, fissa, ioId, mioSettore, stanze, s
         <div className="flex flex-col gap-2">
           <Titolo><I.Sede size={12} />In sede</Titolo>
           {gruppi.length === 0 && senza.length === 0 && (
-            <p className="px-1.5 text-sm text-ink-faint">Nessuno in sede.</p>
+            <p className="px-1.5 text-sm text-ink-faint">{attivo ? 'Nessuna corrispondenza in sede.' : 'Nessuno in sede.'}</p>
           )}
           {gruppi.map(({ stanza, dentro }) => (
             <div key={stanza.id}>
@@ -356,7 +383,7 @@ function ColonnaGiorno({ giorno, oggi, primo, fissa, ioId, mioSettore, stanze, s
                   )}
                 </span>
                 <span className="mono shrink-0 text-2xs text-ink-faint">
-                  {dentro.length}/{stanza.capienza}
+                  {giorno.presenti.filter((x) => x.roomId === stanza.id).length}/{stanza.capienza}
                 </span>
               </p>
               <Elenco gente={ordina(dentro)} ioId={ioId} mioSettore={mioSettore} scrivanie
@@ -370,7 +397,9 @@ function ColonnaGiorno({ giorno, oggi, primo, fissa, ioId, mioSettore, stanze, s
                       settori={raggruppa ? settori : undefined} />
             </div>
           )}
-          {libere.length > 0 && (
+          {/* Col filtro acceso una stanza «libera» è solo una stanza senza
+              corrispondenze: dirlo sarebbe falso. */}
+          {!attivo && libere.length > 0 && (
             <p className="px-1.5 text-2xs text-ink-faint"
                title={`Libere: ${libere.map((s) => s.etichetta).join(', ')}`}>
               {libere.length === 1 ? '1 stanza libera' : `${libere.length} stanze libere`}
@@ -378,31 +407,31 @@ function ColonnaGiorno({ giorno, oggi, primo, fissa, ioId, mioSettore, stanze, s
           )}
         </div>
 
-        {giorno.remoti.length > 0 && (
+        {remoti.length > 0 && (
           // Chi è in sede e chi non c'è sono due domande diverse: il filetto
           // dice dove finisce l'una e comincia l'altra, senza fare da bordo
           // fra le giornate — quello resta il segno della settimana.
           <div className="border-t border-border pt-2">
-            <Titolo><I.Remoto size={12} />Da remoto <span className="mono font-normal">{giorno.remoti.length}</span></Titolo>
-            <Elenco gente={ordina(giorno.remoti)} ioId={ioId} mioSettore={mioSettore}
+            <Titolo><I.Remoto size={12} />Da remoto <span className="mono font-normal">{remoti.length}</span></Titolo>
+            <Elenco gente={ordina(remoti)} ioId={ioId} mioSettore={mioSettore}
                     settori={raggruppa ? settori : undefined} />
           </div>
         )}
 
-        {giorno.assenti.length > 0 && (
+        {assenti.length > 0 && (
           // Richiuso di suo: chi manca è l'informazione meno urgente della
           // giornata, e il dettaglio nativo la apre senza una riga di stato.
-          <details className="group border-t border-border pt-2">
+          <details open={attivo || undefined} className="group border-t border-border pt-2">
             <summary className="mono cursor-pointer list-none px-1.5 [&::-webkit-details-marker]:hidden text-2xs uppercase tracking-[0.06em] text-ink-faint hover:text-ink">
               <I.Freccia size={11} className="mr-1 inline-block transition-transform duration-[120ms] group-open:rotate-90" />
               <I.Croce size={11} className="mr-1 inline-block" />
-              Assenze <span className="mono">{giorno.assenti.length}</span>
+              Assenze <span className="mono">{assenti.length}</span>
             </summary>
             {/* Solo il contenuto si dissolve: l'altezza cambia di colpo, ed è
                 voluto — animare un'altezza fa rifare il layout a ogni
                 fotogramma, e qui di giornate ce ne sono cinque per volta. */}
             <div className="entra">
-              <Elenco gente={ordina(giorno.assenti)} ioId={ioId} mioSettore={mioSettore}
+              <Elenco gente={ordina(assenti)} ioId={ioId} mioSettore={mioSettore}
                       settori={raggruppa ? settori : undefined} />
             </div>
           </details>
