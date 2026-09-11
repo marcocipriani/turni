@@ -49,7 +49,7 @@ export function Vista({ titolo, icona, aiuto, meta, azioni, caricando, denso, ch
 /** Manipolazione della vista: tab, filtri, conteggi. Mai import o export. */
 export function Toolbar({ children }: { children: ReactNode }) {
   return (
-    <div className="non-stampare sticky top-0 z-[200] flex flex-wrap items-center gap-2 border-b border-border bg-bg px-4 py-2">
+    <div data-barra className="non-stampare sticky top-0 z-[200] flex flex-wrap items-center gap-2 border-b border-border bg-bg px-4 py-2">
       {children}
     </div>
   )

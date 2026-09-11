@@ -1,9 +1,10 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, getConEta } from '../api'
-import { descriviSettimana, lunediDi, oggiISO, pezziData } from '../date'
+import { descriviSettimana, esteso, lunediDi, oggiISO, pezziData } from '../date'
 import * as I from '../icone'
 import { Avatar, FilaAvatar, perEsteso } from '../persone'
+import { useSessione } from '../sessione'
 import { SegnoStato, STATI, type Stato } from '../stati'
 import { vibra } from '../tocco'
 import { Bottone, Chip, Messaggio, Scheletro, stileBottone, StatoVuoto, Tag } from '../ui'
@@ -75,6 +76,7 @@ type ElencoScambi = { inArrivo: Proposta[]; inUscita: Proposta[]; conclusi: Prop
 
 export default function Mio() {
   const navigate = useNavigate()
+  const { utente } = useSessione()
   const [dati, setDati] = useState<DatiMio | null>(null)
   const [scambi, setScambi] = useState<ElencoScambi | null>(null)
   const [errore, setErrore] = useState<string | null>(null)
@@ -133,6 +135,14 @@ export default function Mio() {
              aria-label="Scarica il tuo calendario in CSV" className={stileBottone('icona')}>
             <I.Scarica size={17} />
           </a>
+          {/* L'immagine è quella che si vede: con i filtri accesi, solo quelle
+              giornate. È il formato che si manda in chat o si tiene in galleria. */}
+          <Bottone variante="icona" title="Scarica come immagine (PNG)" aria-label="Scarica come immagine (PNG)"
+                   disabled={visibili.length === 0}
+                   onClick={() => void immagine(visibili, stanzaPerId, utente ? perEsteso(utente) : '')
+                     .catch((e) => setErrore(e.message))}>
+            <I.Immagine size={17} />
+          </Bottone>
           <Bottone variante="icona" title="Stampa il tuo calendario" aria-label="Stampa il tuo calendario"
                    onClick={() => navigate('/stampa/mio')}>
             <I.Stampa size={17} />
@@ -369,4 +379,82 @@ function Colleghi({ titolo, gente, stanze, settori }: {
       </ul>
     </>
   )
+}
+
+/* ── Il calendario come immagine ──────────────────────────────────── */
+
+/**
+ * «In sede · 101 · scriv. 3», «Assenza · Ferie»: la riga dell'immagine a
+ * parole, uguale al foglio di stampa. Pura, così la si prova senza canvas.
+ */
+export function rigaImmagine(g: GiornoMio, stanze: Map<number, { etichetta: string }>): [string, string] {
+  const stato = STATI[g.stato].etichetta + (g.stato === 'assenza' && g.causale ? ` · ${g.causale}` : '')
+  if (g.stato !== 'presenza') return [stato, '']
+  const stanza = g.roomId != null ? stanze.get(g.roomId)?.etichetta : undefined
+  return [stato, `${stanza ?? 'da assegnare'}${g.scrivania ? ` · scriv. ${g.scrivania}` : ''}`]
+}
+
+/**
+ * Disegnata a mano su un canvas: niente libreria che fotografa il DOM per
+ * un elenco di righe. Sul telefono passa dal foglio di condivisione — «Salva
+ * immagine» o dritta in chat —, altrove si scarica.
+ */
+async function immagine(giorni: GiornoMio[], stanze: Map<number, { etichetta: string }>, chi: string) {
+  // ponytail: tavolozza chiara fissa, non il tema — un'immagine inoltrata si
+  // legge su sfondi che non conosciamo. Leggere i token se servisse lo scuro.
+  const C = { fondo: '#ffffff', ink: '#16181d', muted: '#5b606b', faint: '#8a8f99', bordo: '#e4e6ea', fascia: '#f3f4f6' }
+  const SANS = 'Inter, system-ui, sans-serif', MONO = "'JetBrains Mono', ui-monospace, monospace"
+  await Promise.all([`400 14px ${SANS}`, `600 14px ${SANS}`, `400 14px ${MONO}`].map((f) => document.fonts.load(f)))
+
+  const L = 640, M = 28, TESTA = 92, RIGA = 38, SETT = 28
+  const settimane = giorni.filter((g, i) => i === 0 || lunediDi(g.data) !== lunediDi(giorni[i - 1]!.data)).length
+  const H = TESTA + settimane * SETT + giorni.length * RIGA + M
+  const k = 2
+  const canvas = document.createElement('canvas')
+  canvas.width = L * k; canvas.height = H * k
+  const x = canvas.getContext('2d')!
+  x.scale(k, k)
+  x.fillStyle = C.fondo; x.fillRect(0, 0, L, H)
+  x.textBaseline = 'middle'
+
+  const testo = (t: string, px: number, py: number, font: string, colore: string, destra = false) => {
+    x.font = font; x.fillStyle = colore; x.textAlign = destra ? 'right' : 'left'; x.fillText(t, px, py)
+  }
+
+  testo('TURNI', M, 30, `400 11px ${MONO}`, C.faint)
+  testo(`Calendario di ${chi}`, M, 54, `600 20px ${SANS}`, C.ink)
+  testo(`al ${esteso(oggiISO())}`, L - M, 30, `400 11px ${MONO}`, C.faint, true)
+
+  let y = TESTA
+  const oggi = oggiISO()
+  giorni.forEach((g, i) => {
+    if (i === 0 || lunediDi(g.data) !== lunediDi(giorni[i - 1]!.data)) {
+      x.fillStyle = C.fascia; x.fillRect(0, y, L, SETT)
+      testo(descriviSettimana(g.data).toUpperCase(), M, y + SETT / 2, `400 10.5px ${MONO}`, C.faint)
+      y += SETT
+    }
+    const { giorno, mese, breve } = pezziData(g.data)
+    const [stato, dove] = rigaImmagine(g, stanze)
+    if (g.data === oggi) { x.fillStyle = C.ink; x.fillRect(0, y, 3, RIGA) }
+    testo(String(giorno), M, y + RIGA / 2, `600 16px ${MONO}`, g.stato === 'assenza' ? C.faint : C.ink)
+    testo(`${breve} ${mese}`, M + 30, y + RIGA / 2, `400 12px ${SANS}`, C.faint)
+    testo(stato, M + 110, y + RIGA / 2, `${g.stato === 'presenza' ? 600 : 400} 14px ${SANS}`,
+          g.stato === 'presenza' ? C.ink : g.stato === 'smart' ? C.muted : C.faint)
+    if (dove) testo(dove, L - M, y + RIGA / 2, `400 13px ${MONO}`, C.muted, true)
+    y += RIGA
+    x.fillStyle = C.bordo; x.fillRect(0, y - 1, L, 1)
+  })
+
+  const blob = await new Promise<Blob | null>((ok) => canvas.toBlob(ok, 'image/png'))
+  if (!blob) throw new Error('Non sono riuscito a creare l\'immagine.')
+  const file = new File([blob], `turni-${oggi}.png`, { type: 'image/png' })
+
+  if (navigator.canShare?.({ files: [file] })) {
+    // Chiudere il foglio di condivisione non è un errore.
+    await navigator.share({ files: [file] }).catch((e) => { if (e?.name !== 'AbortError') throw e })
+    return
+  }
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(file); a.download = file.name; a.click()
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000)
 }

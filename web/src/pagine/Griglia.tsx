@@ -20,8 +20,10 @@ export function descriviCella(p: Persona, iso: string, c: Cella | undefined, sta
 
 type Selezione = { userId: number; data: string } | null
 
-export default function Griglia({ dati, onSeleziona, selezione, raggruppa = true }: {
+export default function Griglia({ dati, onSeleziona, selezione, raggruppa = true, ioId }: {
   dati: DatiGriglia
+  /** La propria riga si trova senza cercarla, come nei giorni. */
+  ioId?: number
   selezione: Selezione
   onSeleziona: (s: Selezione) => void
   /** Spento: un elenco solo, nell'ordine di cognome che il server già dà. */
@@ -151,7 +153,7 @@ export default function Griglia({ dati, onSeleziona, selezione, raggruppa = true
                 const rigaIndice = righe.indexOf(p)
                 return (
                   <RigaPersona
-                    key={p.id} persona={p} etichetta={nomi.get(p.id) ?? p.cognome}
+                    key={p.id} persona={p} etichetta={nomi.get(p.id) ?? p.cognome} io={p.id === ioId}
                     giorni={dati.giorni} indice={indice}
                     stanzaBreve={stanzaBreve} scrivaniaNumero={scrivaniaNumero}
                     selezione={selezione} rigaIndice={rigaIndice} fuoco={fuoco}
@@ -190,11 +192,12 @@ export default function Griglia({ dati, onSeleziona, selezione, raggruppa = true
 
 /** Memoizzata: con 500 persone la selezione di una cella non ridisegna tutto. */
 const RigaPersona = memo(function RigaPersona({
-  persona: p, etichetta, giorni, indice, stanzaBreve, scrivaniaNumero, selezione, rigaIndice, fuoco,
+  persona: p, etichetta, io, giorni, indice, stanzaBreve, scrivaniaNumero, selezione, rigaIndice, fuoco,
   onSeleziona, onFuoco,
 }: {
   persona: Persona
   etichetta: string
+  io: boolean
   giorni: string[]
   indice: Map<string, Cella>
   stanzaBreve: Map<number, string>
@@ -206,14 +209,18 @@ const RigaPersona = memo(function RigaPersona({
   onFuoco: (f: { riga: number; colonna: number }) => void
 }) {
   const dispari = rigaIndice % 2 === 1
+  // Stessi segnali della propria riga nei giorni: fondo, peso, filetto.
+  const fondo = io ? 'bg-surface-2' : dispari ? 'bg-[color-mix(in_oklch,var(--surface)_50%,var(--bg))]' : 'bg-bg'
   return (
     <tr className="h-[30px]">
       <th scope="row"
           className={`sticky left-0 z-[1] h-[30px] border-b border-r border-border px-2.5 text-left text-[12.5px]
-                      font-normal ${dispari ? 'bg-[color-mix(in_oklch,var(--surface)_50%,var(--bg))]' : 'bg-bg'}`}>
+                      ${io ? 'font-semibold text-ink' : 'font-normal'} ${fondo}`}
+          style={io ? { boxShadow: 'inset 2px 0 0 var(--ink)' } : undefined}>
         <span className="block max-w-[96px] truncate md:max-w-[150px]">
           {etichetta}
           {p.ruolo === 'dirigente' && <span className="ml-1 text-2xs text-ink-faint">dirig.</span>}
+          {io && <span className="solo-lettori-schermo"> (sei tu)</span>}
         </span>
       </th>
 
@@ -233,7 +240,7 @@ const RigaPersona = memo(function RigaPersona({
           <td key={g}
               className={`h-[30px] border-b border-r border-border p-0
                           ${lunedi ? 'border-l-2 border-l-border-strong' : ''}
-                          ${dispari ? 'bg-[color-mix(in_oklch,var(--surface)_50%,var(--bg))]' : 'bg-bg'}`}
+                          ${fondo}`}
               style={scelta ? { boxShadow: 'inset 2px 0 0 var(--ink)' } : undefined}>
             <button
               type="button"

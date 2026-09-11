@@ -351,7 +351,7 @@ export default function Turni() {
               {esito && <EsitoProposta esito={esito} />}
             </div>
             <Griglia dati={dati} selezione={selezione} onSeleziona={setSelezione}
-                     raggruppa={raggruppaGriglia} />
+                     raggruppa={raggruppaGriglia} ioId={utente.id} />
           </div>
 
           {selezione && (

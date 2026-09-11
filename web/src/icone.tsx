@@ -53,4 +53,5 @@ export const Cestino = (p: Props) => <Svg {...p}><path d="M4 7h16M10 4h4M6 7l1 1
 export const Presa = (p: Props) => <Svg {...p}><path d="M9 6h.01M9 12h.01M9 18h.01M15 6h.01M15 12h.01M15 18h.01" /></Svg>
 export const Albero = (p: Props) => <Svg {...p}><rect x="9" y="3" width="6" height="4" rx="1" /><rect x="3" y="17" width="6" height="4" rx="1" /><rect x="15" y="17" width="6" height="4" rx="1" /><path d="M12 7v5M6 17v-3h12v3" /></Svg>
 export const Elenco = (p: Props) => <Svg {...p}><path d="M4 6h16M8 12h12M12 18h8" /></Svg>
-export const Stampa = (p: Props) => <Svg {...p}><path d="M7 8V3h10v5" /><path d="M7 18H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2" /><rect x="7" y="14" width="10" height="7" rx="1" /></Svg>
+export const Immagine = (p: Props) => <Svg {...p}><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="9" cy="9.5" r="1.5" /><path d="m21 16-5-5-9 9" /></Svg>
+export const Stampa =(p: Props) => <Svg {...p}><path d="M7 8V3h10v5" /><path d="M7 18H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2" /><rect x="7" y="14" width="10" height="7" rx="1" /></Svg>

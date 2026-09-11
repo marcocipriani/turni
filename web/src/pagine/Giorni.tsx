@@ -8,11 +8,11 @@
  * richiuso, chi manca. L'occupazione è un dato della giornata, non del periodo:
  * «48 su 50 in tre settimane» non dice a nessuno se domani c'è posto.
  */
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
-import { addDays, lunediDi, oggiISO, pezziData } from '../date'
+import { addDays, oggiISO, pezziData } from '../date'
 import * as I from '../icone'
-import { etichette } from '../persone'
+import { Avatar } from '../persone'
 import { useSessione } from '../sessione'
 import { Badge, Messaggio, Scheletro, StatoVuoto, Tag } from '../ui'
 
@@ -205,7 +205,23 @@ export function Giorni({ settimane, da, raggruppa = false, onCaricato }: {
 
   const feriali = useMemo(() => (dati?.giorni ?? []).filter((g) => g.feriale && !g.festivo), [dati])
   const settori = useMemo(() => new Map((dati?.settori ?? []).map((s) => [s.id, s.nome])), [dati])
-  const nomi = useMemo(() => etichette(dati?.persone ?? []), [dati])
+  const radice = useRef<HTMLDivElement>(null)
+
+  /* Sul telefono le giornate si impilano, e di venerdì oggi è in fondo:
+     si parte da lì. Il lunedì no — oggi è già in cima, sotto l'avviso delle
+     stanze. La barra dei filtri è appiccicata in alto e alta quanto vanno a
+     capo i suoi controlli: si misura, così la giornata non ci finisce sotto. */
+  useEffect(() => {
+    if (!matchMedia('(max-width: 639.98px)').matches) return
+    const oggi = oggiISO()
+    const i = feriali.findIndex((g) => g.data >= oggi)
+    if (i <= 0) return
+    const el = radice.current?.querySelector<HTMLElement>(`[data-giorno="${feriali[i]!.data}"]`)
+    if (!el) return
+    const barra = document.querySelector<HTMLElement>('[data-barra]')?.offsetHeight ?? 0
+    el.style.scrollMarginTop = `${barra + 8}px`
+    el.scrollIntoView({ block: 'start' })
+  }, [feriali])
 
   if (errore) return <div className="p-4 md:p-6"><Messaggio tono="errore">{errore}</Messaggio></div>
   if (!dati) return <div className="p-4 md:p-6"><Scheletro righe={6} /></div>
@@ -238,7 +254,7 @@ export function Giorni({ settimane, da, raggruppa = false, onCaricato }: {
   }
 
   return (
-    <div className="flex flex-col gap-3 p-4 md:p-6">
+    <div ref={radice} className="flex flex-col gap-3 p-4 md:p-6">
       <AvvisoStanze stanze={dati.stanze} riservate={dati.stanzeRiservate ?? []} />
 
       <section id="giorni" className="flex flex-col gap-2">
@@ -257,8 +273,8 @@ export function Giorni({ settimane, da, raggruppa = false, onCaricato }: {
               <ColonnaGiorno
                 key={g.data} giorno={g} oggi={g.data === oggiISO()} primo={i === 0}
                 fissa={!unaSettimana}
-                ioId={utente?.id ?? -1} stanze={dati.stanze} settori={settori}
-                nomi={nomi} raggruppa={raggruppa}
+                ioId={utente?.id ?? -1} mioSettore={utente?.sectorId ?? null}
+                stanze={dati.stanze} settori={settori} raggruppa={raggruppa}
               />
             ))}
           </div>
@@ -273,16 +289,16 @@ export function Giorni({ settimane, da, raggruppa = false, onCaricato }: {
 }
 
 /** Una giornata: intestazione, occupazione, chi c'è e dove, chi non c'è. */
-function ColonnaGiorno({ giorno, oggi, primo, fissa, ioId, stanze, settori, nomi, raggruppa }: {
+function ColonnaGiorno({ giorno, oggi, primo, fissa, ioId, mioSettore, stanze, settori, raggruppa }: {
   giorno: Giorno
   oggi: boolean
   primo: boolean
   /** Colonna di larghezza fissa: serve quando le giornate scorrono in orizzontale. */
   fissa: boolean
   ioId: number
+  mioSettore: number | null
   stanze: Stanza[]
   settori: Map<number, string>
-  nomi: Map<number, string>
   raggruppa: boolean
 }) {
   const { giorno: g, mese, breve, lunedi } = pezziData(giorno.data)
@@ -299,6 +315,7 @@ function ColonnaGiorno({ giorno, oggi, primo, fissa, ioId, stanze, settori, nomi
   return (
     <section
       aria-label={`${breve} ${g} ${mese}`}
+      data-giorno={giorno.data}
       className={`flex min-w-0 flex-col ${fissa ? 'sm:w-[188px] sm:shrink-0' : ''} ${settimana}
                   ${oggi ? 'bg-bg' : ''}`}
       style={oggi ? { boxShadow: 'inset 0 2px 0 var(--ink)' } : undefined}
@@ -342,14 +359,14 @@ function ColonnaGiorno({ giorno, oggi, primo, fissa, ioId, stanze, settori, nomi
                   {dentro.length}/{stanza.capienza}
                 </span>
               </p>
-              <Elenco gente={ordina(dentro)} nomi={nomi} ioId={ioId} scrivanie
+              <Elenco gente={ordina(dentro)} ioId={ioId} mioSettore={mioSettore} scrivanie
                       settori={raggruppa ? settori : undefined} />
             </div>
           ))}
           {senza.length > 0 && (
             <div>
               <p className="px-1.5 text-sm font-semibold text-ink-muted">Senza stanza</p>
-              <Elenco gente={ordina(senza)} nomi={nomi} ioId={ioId}
+              <Elenco gente={ordina(senza)} ioId={ioId} mioSettore={mioSettore}
                       settori={raggruppa ? settori : undefined} />
             </div>
           )}
@@ -367,7 +384,7 @@ function ColonnaGiorno({ giorno, oggi, primo, fissa, ioId, stanze, settori, nomi
           // fra le giornate — quello resta il segno della settimana.
           <div className="border-t border-border pt-2">
             <Titolo><I.Remoto size={12} />Da remoto <span className="mono font-normal">{giorno.remoti.length}</span></Titolo>
-            <Elenco gente={ordina(giorno.remoti)} nomi={nomi} ioId={ioId}
+            <Elenco gente={ordina(giorno.remoti)} ioId={ioId} mioSettore={mioSettore}
                     settori={raggruppa ? settori : undefined} />
           </div>
         )}
@@ -385,7 +402,7 @@ function ColonnaGiorno({ giorno, oggi, primo, fissa, ioId, stanze, settori, nomi
                 voluto — animare un'altezza fa rifare il layout a ogni
                 fotogramma, e qui di giornate ce ne sono cinque per volta. */}
             <div className="entra">
-              <Elenco gente={ordina(giorno.assenti)} nomi={nomi} ioId={ioId}
+              <Elenco gente={ordina(giorno.assenti)} ioId={ioId} mioSettore={mioSettore}
                       settori={raggruppa ? settori : undefined} />
             </div>
           </details>
@@ -403,10 +420,11 @@ const Titolo = ({ children }: { children: React.ReactNode }) => (
   <p className="mono flex items-center gap-1 px-1.5 text-2xs uppercase tracking-[0.06em] text-ink-faint">{children}</p>
 )
 
-function Elenco({ gente, nomi, ioId, scrivanie, settori }: {
+function Elenco({ gente, ioId, mioSettore, scrivanie, settori }: {
   gente: (Chi & { scrivania?: string | null })[]
-  nomi: Map<number, string>
   ioId: number
+  /** Chi ne fa parte porta il volto: sono le persone con cui si lavora. */
+  mioSettore: number | null
   scrivanie?: boolean
   /** Presente solo quando si raggruppa: fa comparire le didascalie di settore. */
   settori?: Map<number, string>
@@ -425,12 +443,19 @@ function Elenco({ gente, nomi, ioId, scrivanie, settori }: {
           <li
               // Il proprio nome si riconosce senza cercarlo: riempimento, peso e
               // un filetto a sinistra, cioè tre segnali e non solo il colore.
-              className={`flex items-baseline justify-between gap-1.5 rounded-r1 px-1.5 py-1 text-sm
+              className={`flex items-center justify-between gap-1.5 rounded-r1 px-1.5 py-1 text-sm
                           ${io ? 'bg-surface-2 font-semibold text-ink' : 'text-ink-muted'}`}
               style={io ? { boxShadow: 'inset 2px 0 0 var(--ink)' } : undefined}>
-            <span className="truncate">
-              {nomi.get(p.userId) ?? p.cognome}
-              {io && <span className="solo-lettori-schermo"> (sei tu)</span>}
+            <span className="flex min-w-0 items-center gap-1.5">
+              {!io && mioSettore != null && p.sectorId === mioSettore && (
+                <Avatar persona={{ id: p.userId, nome: p.nome, cognome: p.cognome }} misura="piccolo" />
+              )}
+              {/* Cognome e nome: l'elenco è ordinato per cognome, e il nome
+                  serve a riconoscere chi non si frequenta. */}
+              <span className="truncate">
+                {p.cognome} {p.nome}
+                {io && <span className="solo-lettori-schermo"> (sei tu)</span>}
+              </span>
             </span>
             {scrivanie && p.scrivania && (
               <span className="mono shrink-0 text-2xs text-ink-faint">/{p.scrivania}</span>
