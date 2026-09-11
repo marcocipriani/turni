@@ -114,7 +114,7 @@ absences.delete('/regole/:id', async (c) => {
 absences.get('/preferenze', async (c) => {
   const a = c.get('attore')
   const [p] = await db.select().from(schema.userPreference).where(eq(schema.userPreference.userId, a.id)).limit(1)
-  return c.json(p ?? { userId: a.id, giorniPreferiti: [], giorniDaEvitare: [], nota: null })
+  return c.json(p ?? { userId: a.id, giorniPreferiti: [], giorniDaEvitare: [], nota: null, promemoriaSera: false })
 })
 
 absences.put('/preferenze', async (c) => {
@@ -123,6 +123,7 @@ absences.put('/preferenze', async (c) => {
   const b = z.object({
     giorniPreferiti: giorni.default([]), giorniDaEvitare: giorni.default([]),
     nota: z.string().max(500).nullable().default(null),
+    promemoriaSera: z.boolean().default(false),
   }).safeParse(await c.req.json())
   if (!b.success) throw new HttpError(422, 'Preferenze non valide')
   await db.insert(schema.userPreference).values({ userId: a.id, ...b.data })

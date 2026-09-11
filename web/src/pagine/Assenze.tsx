@@ -8,7 +8,10 @@ import { Vista } from '../Vista'
 type Causale = { id: number; codice: string; etichetta: string }
 type Assenza = { id: number; dataInizio: string; dataFine: string; causale: string }
 type Regola = { id: number; giornoSettimana: number; causale: string; validoDa: string; validoA: string | null }
-type Preferenze = { giorniPreferiti: number[] | null; giorniDaEvitare: number[] | null; nota: string | null }
+type Preferenze = {
+  giorniPreferiti: number[] | null; giorniDaEvitare: number[] | null; nota: string | null
+  promemoriaSera: boolean
+}
 
 const GIORNI = [[1, 'lunedì'], [2, 'martedì'], [3, 'mercoledì'], [4, 'giovedì'], [5, 'venerdì']] as const
 const oggi = () => new Date().toISOString().slice(0, 10)
@@ -190,6 +193,19 @@ export default function Assenze() {
                     </div>
                   </fieldset>
                 ))}
+                <label className="flex cursor-pointer items-start gap-2 text-base">
+                  <input type="checkbox" className="mt-1" checked={pref.promemoriaSera}
+                         onChange={(e) => setPref({ ...pref, promemoriaSera: e.target.checked })} />
+                  <span>
+                    Promemoria la sera prima
+                    <span className="block text-sm text-ink-faint">
+                      Alle 18 del giorno prima di una giornata in sede, con stanza e scrivania.
+                      {/* Il promemoria arriva comunque nella campanella: il push è un di più. */}
+                      {typeof Notification !== 'undefined' && Notification.permission !== 'granted'
+                        && ' Su questo dispositivo le notifiche push non sono attive: lo troverai nella campanella.'}
+                    </span>
+                  </span>
+                </label>
                 <Campo etichetta="Nota per chi programma">
                   <textarea className={`${inputCls} min-h-[56px] resize-y`} rows={2} value={pref.nota ?? ''}
                             onChange={(e) => setPref({ ...pref, nota: e.target.value })} />

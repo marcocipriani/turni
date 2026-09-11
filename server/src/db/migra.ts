@@ -137,6 +137,9 @@ async function main() {
     )
   `)
 
+  // Il promemoria della sera prima: spento finché la persona non lo accende.
+  await colonna('user_preference', 'promemoria_sera', '`promemoria_sera` tinyint(1) NOT NULL DEFAULT 0')
+
   console.log('Fatto.')
   await pool.end()
 }

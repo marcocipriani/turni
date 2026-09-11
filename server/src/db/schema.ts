@@ -190,6 +190,8 @@ export const userPreference = mysqlTable('user_preference', {
   // Fin dove la persona ha guardato la programmazione. Serve a dire «ce n'è
   // una nuova» una volta sola: null significa che non l'ha ancora aperta.
   programmazioneVistaIl: timestamp('programmazione_vista_il'),
+  // Promemoria la sera prima di una giornata in sede. Chiesto, non imposto.
+  promemoriaSera: boolean('promemoria_sera').default(false).notNull(),
 })
 
 export const recurringRule = mysqlTable('recurring_rule', {
