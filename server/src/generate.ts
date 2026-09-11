@@ -31,6 +31,8 @@ export type GenerateInput = {
   presidioSettori: number[]
   smartMinSettimana: number | null
   smartMaxSettimana: number | null
+  /** Stanza che aveva ciascuno prima di rigenerare, chiave `userId|data`: a parità si conserva. */
+  stanzePrecedenti?: Map<string, number>
 }
 
 export type GenerateResult = {
@@ -70,6 +72,60 @@ function restiMaggiori(totale: number, chiavi: number[], tetti: Map<number, numb
     if (!mosso) break   // tutti al tetto: la capienza eccede la disponibilità
   }
   return out
+}
+
+/**
+ * Le stanze di una giornata, settore per settore: chi lavora insieme si siede
+ * insieme, e una stanza mescola meno gruppi possibile. Vincoli prima di tutto:
+ * chi è bloccato in una stanza ci resta, e i posti non si superano.
+ *
+ * ponytail: avido, non ottimo — i gruppi più grandi scelgono per primi. Con una
+ * ventina di presenti al giorno e poche stanze l'ottimo non si distingue a
+ * occhio; se un giorno servisse, qui va una ricerca esaustiva sulle stanze.
+ */
+export function assegnaStanze(
+  persone: { userId: number; sectorId: number | null }[],
+  stanze: Stanza[],
+  fissate: { userId: number; sectorId: number | null; roomId: number }[],
+  precedente: (userId: number) => number | undefined,
+): Map<number, number | null> {
+  const liberi = new Map(stanze.map((s) => [s.roomId, s.capienza]))
+  const settoriIn = new Map(stanze.map((s) => [s.roomId, new Set<number | null>()]))
+  for (const f of fissate) {
+    liberi.set(f.roomId, (liberi.get(f.roomId) ?? 0) - 1)
+    settoriIn.get(f.roomId)?.add(f.sectorId)
+  }
+
+  const gruppi = new Map<number | null, typeof persone>()
+  for (const p of persone) gruppi.set(p.sectorId, [...(gruppi.get(p.sectorId) ?? []), p])
+  const ordine = [...gruppi.entries()].sort((a, b) => b[1].length - a[1].length)
+
+  const esito = new Map<number, number | null>()
+  for (const [settore, membri] of ordine) {
+    const restanti = [...membri]
+    while (restanti.length) {
+      const conPosto = stanze.filter((s) => (liberi.get(s.roomId) ?? 0) > 0)
+      if (conPosto.length === 0) { for (const m of restanti) esito.set(m.userId, null); break }
+      // Prima dove il settore c'è già, poi una stanza vuota che lo contenga
+      // tutto (la più piccola che basta; a parità, dove qualcuno stava già),
+      // poi quella con più posti.
+      const giaQui = conPosto.filter((s) => settoriIn.get(s.roomId)!.has(settore))
+      const vuote = conPosto.filter((s) => settoriIn.get(s.roomId)!.size === 0)
+      const preferita = (s: Stanza) => restanti.some((m) => precedente(m.userId) === s.roomId)
+      const intera = vuote.filter((s) => liberi.get(s.roomId)! >= restanti.length)
+        .sort((a, b) => Number(preferita(b)) - Number(preferita(a)) || liberi.get(a.roomId)! - liberi.get(b.roomId)!)[0]
+      const scelta = giaQui[0] ?? intera
+        ?? [...conPosto].sort((a, b) => liberi.get(b.roomId)! - liberi.get(a.roomId)!)[0]!
+      // Dentro il gruppo passa prima chi in quella stanza c'era già.
+      restanti.sort((a, b) =>
+        Number(precedente(b.userId) === scelta.roomId) - Number(precedente(a.userId) === scelta.roomId))
+      const quanti = Math.min(liberi.get(scelta.roomId)!, restanti.length)
+      for (const m of restanti.splice(0, quanti)) esito.set(m.userId, scelta.roomId)
+      liberi.set(scelta.roomId, liberi.get(scelta.roomId)! - quanti)
+      settoriIn.get(scelta.roomId)!.add(settore)
+    }
+  }
+  return esito
 }
 
 export function generate(input: GenerateInput): GenerateResult {
@@ -235,25 +291,22 @@ export function generate(input: GenerateInput): GenerateResult {
     for (const p of ordinate) if (!scelte.has(key(p.userId, d))) scelte.set(key(p.userId, d), 'smart')
   }
 
-  // ── Stanze: riempite nell'ordine dichiarato ──────────────────────
+  // ── Stanze: per settore, dopo lucchetti, assenze e regole ────────
   const assegnazioni: GenerateResult['assegnazioni'] = []
   const presidiScoperti: GenerateResult['presidiScoperti'] = []
 
   for (const d of giorni) {
     const presenti = ordinate.filter((p) => scelte.get(key(p.userId, d)) === 'presenza')
-    const residua = new Map(stanze.map((r) => [r.roomId, r.capienza]))
-
-    for (const p of presenti) {
+    const fissateOggi = presenti.flatMap((p) => {
       const rid = fissata.get(key(p.userId, d))?.roomId
-      if (rid == null) continue
-      residua.set(rid, (residua.get(rid) ?? 0) - 1)
-      assegnazioni.push({ userId: p.userId, data: d, stato: 'presenza', roomId: rid })
-    }
-    for (const p of presenti) {
-      if (fissata.get(key(p.userId, d))?.roomId != null) continue
-      const stanza = stanze.find((r) => (residua.get(r.roomId) ?? 0) > 0)
-      if (stanza) residua.set(stanza.roomId, residua.get(stanza.roomId)! - 1)
-      assegnazioni.push({ userId: p.userId, data: d, stato: 'presenza', roomId: stanza?.roomId ?? null })
+      return rid == null ? [] : [{ userId: p.userId, sectorId: p.sectorId, roomId: rid }]
+    })
+    const daCollocare = presenti.filter((p) => fissata.get(key(p.userId, d))?.roomId == null)
+    const stanzaDi = assegnaStanze(daCollocare, stanze, fissateOggi,
+                                   (uid) => input.stanzePrecedenti?.get(key(uid, d)))
+    for (const f of fissateOggi) assegnazioni.push({ userId: f.userId, data: d, stato: 'presenza', roomId: f.roomId })
+    for (const p of daCollocare) {
+      assegnazioni.push({ userId: p.userId, data: d, stato: 'presenza', roomId: stanzaDi.get(p.userId) ?? null })
     }
     for (const p of ordinate) {
       if (scelte.get(key(p.userId, d)) === 'smart') {

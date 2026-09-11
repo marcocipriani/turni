@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { generate, type GenerateInput, type Persona } from './generate'
+import { assegnaStanze, generate, type GenerateInput, type Persona } from './generate'
 import { easterSunday, italianHolidays, weekKey, workingDays } from './lib/dates'
 
 function persona(id: number, cognome: string, sectorId: number | null = null): Persona {
@@ -129,5 +129,40 @@ describe('generazione', () => {
     const prima = r.assegnazioni.filter((a) => a.stato === 'presenza' && a.data <= '2026-09-11').length
     const dopo = r.assegnazioni.filter((a) => a.stato === 'presenza' && a.data > '2026-09-11').length
     expect(Math.abs(prima - dopo)).toBeLessThanOrEqual(2)
+  })
+})
+
+describe('stanze per settore', () => {
+  const stanze = [{ roomId: 10, capienza: 2 }, { roomId: 20, capienza: 2 }, { roomId: 30, capienza: 3 }]
+  const p = (userId: number, sectorId: number | null) => ({ userId, sectorId })
+  const nessuna = () => undefined
+
+  it('mette ogni settore nella sua stanza quando i posti bastano', () => {
+    const m = assegnaStanze([p(1, 1), p(2, 2), p(3, 1), p(4, 2)], stanze, [], nessuna)
+    expect(m.get(1)).toBe(m.get(3))
+    expect(m.get(2)).toBe(m.get(4))
+    expect(m.get(1)).not.toBe(m.get(2))
+  })
+  it('un settore di tre sceglie la stanza da tre invece di spezzarsi', () => {
+    const m = assegnaStanze([p(1, 1), p(2, 1), p(3, 1)], stanze, [], nessuna)
+    expect(new Set([m.get(1), m.get(2), m.get(3)])).toEqual(new Set([30]))
+  })
+  it('raggiunge il collega di settore già bloccato in una stanza', () => {
+    const m = assegnaStanze([p(2, 1)], stanze, [{ userId: 1, sectorId: 1, roomId: 20 }], nessuna)
+    expect(m.get(2)).toBe(20)
+  })
+  it('a parità conserva la stanza di prima', () => {
+    const m = assegnaStanze([p(1, null)], stanze, [], (id) => (id === 1 ? 20 : undefined))
+    expect(m.get(1)).toBe(20)
+  })
+  it('senza posti restituisce null', () => {
+    const m = assegnaStanze([p(1, 1)], [{ roomId: 10, capienza: 1 }], [{ userId: 9, sectorId: 2, roomId: 10 }], nessuna)
+    expect(m.get(1)).toBeNull()
+  })
+  it('non supera mai i posti, anche con un settore più grande di ogni stanza', () => {
+    const gente = Array.from({ length: 7 }, (_, i) => p(i + 1, 1))
+    const m = assegnaStanze(gente, stanze, [], nessuna)
+    for (const s of stanze) expect([...m.values()].filter((r) => r === s.roomId).length).toBeLessThanOrEqual(s.capienza)
+    expect([...m.values()].every((r) => r != null)).toBe(true)
   })
 })
