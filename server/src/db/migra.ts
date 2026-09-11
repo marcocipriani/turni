@@ -144,6 +144,9 @@ async function main() {
   await colonna('user_preference', 'vista_turni', "`vista_turni` varchar(10) NOT NULL DEFAULT 'giorni'")
   await colonna('user_preference', 'filtri_mio', '`filtri_mio` json DEFAULT NULL')
 
+  // La sede della stanza: prima c'era un edificio solo.
+  await colonna('room', 'sede', '`sede` varchar(80) DEFAULT NULL')
+
   console.log('Fatto.')
   await pool.end()
 }

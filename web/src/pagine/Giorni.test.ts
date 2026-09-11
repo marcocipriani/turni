@@ -78,8 +78,9 @@ describe('suddivisione della giornata per stanza', () => {
 })
 
 describe('avviso: le stanze dette a parole', () => {
-  const stanza = (etichetta: string, soprannome: string | null, piano: string | null, capienza: number): Stanza =>
-    ({ id: etichetta.length, etichetta, soprannome, piano, capienza })
+  const stanza = (etichetta: string, soprannome: string | null, piano: string | null, capienza: number,
+                  sede: string | null = null): Stanza =>
+    ({ id: etichetta.length, etichetta, soprannome, piano, capienza, sede })
 
   it('scrive la frase dell\'ufficio vero, com\'è in archivio', () => {
     const frasi = fraseStanze(
@@ -111,6 +112,24 @@ describe('avviso: le stanze dette a parole', () => {
   it('accorda il singolare, sulle stanze come sulle postazioni', () => {
     expect(fraseStanze([stanza('12', null, 'Primo piano', 1)])[0])
       .toBe('L\'unica stanza disponibile è al primo piano: la stanza 12 (una postazione).')
+  })
+
+  it('divide per sede quando le sedi sono più di una', () => {
+    const frasi = fraseStanze([
+      stanza('1028', null, 'Primo piano', 2, 'via Roma 1'),
+      stanza('1032', null, 'Primo piano', 2, 'via Roma 1'),
+      stanza('A3', null, 'Piano terra', 3, 'via Milano 5'),
+    ])
+    expect(frasi).toEqual([
+      'In via Roma 1, le due stanze disponibili sono al primo piano: la stanza 1028 (due postazioni)'
+        + ' e la stanza 1032 (due postazioni).',
+      'In via Milano 5, l\'unica stanza disponibile è al piano terra: la stanza A3 (tre postazioni).',
+    ])
+  })
+
+  it('con una sede sola non la ripete', () => {
+    const frasi = fraseStanze([stanza('12', null, 'Primo piano', 1, 'via Roma 1')])
+    expect(frasi[0]).toBe('L\'unica stanza disponibile è al primo piano: la stanza 12 (una postazione).')
   })
 
   it('tace del tutto quando non c\'è niente da dire', () => {

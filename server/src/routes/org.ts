@@ -261,6 +261,7 @@ org.post('/stanze', async (c) => {
   const b = z.object({
     unitId: z.number().int(), etichetta: z.string().min(1).max(60),
     soprannome: z.string().max(60).optional(), piano: z.string().max(40).optional(),
+    sede: z.string().max(80).optional(),
     riservataA: z.number().int().nullable().optional(),
     scrivanie: z.number().int().min(1).max(200),
   }).safeParse(await c.req.json())
@@ -272,7 +273,7 @@ org.post('/stanze', async (c) => {
   }
   const [ins] = await db.insert(schema.room).values({
     unitId: b.data.unitId, etichetta: b.data.etichetta,
-    soprannome: b.data.soprannome || null, piano: b.data.piano || null,
+    soprannome: b.data.soprannome || null, piano: b.data.piano || null, sede: b.data.sede || null,
     riservataA: await verificaRiservata(b.data.riservataA, b.data.unitId),
   })
   // Nascono numerate e disposte in fila: la planimetria arriverà a spostarle.
@@ -284,7 +285,7 @@ org.post('/stanze', async (c) => {
   return c.json({ id: ins.insertId }, 201)
 })
 
-/** La stanza cambia nome, soprannome o piano; la capienza no, quella la fanno le scrivanie. */
+/** La stanza cambia nome, soprannome, piano o sede; la capienza no, quella la fanno le scrivanie. */
 org.patch('/stanze/:rid', async (c) => {
   const rid = Number(c.req.param('rid'))
   const [r] = await db.select().from(schema.room).where(eq(schema.room.id, rid)).limit(1)
@@ -294,6 +295,7 @@ org.patch('/stanze/:rid', async (c) => {
     etichetta: z.string().min(1).max(60).optional(),
     soprannome: z.string().max(60).nullable().optional(),
     piano: z.string().max(40).nullable().optional(),
+    sede: z.string().max(80).nullable().optional(),
     riservataA: z.number().int().nullable().optional(),
     attiva: z.boolean().optional(),
   }).safeParse(await c.req.json())
@@ -303,6 +305,7 @@ org.patch('/stanze/:rid', async (c) => {
     ...b.data,
     soprannome: b.data.soprannome === undefined ? undefined : b.data.soprannome || null,
     piano: b.data.piano === undefined ? undefined : b.data.piano || null,
+    sede: b.data.sede === undefined ? undefined : b.data.sede || null,
   }).where(eq(schema.room.id, rid))
   await traccia({ entita: 'room', entitaId: rid, azione: 'modifica', utente: c.get('attore').id, dopo: b.data })
   return c.json({ ok: true })

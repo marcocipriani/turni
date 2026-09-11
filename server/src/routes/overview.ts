@@ -82,7 +82,7 @@ overview.get('/', async (c) => {
   const capienzaPerStanza = new Map<number, number>()
   for (const d of scrivanie) capienzaPerStanza.set(d.roomId, (capienzaPerStanza.get(d.roomId) ?? 0) + 1)
   const descrivi = (s: typeof stanzeRighe[number]) => ({
-    id: s.id, etichetta: s.etichetta, soprannome: s.soprannome, piano: s.piano,
+    id: s.id, etichetta: s.etichetta, soprannome: s.soprannome, piano: s.piano, sede: s.sede,
     capienza: capienzaPerStanza.get(s.id) ?? 0,
   })
   // La stanza riservata a una persona non è capienza condivisa: esce dal conto

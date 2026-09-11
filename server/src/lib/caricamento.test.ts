@@ -24,6 +24,12 @@ describe('modelli di caricamento', () => {
     for (const r of righe) expect(Object.keys(r)).toEqual(colonne)
   })
 
+  it('il modello delle stanze porta la sede', () => {
+    const righe = leggiCsv(MODELLI.stanze)
+    expect(Object.keys(righe[0]!)).toContain('sede')
+    expect(righe.some((r) => r.sede)).toBe(true)
+  })
+
   it('il modello delle persone dichiara ogni unità con il suo dirigente', () => {
     // È la regola dell'app: un'unità senza chi la comanda non esiste. Se il
     // modello la violasse, chi lo usa come punto di partenza verrebbe respinto.

@@ -296,6 +296,9 @@ function FoglioGiorni({ da }: { da: string }) {
                         <p className="border-b border-border pb-px font-semibold">
                           {stanza.etichetta}
                           {stanza.soprannome && <span className="font-normal text-ink-muted"> {stanza.soprannome}</span>}
+                          {new Set(dati.stanze.map((s) => s.sede ?? '')).size > 1 && stanza.sede && (
+                            <span className="font-normal text-ink-muted"> · {stanza.sede}</span>
+                          )}
                           <span className="mono float-right font-normal text-ink-faint">
                             {dentro.length}/{stanza.capienza}
                           </span>

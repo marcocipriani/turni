@@ -310,7 +310,7 @@ async function stanze(righe: Riga[], e: Esito, opz: Opzioni) {
     const soprannome = (r.soprannome ?? resto.join('·')).trim()
     if (!etichetta) { e.errore(i, 'la colonna «stanza» non contiene un codice.'); continue }
     const troppo = lungo(etichetta, 60, 'stanza') ?? lungo(soprannome, 60, 'soprannome')
-      ?? lungo(r.piano ?? '', 40, 'piano')
+      ?? lungo(r.piano ?? '', 40, 'piano') ?? lungo(r.sede ?? '', 80, 'sede')
     if (troppo) { e.errore(i, troppo); continue }
 
     if (unita.ambigua(r.unita ?? '')) { e.errore(i, `«${r.unita}» è il nome di due unità diverse.`); continue }
@@ -332,7 +332,7 @@ async function stanze(righe: Riga[], e: Esito, opz: Opzioni) {
 
     if (!opz.prova) {
       const [ins] = await db.insert(schema.room)
-        .values({ unitId, etichetta, soprannome: soprannome || null, piano: r.piano || null })
+        .values({ unitId, etichetta, soprannome: soprannome || null, piano: r.piano || null, sede: r.sede || null })
       await db.insert(schema.desk).values(numeri.map((numero, n) => ({
         roomId: ins.insertId, numero, x: 40 + (n % 5) * 120, y: 60 + Math.floor(n / 5) * 140,
       })))
@@ -499,10 +499,10 @@ Di Marco Luca;dipendente;Dipartimento esempio;;;Segreteria;si;si;
 Bianchi Paolo;dirigente;Ufficio esempio;UFFES;Dipartimento esempio;;;;
 Verdi Anna;dipendente;Ufficio esempio;;;Contabilità;;;anna.ver@esempio.it
 `,
-  stanze: `stanza;soprannome;piano;scrivanie;unita
-101;Sala nord;Primo piano;5;Dipartimento esempio
-102;;Primo piano;2;Dipartimento esempio
-204 · Archivio;;Secondo piano;1,2,5;Ufficio esempio
+  stanze: `stanza;soprannome;piano;sede;scrivanie;unita
+101;Sala nord;Primo piano;via Roma 1;5;Dipartimento esempio
+102;;Primo piano;via Roma 1;2;Dipartimento esempio
+204 · Archivio;;Secondo piano;via Milano 5;1,2,5;Ufficio esempio
 `,
   settori: `settore;unita;presidio;ordine
 Segreteria;Ufficio esempio;si;0

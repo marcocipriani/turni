@@ -49,6 +49,8 @@ export default function Organizzazione() {
   // elenchi dice dov'è finita la cosa che si è appena creata.
   const settoriNuovi = useNuovi(settori.map((s) => s.id))
   const stanzeNuove = useNuovi(stanze.map((s) => s.id))
+  // Le sedi già scritte tornano come suggerimento: «via Roma 1» si scrive una volta.
+  const sedi = [...new Set(stanze.map((s) => s.sede).filter((x): x is string => Boolean(x)))]
 
   // La stanza si riserva a chi è in forza all'unità che la possiede: è la
   // stessa regola che il server fa rispettare, qui solo per non proporre nomi
@@ -259,6 +261,7 @@ export default function Organizzazione() {
         </section>
 
         <section id="stanze">
+          <datalist id="sedi">{sedi.map((s) => <option key={s} value={s} />)}</datalist>
           <Pannello titolo="Stanze e scrivanie" icona={<I.Stanza size={18} />}
                     piede="La capienza di una stanza è il numero di scrivanie attive. Una stanza usata da una programmazione non si elimina: si disattiva, e lo storico resta leggibile.">
             <form
@@ -269,16 +272,20 @@ export default function Organizzazione() {
                 void prova(() => api.post('/org/stanze', {
                   unitId, etichetta: f.get('etichetta'),
                   soprannome: f.get('soprannome') || undefined, piano: f.get('piano') || undefined,
+                  sede: f.get('sede') || undefined,
                   riservataA: f.get('riservataA') ? Number(f.get('riservataA')) : null,
                   scrivanie: Number(f.get('scrivanie')),
                 }), 'stanza')
                 form.reset()
               }}
-              className="grid items-end gap-3 sm:grid-cols-[.7fr_1fr_1fr_1fr_100px_auto]"
+              className="grid items-end gap-3 sm:grid-cols-[.7fr_1fr_1fr_1fr_1fr_100px_auto]"
             >
               <Campo etichetta="Codice"><input name="etichetta" className={inputCls} required placeholder="101" /></Campo>
               <Campo etichetta="Soprannome"><input name="soprannome" className={inputCls} placeholder="Sala nord" /></Campo>
               <Campo etichetta="Piano"><input name="piano" className={inputCls} placeholder="Primo piano" /></Campo>
+              <Campo etichetta="Sede">
+                <input name="sede" list="sedi" className={inputCls} maxLength={80} placeholder="via Roma 1" />
+              </Campo>
               <Campo etichetta="Riservata a" aiuto="Fuori dalla capienza condivisa">
                 <select name="riservataA" className={inputCls} defaultValue="">
                   <option value="">Nessuno: stanza condivisa</option>
@@ -308,7 +315,7 @@ export default function Organizzazione() {
                             {!s.attiva && <Badge>disattivata</Badge>}
                           </p>
                           <p className="mono text-sm text-ink-faint">
-                            {s.piano ?? 'piano non indicato'} · capienza {s.capienza}
+                            {s.sede ? `${s.sede} · ` : ''}{s.piano ?? 'piano non indicato'} · capienza {s.capienza}
                           </p>
                           {s.riservataA != null && (
                             <p className="text-sm text-ink-muted">
@@ -412,7 +419,8 @@ function FormaStanza({ stanza, riservabili, onSalva, onChiudi }: {
   stanza: StanzaVista
   riservabili: Persona[]
   onSalva: (dati: {
-    etichetta: string; soprannome: string | null; piano: string | null; riservataA: number | null
+    etichetta: string; soprannome: string | null; piano: string | null; sede: string | null
+    riservataA: number | null
   }) => void
   onChiudi: () => void
 }) {
@@ -425,6 +433,7 @@ function FormaStanza({ stanza, riservabili, onSalva, onChiudi }: {
           etichetta: String(f.get('etichetta') ?? '').trim(),
           soprannome: String(f.get('soprannome') ?? '').trim() || null,
           piano: String(f.get('piano') ?? '').trim() || null,
+          sede: String(f.get('sede') ?? '').trim() || null,
           riservataA: f.get('riservataA') ? Number(f.get('riservataA')) : null,
         })
       }}
@@ -438,9 +447,14 @@ function FormaStanza({ stanza, riservabili, onSalva, onChiudi }: {
           <input name="soprannome" className={inputCls} maxLength={60} defaultValue={stanza.soprannome ?? ''} />
         </Campo>
       </div>
-      <Campo etichetta="Piano">
-        <input name="piano" className={inputCls} maxLength={40} defaultValue={stanza.piano ?? ''} />
-      </Campo>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Campo etichetta="Piano">
+          <input name="piano" className={inputCls} maxLength={40} defaultValue={stanza.piano ?? ''} />
+        </Campo>
+        <Campo etichetta="Sede">
+          <input name="sede" list="sedi" className={inputCls} maxLength={80} defaultValue={stanza.sede ?? ''} />
+        </Campo>
+      </div>
       <Campo etichetta="Riservata a" aiuto="Una stanza riservata esce dalla capienza da distribuire.">
         <select name="riservataA" className={inputCls} defaultValue={stanza.riservataA ?? ''}>
           <option value="">Nessuno: stanza condivisa</option>

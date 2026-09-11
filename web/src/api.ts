@@ -72,6 +72,7 @@ export type Settore = { id: number; unitId: number; nome: string; richiedePresid
 export type Scrivania = { id: number; roomId: number; numero: string; attiva: boolean }
 export type StanzaVista = {
   id: number; etichetta: string; soprannome: string | null; piano: string | null
+  sede: string | null
   /** Ufficio di una persona sola: fuori dalla capienza condivisa. */
   riservataA: number | null
   attiva: boolean; capienza: number; scrivanie: Scrivania[]

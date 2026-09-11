@@ -85,6 +85,8 @@ export const room = mysqlTable('room', {
   // l'etichetta obbligherebbe ogni schermata a tagliarlo a mano.
   soprannome: varchar('soprannome', { length: 60 }),
   piano: varchar('piano', { length: 40 }),
+  // In quale edificio: le stanze non stanno più tutte sotto lo stesso tetto.
+  sede: varchar('sede', { length: 80 }),
   // Stanza di una persona sola — l'ufficio di un dirigente. Non entra nella
   // capienza da distribuire e non la si assegna a nessun altro: esiste perché
   // chi cerca quella persona sappia dove trovarla, non perché ci sia un posto.

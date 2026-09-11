@@ -62,6 +62,7 @@ persone dopo: `npm run avvio -- nuovi.csv --aggiungi`.
 | `stanza` | il codice breve che compare in griglia: `101`. Se contiene un `·`, la parte dopo diventa il soprannome |
 | `soprannome` | facoltativo: come la chiamano davvero, `Sala nord` |
 | `piano` | facoltativo |
+| `sede` | facoltativa: l'edificio, per esempio `via Roma 1`. Con più sedi, l'avviso in cima ai giorni divide le stanze per sede |
 | `scrivanie` | `5` crea le scrivanie da 1 a 5; `1,2,5,8` crea esattamente quelle |
 | `unita` | l'unità **radice** che possiede gli spazi |
 
