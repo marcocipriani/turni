@@ -78,6 +78,19 @@ export function puoApprovare(a: Attore, unitId: number): boolean {
   return a.ruolo === 'dirigente' && a.unitId === unitId
 }
 
+/**
+ * Chi registra un'assenza per qualcun altro: chi programma l'unità in cui
+ * quella persona è programmata. È lo stesso perimetro in cui vede la causale,
+ * quindi registrarla non gli rivela niente che non sapesse già.
+ */
+export function puoRegistrareAssenzaPer(
+  albero: Albero, a: Attore, interessato: { id: number; ruolo: Ruolo; unitId: number | null },
+): boolean {
+  if (a.id === interessato.id) return true
+  const uid = unitaDiProgrammazione(albero, interessato.ruolo, interessato.unitId)
+  return uid != null && puoProgrammare(a, uid)
+}
+
 /** Anagrafiche dell'unità: settori, unità figlie, deleghe, assegnazione persone. */
 export function puoAmministrareUnita(a: Attore, unitId: number): boolean {
   return a.ruolo === 'dirigente' && a.unitId === unitId
@@ -106,6 +119,10 @@ export type CellaGriglia = {
   /** La cella nasce da uno scambio fra colleghi, non dalla generazione. */
   daScambio?: boolean
   causale: string | null
+  /** Assenza registrata da chi programma, non dall'interessato. */
+  perConto?: boolean
+  /** Serve a toglierla dalla griglia; solo a chi può farlo. */
+  assenzaId?: number | null
 }
 
 /**
@@ -124,5 +141,7 @@ export function mascheraCella(
     ...cella,
     stato: cella.stato === 'assenza' ? 'smart' : cella.stato,
     causale: null,
+    perConto: false,
+    assenzaId: null,
   }
 }

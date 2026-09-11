@@ -15,6 +15,11 @@ describe('etichetta testuale della cella', () => {
       .toBe('Marchetti Elena, lun 7 settembre, in sede, stanza 101, scrivania 4')
   })
 
+  it('dice chi ha registrato un\'assenza per conto', () => {
+    expect(descriviCella(p, '2026-09-07', cella({ stato: 'assenza', perConto: true }), null, null))
+      .toBe('Marchetti Elena, lun 7 settembre, assenza registrata dall\'organizzazione')
+  })
+
   it('segnala una cella bloccata', () => {
     expect(descriviCella(p, '2026-09-07', cella({ stato: 'presenza', roomId: 3, bloccata: true }), '101', null))
       .toContain('cella bloccata')

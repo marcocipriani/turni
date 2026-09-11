@@ -3,19 +3,32 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { type Env, HttpError, nonTrovato, vietato } from '../context'
 import { db, schema } from '../db/index'
+import { traccia } from '../lib/audit'
 import { eachDay, type ISODate, weekday } from '../lib/dates'
 import { avvisa } from '../lib/notify'
-import { unitaDiProgrammazione } from '../permissions'
+import { puoRegistrareAssenzaPer, unitaDiProgrammazione } from '../permissions'
 
 export const absences = new Hono<Env>()
 
 const ISO = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data non valida')
 
-/** Giornate coperte da assenze o regole, per un insieme di persone. */
-export async function giorniIndisponibili(
+export type Indisponibilita = { causale: string; assenzaId: number | null; perConto: boolean }
+
+/** Giornate coperte da assenze o regole: chiave `userId|data` → causale. */
+export async function giorniIndisponibili(userIds: number[], da: ISODate, a: ISODate): Promise<Map<string, string>> {
+  const d = await giorniIndisponibiliDettaglio(userIds, da, a)
+  return new Map([...d].map(([k, v]) => [k, v.causale]))
+}
+
+/**
+ * Come `giorniIndisponibili`, ma dice anche quale assenza copre la giornata e
+ * se l'ha registrata chi programma: serve alla griglia, per il segno ⊗ e per
+ * poterla togliere. Le regole ricorrenti sono sempre dell'interessato.
+ */
+export async function giorniIndisponibiliDettaglio(
   userIds: number[], da: ISODate, a: ISODate,
-): Promise<Map<string, string>> {
-  const out = new Map<string, string>()
+): Promise<Map<string, Indisponibilita>> {
+  const out = new Map<string, Indisponibilita>()
   if (userIds.length === 0) return out
 
   const puntuali = await db.select().from(schema.absence).where(
@@ -23,7 +36,9 @@ export async function giorniIndisponibili(
   )
   for (const ass of puntuali) {
     for (const g of eachDay(ass.dataInizio, ass.dataFine)) {
-      if (g >= da && g <= a) out.set(`${ass.userId}|${g}`, ass.causale)
+      if (g >= da && g <= a) {
+        out.set(`${ass.userId}|${g}`, { causale: ass.causale, assenzaId: ass.id, perConto: ass.registrataDa != null })
+      }
     }
   }
 
@@ -39,7 +54,7 @@ export async function giorniIndisponibili(
       if (weekday(g) !== r.giornoSettimana) continue
       if (g < r.validoDa) continue
       if (r.validoA && g > r.validoA) continue
-      if (!out.has(`${r.userId}|${g}`)) out.set(`${r.userId}|${g}`, r.causale)
+      if (!out.has(`${r.userId}|${g}`)) out.set(`${r.userId}|${g}`, { causale: r.causale, assenzaId: null, perConto: false })
     }
   }
   return out
@@ -63,8 +78,11 @@ absences.get('/mie', async (c) => {
  */
 absences.post('/', async (c) => {
   const a = c.get('attore'), alb = c.get('albero')
-  const b = z.object({ dataInizio: ISO, dataFine: ISO, causale: z.string().min(2) })
-    .safeParse(await c.req.json())
+  const b = z.object({
+    dataInizio: ISO, dataFine: ISO, causale: z.string().min(2),
+    // Per conto di un collega: solo chi programma la sua unità.
+    userId: z.number().int().optional(),
+  }).safeParse(await c.req.json())
   if (!b.success) throw new HttpError(422, 'Assenza non valida')
   if (b.data.dataFine < b.data.dataInizio) throw new HttpError(422, 'La data di fine precede quella di inizio')
 
@@ -72,8 +90,21 @@ absences.post('/', async (c) => {
     .where(and(eq(schema.absenceReason.codice, b.data.causale), eq(schema.absenceReason.attiva, true))).limit(1)
   if (!causale) throw new HttpError(422, 'Causale non ammessa')
 
-  const [ins] = await db.insert(schema.absence).values({ userId: a.id, ...b.data })
-  await segnalaConflitti(a.id, alb, b.data.dataInizio, b.data.dataFine)
+  const perId = b.data.userId ?? a.id
+  let registrataDa: number | null = null
+  if (perId !== a.id) {
+    const [u] = await db.select().from(schema.user).where(eq(schema.user.id, perId)).limit(1)
+    if (!u || !u.attivo) throw nonTrovato('Persona non trovata')
+    if (!puoRegistrareAssenzaPer(alb, a, { id: u.id, ruolo: u.ruolo, unitId: u.unitId })) {
+      throw vietato('Registri assenze solo per chi programmi')
+    }
+    registrataDa = a.id
+  }
+
+  const { userId: _, ...periodo } = b.data
+  const [ins] = await db.insert(schema.absence).values({ userId: perId, ...periodo, registrataDa })
+  if (registrataDa != null) await notificaPerConto(a.id, perId, 'registrata', periodo)
+  await segnalaConflitti(perId, alb, b.data.dataInizio, b.data.dataFine)
   return c.json({ id: ins.insertId }, 201)
 })
 
@@ -82,8 +113,16 @@ absences.delete('/:id', async (c) => {
   const a = c.get('attore')
   const [ass] = await db.select().from(schema.absence).where(eq(schema.absence.id, id)).limit(1)
   if (!ass) throw nonTrovato('Assenza non trovata')
-  if (ass.userId !== a.id) throw vietato('Si possono revocare solo le proprie assenze')
+  if (ass.userId !== a.id) {
+    const [u] = await db.select().from(schema.user).where(eq(schema.user.id, ass.userId)).limit(1)
+    // Chi programma toglie solo quelle che ha messo l'organizzazione: una
+    // dichiarata dall'interessato resta sua.
+    const ammesso = ass.registrataDa != null && u != null
+      && puoRegistrareAssenzaPer(c.get('albero'), a, { id: u.id, ruolo: u.ruolo, unitId: u.unitId })
+    if (!ammesso) throw vietato('Si possono revocare solo le proprie assenze')
+  }
   await db.delete(schema.absence).where(eq(schema.absence.id, id))
+  if (ass.userId !== a.id) await notificaPerConto(a.id, ass.userId, 'tolta', ass)
   return c.json({ ok: true })
 })
 
@@ -176,5 +215,23 @@ async function segnalaConflitti(userId: number, alb: Map<number, number | null>,
     titolo: `Assenza su giornate già programmate: ${u.nome} ${u.cognome}`,
     corpo: `Presenze interessate: ${date}. Il calendario pubblicato non è stato modificato.`,
     link: '/programmazione',
+  })
+}
+
+/** Traccia e avvisa l'interessato: un'assenza a proprio nome non arriva mai di nascosto. */
+async function notificaPerConto(autoreId: number, interessatoId: number, cosa: 'registrata' | 'tolta',
+                                p: { dataInizio: string; dataFine: string; causale: string }) {
+  const [autore] = await db.select().from(schema.user).where(eq(schema.user.id, autoreId)).limit(1)
+  const chi = autore ? `${autore.nome} ${autore.cognome}` : 'Chi programma'
+  const quando = p.dataInizio === p.dataFine ? `il ${p.dataInizio}` : `dal ${p.dataInizio} al ${p.dataFine}`
+  await traccia({
+    entita: 'absence', entitaId: `${interessatoId}:${p.dataInizio}`, azione: `assenza_per_conto_${cosa}`,
+    utente: autoreId, dopo: { dataInizio: p.dataInizio, dataFine: p.dataFine, causale: p.causale },
+  })
+  await avvisa([interessatoId], {
+    tipo: 'assenza_per_conto',
+    titolo: cosa === 'registrata' ? 'Un\'assenza registrata per te' : 'Un\'assenza tolta dal tuo calendario',
+    corpo: `${chi} ${cosa === 'registrata' ? 'ha registrato' : 'ha tolto'} un'assenza ${quando}.`,
+    link: '/assenze',
   })
 }

@@ -8,7 +8,7 @@ import { Bottone, Campo, inputCls, Messaggio, Pannello, Scheletro, Tag } from '.
 import { Vista } from '../Vista'
 
 type Causale = { id: number; codice: string; etichetta: string }
-type Assenza = { id: number; dataInizio: string; dataFine: string; causale: string }
+type Assenza = { id: number; dataInizio: string; dataFine: string; causale: string; registrataDa: number | null }
 type Regola = { id: number; giornoSettimana: number; causale: string; validoDa: string; validoA: string | null }
 type Preferenze = {
   giorniPreferiti: number[] | null; giorniDaEvitare: number[] | null; nota: string | null
@@ -104,6 +104,8 @@ export default function Assenze() {
                       <span className="mono">
                         {a.dataInizio}{a.dataFine !== a.dataInizio && ` → ${a.dataFine}`}
                         <span className="ml-2 font-sans text-sm text-ink-muted">{etichetta(a.causale)}</span>
+                        {/* Non l'hai scritta tu: lo si dice, e la puoi togliere come le altre. */}
+                        {a.registrataDa != null && <span className="ml-2"><Tag>registrata dall'organizzazione</Tag></span>}
                       </span>
                       <Bottone variante="piccolo" stato={assenze.statoDi(a.id)}
                                onClick={() => void assenze.esegui(async () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   type Albero, type Attore, mascheraCella, puoAmministrareUnita, puoApprovare,
-  puoLeggereUnita, puoProgrammare, puoVedereCausale, radice, sottoalbero,
+  puoLeggereUnita, puoProgrammare, puoRegistrareAssenzaPer, puoVedereCausale, radice, sottoalbero,
   unitaDiProgrammazione,
 } from './permissions'
 
@@ -98,10 +98,42 @@ describe('causali di assenza', () => {
     expect(vista.causale).toBeNull()
   })
 
+  it('a chi non ha titolo non dice chi ha registrato l\'assenza', () => {
+    const collega: Attore = { id: 20, ruolo: 'dipendente', unitId: 2, organizzatoreDi: [] }
+    const cella = { userId: 12, data: '2026-09-07', stato: 'assenza' as const, roomId: null, deskId: null,
+                    bloccata: false, causale: 'ferie', perConto: true, assenzaId: 7 }
+    const vista = mascheraCella(albero, collega, cella, interessato)
+    expect(vista.perConto).toBe(false)
+    expect(vista.assenzaId).toBeNull()
+    expect(mascheraCella(albero, organizzatoreX, cella, interessato).assenzaId).toBe(7)
+  })
+
   it('il dirigente vede assenza e causale in chiaro', () => {
     const cella = { userId: 12, data: '2026-09-07', stato: 'assenza' as const, roomId: null, deskId: null, bloccata: false, causale: 'legge_104' }
     const vista = mascheraCella(albero, dirigenteDip, cella, interessato)
     expect(vista.stato).toBe('assenza')
     expect(vista.causale).toBe('legge_104')
+  })
+})
+
+describe('assenze registrate per conto di un collega', () => {
+  const persona = (id: number, ruolo: 'dirigente' | 'dipendente', unitId: number) => ({ id, ruolo, unitId })
+
+  it('ognuno registra le proprie', () => {
+    expect(puoRegistrareAssenzaPer(albero, dipendenteX, persona(12, 'dipendente', 2))).toBe(true)
+  })
+  it('chi programma l\'unità registra per i suoi', () => {
+    expect(puoRegistrareAssenzaPer(albero, organizzatoreX, persona(12, 'dipendente', 2))).toBe(true)
+    expect(puoRegistrareAssenzaPer(albero, dirigenteX, persona(12, 'dipendente', 2))).toBe(true)
+  })
+  it('il dirigente di una figlia è programmato nel padre: lì lo registra chi programma il padre', () => {
+    expect(puoRegistrareAssenzaPer(albero, organizzatoreX, persona(40, 'dirigente', 4))).toBe(true)
+  })
+  it('un collega senza delega no, l\'admin nemmeno', () => {
+    expect(puoRegistrareAssenzaPer(albero, dipendenteX, persona(13, 'dipendente', 2))).toBe(false)
+    expect(puoRegistrareAssenzaPer(albero, admin, persona(12, 'dipendente', 2))).toBe(false)
+  })
+  it('chi programma un\'altra unità no', () => {
+    expect(puoRegistrareAssenzaPer(albero, dirigenteX, persona(30, 'dipendente', 3))).toBe(false)
   })
 })
