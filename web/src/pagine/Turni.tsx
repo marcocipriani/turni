@@ -7,7 +7,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { api, type Griglia as DatiGriglia, type Periodo } from '../api'
+import { api, type Cella, type Griglia as DatiGriglia, type Periodo } from '../api'
 import { type StatoBottone, useAzione } from '../azioni'
 import { addDays, lunediDi, oggiISO } from '../date'
 import * as I from '../icone'
@@ -17,10 +17,12 @@ import { Bottone, Messaggio, Pill, Scheletro, stileBottone, StatoVuoto } from '.
 import { Drawer, Toolbar, Vista } from '../Vista'
 import { ModaleCambiamenti } from './cambiamenti'
 import { Giorni } from './Giorni'
-import Griglia, { Legenda } from './Griglia'
+import Griglia, { type CellaModifica, Legenda } from './Griglia'
+import { MenuCella, vociMenu } from './MenuCella'
 import { AvvisoNovita, quando } from './novita'
 import {
-  EditorCella, type EsitoGenerazione, EsitoProposta, ModaleNota, NuovoPeriodo, periodoDiRiferimento, StatoPeriodo,
+  EditorCella, type EsitoGenerazione, EsitoProposta, ModaleAssenzaPerConto, ModaleNota, NuovoPeriodo,
+  periodoDiRiferimento, StatoPeriodo,
 } from './periodo'
 
 const gg = (iso: string) => `${iso.slice(8)}/${iso.slice(5, 7)}`
@@ -31,6 +33,7 @@ const finestra = (da: string, settimane: number) => `${gg(da)} → ${gg(addDays(
 /** Etichetta compatta di un periodo: le date bastano a riconoscerlo. */
 const etichettaPeriodo = (p: Periodo) =>
   `${p.dataInizio.slice(8)}/${p.dataInizio.slice(5, 7)} → ${p.dataFine.slice(8)}/${p.dataFine.slice(5, 7)}` +
+  (p.revisioneDi != null ? ' · revisione' : '') +
   (p.stato === 'pubblicato' ? '' : p.stato === 'in_approvazione' ? ' · in approvazione' : ' · bozza')
 
 export default function Turni() {
@@ -50,6 +53,12 @@ export default function Turni() {
   const [respingiAperto, setRespingiAperto] = useState(false)
   const [cerca, setCerca] = useState('')
   const [soloSettore, setSoloSettore] = useState(false)
+  /* Modalità modifica: fuori, la griglia si legge e basta — anche per chi
+     programma. Dentro, si trascina e si apre il menu delle celle. */
+  const [modifica, setModifica] = useState(false)
+  const [menu, setMenu] = useState<{ sel: { userId: number; data: string }; pos: { x: number; y: number } | null } | null>(null)
+  const [assenzaPer, setAssenzaPer] = useState<{ userId: number; data: string } | null>(null)
+  const [richiestaAperta, setRichiestaAperta] = useState(false)
   // Una settimana: è la domanda che si fa entrando — «questa settimana chi
   // c'è» — e a una sola le colonne si allargano invece di scorrere.
   const [settimane, setSettimane] = useState(1)
@@ -79,6 +88,22 @@ export default function Turni() {
   }, [])
 
   useEffect(() => { void caricaPeriodi() }, [caricaPeriodi])
+
+  // Tornando ai giorni la modifica si spegne; passare dall'originale alla sua
+  // revisione resta dentro la griglia, e la modifica resta accesa.
+  useEffect(() => { if (!id) setModifica(false) }, [id])
+
+  const pid = dati?.periodo.id
+  /** Scrive e ricarica: ogni gesto della modalità modifica passa da qui. */
+  const scriviCelle = useCallback((celle: CellaModifica[]) => {
+    if (pid == null) return
+    void azione.esegui(async () => {
+      await api.put(`/periodi/${pid}/celle`, { celle }); await caricaGriglia(pid)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pid, caricaGriglia])
+  const apriMenu = useCallback((sel: { userId: number; data: string }, pos: { x: number; y: number } | null) =>
+    setMenu({ sel, pos }), [])
 
   /* Chi preferisce la griglia ci atterra entrando da «Turni»; chi preme
      «Giorni» porta con sé `?vista=giorni` e resta sui giorni. */
@@ -167,11 +192,12 @@ export default function Turni() {
                        await caricaGriglia(p.id)
                      }, 'genera')}>Genera</Comando>
           )}
-          {inGriglia && p && modificabile && p.stato !== 'pubblicato' && (
-            <Comando titolo="Invia in approvazione" stato={azione.statoDi('invia')} disabled={azione.inCorso} icona={<I.Freccia size={15} />}
-                     onClick={() => void azione.esegui(async () => {
-                       await api.post(`/periodi/${p.id}/invia`); await caricaGriglia(p.id); await caricaPeriodi()
-                     }, 'invia')}>Invia</Comando>
+          {inGriglia && p && modificabile && p.stato === 'bozza' && (
+            <Comando titolo={p.revisioneDi != null ? 'Richiedi approvazione' : 'Invia in approvazione'}
+                     stato={azione.statoDi('invia')} disabled={azione.inCorso} icona={<I.Freccia size={15} />}
+                     onClick={() => setRichiestaAperta(true)}>
+              {p.revisioneDi != null ? 'Richiedi approvazione' : 'Invia'}
+            </Comando>
           )}
           {inGriglia && p && dati?.permessi.approvare && p.stato === 'in_approvazione' && (
             <>
@@ -232,7 +258,28 @@ export default function Turni() {
               ))}
             </select>
           </label>
-        ) : (
+        ) : null}
+
+        {inGriglia && p && modificabile ? (
+          <Bottone variante={modifica ? 'primario' : 'normale'} aria-pressed={modifica}
+                   stato={azione.statoDi('modifica')} disabled={azione.inCorso}
+                   title={modifica ? 'Esci dalla modalità modifica' : 'Modifica la griglia: trascina, o tasto destro su una cella'}
+                   onClick={() => void azione.esegui(async () => {
+                     if (modifica) { setModifica(false); return }
+                     // Il pubblicato non si tocca: si lavora sul suo gemello, che i
+                     // colleghi non vedono finché il dirigente non lo approva.
+                     if (p.stato === 'pubblicato') {
+                       const { id: gid } = await api.post<{ id: number }>(`/periodi/${p.id}/revisione`)
+                       await caricaPeriodi()
+                       navigate(`/turni/${gid}`)
+                     }
+                     setModifica(true)
+                   }, 'modifica')}>
+            <I.Matita size={15} />{modifica ? 'Fine' : 'Modifica'}
+          </Bottone>
+        ) : null}
+
+        {!inGriglia && (
           <>
             <div role="radiogroup" aria-label="Quante settimane mostrare"
                  className="inline-flex overflow-hidden rounded-r2 border border-border-controllo">
@@ -366,6 +413,32 @@ export default function Turni() {
               {p.notaApprovazione && (
                 <Messaggio tono="attenzione" titolo="Rimandato indietro">{p.notaApprovazione}</Messaggio>
               )}
+              {p.revisioneDi != null && (
+                <Messaggio tono="info" titolo={`Revisione della versione ${p.versione}`}>
+                  I colleghi vedono ancora la versione pubblicata finché questa non è approvata.
+                  {p.stato === 'bozza' && modificabile && (
+                    <span className="mt-1.5 flex gap-2">
+                      <Bottone variante="distruttivo" stato={azione.statoDi('scarta')}
+                               onClick={() => void azione.esegui(async () => {
+                                 if (!confirm('Scartare la revisione? Le modifiche fatte qui si perdono.')) return
+                                 const r = await api.del<{ originale: number }>(`/periodi/${p.id}`)
+                                 setModifica(false); await caricaPeriodi(); navigate(`/turni/${r.originale}`)
+                               }, 'scarta')}>Scarta revisione</Bottone>
+                    </span>
+                  )}
+                </Messaggio>
+              )}
+              {(() => {
+                const rev = periodi?.find((x) => x.id === p.id)?.revisione
+                return rev != null && (
+                  <Messaggio tono="attenzione">
+                    C'è una revisione aperta di questo periodo.{' '}
+                    <button type="button" className="cursor-pointer underline" onClick={() => navigate(`/turni/${rev}`)}>
+                      Aprila
+                    </button>
+                  </Messaggio>
+                )
+              })()}
               {attenzioni.length > 0 && (
                 <Messaggio tono="attenzione"
                            titolo={`${attenzioni.length} ${attenzioni.length === 1 ? 'segnalazione' : 'segnalazioni'}`}>
@@ -376,16 +449,68 @@ export default function Turni() {
               {esito && <EsitoProposta esito={esito} />}
             </div>
             <Griglia dati={dati} selezione={selezione} onSeleziona={setSelezione}
-                     raggruppa={raggruppaGriglia} ioId={utente.id} />
+                     raggruppa={raggruppaGriglia} ioId={utente.id}
+                     modifica={modifica && modificabile} onCambia={scriviCelle} onMenu={apriMenu} />
           </div>
 
           {selezione && (
             <Drawer titolo="Cella" onChiudi={() => setSelezione(null)}>
-              <EditorCella dati={dati} selezione={selezione} abilitato={modificabile}
+              <EditorCella dati={dati} selezione={selezione} abilitato={modificabile && modifica}
                            onSalvato={() => void caricaGriglia(p.id)} />
             </Drawer>
           )}
         </div>
+      )}
+
+      {dati && p && menu && (() => {
+        const c = dati.celle.find((x) => x.userId === menu.sel.userId && x.data === menu.sel.data)
+        const chi = dati.persone.find((x) => x.id === menu.sel.userId)
+        if (!c || !chi) return null
+        const occupati = new Map<number, number>()
+        for (const x of dati.celle) {
+          if (x.data === c.data && x.stato === 'presenza' && x.roomId != null) {
+            occupati.set(x.roomId, (occupati.get(x.roomId) ?? 0) + 1)
+          }
+        }
+        const cambia = (m: Partial<CellaModifica>) => scriviCelle([{ ...comeModifica(c), ...m }])
+        return (
+          <MenuCella
+            titolo={`${chi.cognome} ${chi.nome} · ${c.data}`} posizione={menu.pos}
+            voci={vociMenu(c, dati.stanze, occupati)}
+            onChiudi={() => setMenu(null)}
+            onScegli={(k) => {
+              setMenu(null)
+              if (k.startsWith('stanza:')) cambia({ stato: 'presenza', roomId: Number(k.slice(7)), deskId: null })
+              else if (k === 'remoto') cambia({ stato: 'smart', roomId: null, deskId: null })
+              else if (k === 'blocca') cambia({ bloccata: true })
+              else if (k === 'sblocca') cambia({ bloccata: false })
+              else if (k === 'dettagli') setSelezione(menu.sel)
+              else if (k === 'assenza') setAssenzaPer(menu.sel)
+              else if (k === 'togli-assenza') {
+                void azione.esegui(async () => { await api.del(`/assenze/${c.assenzaId}`); await caricaGriglia(p.id) })
+              }
+            }}
+          />
+        )
+      })()}
+
+      {dati && p && (
+        <ModaleAssenzaPerConto
+          persona={assenzaPer ? dati.persone.find((x) => x.id === assenzaPer.userId) ?? null : null}
+          data={assenzaPer?.data ?? ''} aperta={assenzaPer != null}
+          onChiudi={() => setAssenzaPer(null)} onFatto={() => void caricaGriglia(p.id)} />
+      )}
+
+      {p && (
+        <ModaleNota
+          titolo={p.revisioneDi != null ? 'Richiedi approvazione' : 'Invia in approvazione'}
+          etichetta="Nota per il dirigente" obbligatoria={false} conferma={p.revisioneDi != null ? 'Richiedi' : 'Invia'}
+          aperta={richiestaAperta} onChiudi={() => setRichiestaAperta(false)}
+          onConferma={async (nota) => {
+            await api.post(`/periodi/${p.id}/invia`, { nota: nota || undefined })
+            setModifica(false); await caricaGriglia(p.id); await caricaPeriodi()
+          }}
+        />
       )}
 
       {p && (
@@ -442,4 +567,12 @@ function BottoneVista({ attivo, children, ...resto }: {
       {children}
     </button>
   )
+}
+
+/** La cella com'è, nella forma che si rimanda al server: tocca poi cambiarne un pezzo. */
+function comeModifica(c: Cella): CellaModifica {
+  return {
+    userId: c.userId, data: c.data, stato: c.stato === 'presenza' ? 'presenza' : 'smart',
+    roomId: c.roomId, deskId: c.deskId, bloccata: true,
+  }
 }
