@@ -443,6 +443,9 @@ periods.post('/:id/genera', async (c) => {
     presidioSettori: ctx.settori.filter((s) => s.richiedePresidio).map((s) => s.id),
     smartMinSettimana: p.smartMinSettimana,
     smartMaxSettimana: p.smartMaxSettimana,
+    // Rigenerando, a parità si resta dove si era: meno sorprese in una proposta rifatta.
+    stanzePrecedenti: new Map(ctx.celle.filter((x) => !x.bloccata && x.roomId != null)
+      .map((x) => [`${x.userId}|${x.data}`, x.roomId!])),
   })
 
   // Le celle bloccate sopravvivono: si riscrive tutto il resto.
