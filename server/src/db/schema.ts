@@ -144,8 +144,16 @@ export const period = mysqlTable('period', {
   // la coppia con `versione` racconta «v2, aggiornata il …».
   pubblicatoIl: timestamp('pubblicato_il'),
   aggiornatoIl: timestamp('aggiornato_il'),
+  // Revisione di un periodo pubblicato: un gemello in bozza su cui si lavora
+  // mentre i colleghi continuano a vedere l'originale. Uno per periodo.
+  revisioneDi: int('revisione_di'),
+  // Nota di chi chiede l'approvazione: finisce nell'istantanea come motivo.
+  notaRichiesta: varchar('nota_richiesta', { length: 500 }),
   creatoIl: now(),
-}, (t) => [index('ix_period_unit').on(t.unitId, t.dataInizio)])
+}, (t) => [
+  index('ix_period_unit').on(t.unitId, t.dataInizio),
+  uniqueIndex('uk_period_revisione').on(t.revisioneDi),
+])
 
 export const assignment = mysqlTable('assignment', {
   id: id(),
