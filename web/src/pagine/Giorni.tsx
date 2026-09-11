@@ -9,12 +9,13 @@
  * «48 su 50 in tre settimane» non dice a nessuno se domani c'è posto.
  */
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import { api } from '../api'
+import { getConEta } from '../api'
 import { addDays, oggiISO, pezziData } from '../date'
 import * as I from '../icone'
 import { Avatar } from '../persone'
 import { useSessione } from '../sessione'
 import { Badge, Messaggio, Scheletro, StatoVuoto, Tag } from '../ui'
+import { quando } from './novita'
 
 export type Chi = {
   userId: number; nome: string; cognome: string
@@ -212,11 +213,12 @@ export function Giorni({ settimane, da, raggruppa = false, filtro = NESSUN_FILTR
   const { utente } = useSessione()
   const [dati, setDati] = useState<DatiGiorni | null>(null)
   const [errore, setErrore] = useState<string | null>(null)
+  const [copiaDel, setCopiaDel] = useState<Date | null>(null)
 
   useEffect(() => {
     const a = addDays(da, settimane * 7 - 1)
-    void api.get<DatiGiorni>(`/panoramica?da=${da}&a=${a}`)
-      .then((d) => { setDati(d); onCaricato?.(d) })
+    void getConEta<DatiGiorni>(`/panoramica?da=${da}&a=${a}`)
+      .then(({ dati: d, copiaDel: c }) => { setDati(d); setCopiaDel(c); setErrore(null); onCaricato?.(d) })
       .catch((e) => setErrore(e.message))
     // onCaricato è un riferimento nuovo a ogni render del padre: tenerlo fra le
     // dipendenze rifarebbe la richiesta a ogni battito.
@@ -244,6 +246,14 @@ export function Giorni({ settimane, da, raggruppa = false, filtro = NESSUN_FILTR
   }, [feriali])
 
   if (errore) return <div className="p-4 md:p-6"><Messaggio tono="errore">{errore}</Messaggio></div>
+
+  /* Senza rete si vede l'ultima copia, e lo si dice: fra allora e adesso
+     qualcuno può aver scambiato una giornata o dichiarato un'assenza. */
+  const senzaRete = copiaDel && (
+    <Messaggio tono="attenzione" titolo="Senza rete">
+      Stai vedendo i dati conservati sul telefono, aggiornati al {quando(copiaDel.toISOString())}.
+    </Messaggio>
+  )
   if (!dati) return <div className="p-4 md:p-6"><Scheletro righe={6} /></div>
 
   if (dati.periodiPubblicati === 0) {
@@ -265,6 +275,7 @@ export function Giorni({ settimane, da, raggruppa = false, filtro = NESSUN_FILTR
   if (feriali.length === 0) {
     return (
       <div className="flex flex-col gap-3 p-4 md:p-6">
+        {senzaRete}
         <AvvisoStanze stanze={dati.stanze} riservate={dati.stanzeRiservate ?? []} />
         <p className="rounded-r3 border border-border bg-surface px-4 py-8 text-center text-base text-ink-faint">
           Nessuna giornata lavorativa in questo tratto di calendario: festività, o un fine settimana intero.
@@ -275,6 +286,7 @@ export function Giorni({ settimane, da, raggruppa = false, filtro = NESSUN_FILTR
 
   return (
     <div ref={radice} className="flex flex-col gap-3 p-4 md:p-6">
+      {senzaRete}
       <AvvisoStanze stanze={dati.stanze} riservate={dati.stanzeRiservate ?? []} />
 
       <section id="giorni" className="flex flex-col gap-2">

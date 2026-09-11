@@ -5,18 +5,22 @@
  *
  *   guscio       (navigazioni)  rete, e se non c'è la copia dell'ultima pagina
  *   statici      (/assets, font, icone)  copia, e rete solo la prima volta
- *   /api/mio     rete, e se non c'è l'ultima risposta riuscita
+ *   /api/auth/me, /api/mio, /api/panoramica   rete, e se non c'è l'ultima risposta riuscita
  *
  * Niente elenco di file da precaricare: gli assetti hanno il digest nel nome,
  * quindi la copia non scade mai per conto suo e la prima visita online riempie
  * la dispensa da sé. Chi installa l'applicazione e va offline prima di averla
  * mai aperta non ha niente da mostrare, ed è giusto così.
  *
- * DEI DATI SI CONSERVA SOLO «/api/mio»: le proprie giornate, cioè quello che
- * si va a guardare col telefono in mano davanti al portone. La panoramica
- * dell'unità intera resta fuori — è un elenco di terzi, e su un disco vale la
- * pena tenerci il meno possibile. La dispensa dei dati si svuota all'uscita:
- * ci pensa l'applicazione chiamando `caches.delete`.
+ * DEI DATI SI CONSERVANO «/api/mio» E «/api/panoramica»: le proprie giornate
+ * e chi c'è in sede, cioè le due cose che si guardano col telefono in mano
+ * davanti al portone. Della panoramica nessuna causale arriva mai sul disco:
+ * chi è assente vi compare come nome e settore, e le assenze di chi non si ha
+ * titolo a vedere non lasciano il server affatto. Si conserva anche «chi sono»
+ * (`/api/auth/me`): senza, l'applicazione offline non sa di chi è e apre la
+ * pagina di accesso, e le copie qui sopra non le vede nessuno. Un 401 non si
+ * conserva mai: una sessione scaduta resta scaduta. La dispensa dei dati si
+ * svuota all'uscita: ci pensa l'applicazione chiamando `caches.delete`.
  */
 const VERSIONE = 'v1'
 const GUSCIO = `turni-guscio-${VERSIONE}`
@@ -92,8 +96,12 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  if (url.pathname === '/api/mio') {
+  if (url.pathname === '/api/mio' || url.pathname === '/api/panoramica') {
     event.respondWith(reteOCopia(richiesta, DATI, true))
+    return
+  }
+  if (url.pathname === '/api/auth/me') {
+    event.respondWith(reteOCopia(richiesta, DATI, false))
     return
   }
 
