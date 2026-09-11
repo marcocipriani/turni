@@ -2,6 +2,8 @@ import { type FormEvent, useEffect, useState } from 'react'
 import { api } from '../api'
 import { useAzione, useNuovi } from '../azioni'
 import * as I from '../icone'
+import { useSessione } from '../sessione'
+import { STATI, type Stato } from '../stati'
 import { Bottone, Campo, inputCls, Messaggio, Pannello, Scheletro, Tag } from '../ui'
 import { Vista } from '../Vista'
 
@@ -11,12 +13,15 @@ type Regola = { id: number; giornoSettimana: number; causale: string; validoDa: 
 type Preferenze = {
   giorniPreferiti: number[] | null; giorniDaEvitare: number[] | null; nota: string | null
   promemoriaSera: boolean
+  vistaTurni: 'giorni' | 'griglia'
+  filtriMio: Stato[]
 }
 
 const GIORNI = [[1, 'lunedì'], [2, 'martedì'], [3, 'mercoledì'], [4, 'giovedì'], [5, 'venerdì']] as const
 const oggi = () => new Date().toISOString().slice(0, 10)
 
 export default function Assenze() {
+  const { ricarica: ricaricaSessione } = useSessione()
   const [causali, setCausali] = useState<Causale[]>([])
   const [dati, setDati] = useState<{ assenze: Assenza[]; regole: Regola[] } | null>(null)
   const [pref, setPref] = useState<Preferenze | null>(null)
@@ -168,7 +173,8 @@ export default function Assenze() {
               <form onSubmit={(e: FormEvent<HTMLFormElement>) => {
                       e.preventDefault()
                       void preferenze.esegui(async () => {
-                        await api.put('/assenze/preferenze', pref); await ricarica()
+                        // Anche la sessione: Turni e Mio leggono lì da dove partire.
+                        await api.put('/assenze/preferenze', pref); await ricarica(); await ricaricaSessione()
                       })
                     }}
                     className="flex flex-col gap-4">
@@ -193,6 +199,38 @@ export default function Assenze() {
                     </div>
                   </fieldset>
                 ))}
+                <fieldset>
+                  <legend className="mb-1.5 text-xs font-medium text-ink-muted">Turni si apre su</legend>
+                  <div className="flex flex-wrap gap-3">
+                    {([['giorni', 'Giorni'], ['griglia', 'Griglia']] as const).map(([v, t]) => (
+                      <label key={v} className="flex cursor-pointer items-center gap-1.5 text-base">
+                        <input type="radio" name="vistaTurni" checked={pref.vistaTurni === v}
+                               onChange={() => setPref({ ...pref, vistaTurni: v })} />
+                        {t}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                <fieldset>
+                  <legend className="mb-1.5 text-xs font-medium text-ink-muted">In Mio, all'apertura mostra</legend>
+                  <div className="flex flex-wrap gap-3">
+                    {(Object.keys(STATI) as Stato[]).map((s) => {
+                      const on = pref.filtriMio.includes(s)
+                      return (
+                        <label key={s} className="flex cursor-pointer items-center gap-1.5 text-base">
+                          {/* Almeno una: una lista vuota all'apertura sembra un guasto. */}
+                          <input type="checkbox" checked={on} disabled={on && pref.filtriMio.length === 1}
+                                 onChange={(e) => setPref({
+                                   ...pref,
+                                   filtriMio: e.target.checked
+                                     ? [...pref.filtriMio, s] : pref.filtriMio.filter((x) => x !== s),
+                                 })} />
+                          {STATI[s].plurale}
+                        </label>
+                      )
+                    })}
+                  </div>
+                </fieldset>
                 <label className="flex cursor-pointer items-start gap-2 text-base">
                   <input type="checkbox" className="mt-1" checked={pref.promemoriaSera}
                          onChange={(e) => setPref({ ...pref, promemoriaSera: e.target.checked })} />

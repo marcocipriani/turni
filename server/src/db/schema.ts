@@ -1,11 +1,23 @@
 import { sql } from 'drizzle-orm'
 import {
-  boolean, date, index, int, json, mysqlEnum, mysqlTable, primaryKey,
+  boolean, customType, date, index, int, json, mysqlEnum, mysqlTable, primaryKey,
   text, timestamp, tinyint, uniqueIndex, varchar,
 } from 'drizzle-orm/mysql-core'
 
 const id = () => int('id').autoincrement().primaryKey()
 const now = () => timestamp('creato_il').defaultNow().notNull()
+
+/**
+ * JSON che torna JSON. Su MariaDB `json` è un `longtext` con un controllo, e il
+ * driver lo restituisce come testo: `json()` di drizzle lo lascerebbe stringa,
+ * e un `"[2,4]".includes(2)` funziona per caso finché qualcuno non lo rimanda
+ * indietro. Questo tipo lo decodifica all'uscita, qualunque sia il motore.
+ */
+const jsonDecodificato = <T>(nome: string) => customType<{ data: T; driverData: string }>({
+  dataType: () => 'json',
+  toDriver: (v) => JSON.stringify(v),
+  fromDriver: (v) => (typeof v === 'string' ? JSON.parse(v) : v) as T,
+})(nome)
 
 /* ─── Organizzazione ─────────────────────────────────────────────── */
 
@@ -182,8 +194,8 @@ export const absenceRule = mysqlTable('absence_rule', {
 
 export const userPreference = mysqlTable('user_preference', {
   userId: int('user_id').primaryKey(),
-  giorniPreferiti: json('giorni_preferiti').$type<number[]>(),
-  giorniDaEvitare: json('giorni_da_evitare').$type<number[]>(),
+  giorniPreferiti: jsonDecodificato<number[]>('giorni_preferiti'),
+  giorniDaEvitare: jsonDecodificato<number[]>('giorni_da_evitare'),
   nota: varchar('nota', { length: 500 }),
   // Tonalità dell'avatar, 0-7. Null = ricavata dall'identificativo.
   avatarTinta: tinyint('avatar_tinta'),
@@ -192,6 +204,9 @@ export const userPreference = mysqlTable('user_preference', {
   programmazioneVistaIl: timestamp('programmazione_vista_il'),
   // Promemoria la sera prima di una giornata in sede. Chiesto, non imposto.
   promemoriaSera: boolean('promemoria_sera').default(false).notNull(),
+  // Da dove si parte: la vista di Turni e le chip di Mio accese all'apertura.
+  vistaTurni: varchar('vista_turni', { length: 10 }).default('giorni').notNull(),
+  filtriMio: jsonDecodificato<string[]>('filtri_mio'),
 })
 
 export const recurringRule = mysqlTable('recurring_rule', {

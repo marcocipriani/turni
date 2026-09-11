@@ -114,16 +114,26 @@ absences.delete('/regole/:id', async (c) => {
 absences.get('/preferenze', async (c) => {
   const a = c.get('attore')
   const [p] = await db.select().from(schema.userPreference).where(eq(schema.userPreference.userId, a.id)).limit(1)
-  return c.json(p ?? { userId: a.id, giorniPreferiti: [], giorniDaEvitare: [], nota: null, promemoriaSera: false })
+  // Le colonne nate dopo la riga valgono null: si rimandano coi valori di partenza.
+  return c.json({
+    userId: a.id, nota: null, promemoriaSera: false, vistaTurni: 'giorni', ...p,
+    giorniPreferiti: p?.giorniPreferiti ?? [], giorniDaEvitare: p?.giorniDaEvitare ?? [],
+    filtriMio: p?.filtriMio?.length ? p.filtriMio : ['presenza'],
+  })
 })
 
 absences.put('/preferenze', async (c) => {
   const a = c.get('attore')
-  const giorni = z.array(z.number().int().min(1).max(5)).max(5)
+  // Il modulo rimanda indietro la riga com'è in archivio, e lì un elenco mai
+  // compilato vale null: null e assente sono la stessa cosa, un elenco vuoto.
+  const giorni = z.array(z.number().int().min(1).max(5)).max(5).nullish().transform((v) => v ?? [])
   const b = z.object({
-    giorniPreferiti: giorni.default([]), giorniDaEvitare: giorni.default([]),
+    giorniPreferiti: giorni, giorniDaEvitare: giorni,
     nota: z.string().max(500).nullable().default(null),
     promemoriaSera: z.boolean().default(false),
+    vistaTurni: z.enum(['giorni', 'griglia']).default('giorni'),
+    filtriMio: z.array(z.enum(['presenza', 'smart', 'assenza'])).min(1).max(3).nullish()
+      .transform((v) => v ?? ['presenza' as const]),
   }).safeParse(await c.req.json())
   if (!b.success) throw new HttpError(422, 'Preferenze non valide')
   await db.insert(schema.userPreference).values({ userId: a.id, ...b.data })

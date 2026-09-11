@@ -140,6 +140,10 @@ async function main() {
   // Il promemoria della sera prima: spento finché la persona non lo accende.
   await colonna('user_preference', 'promemoria_sera', '`promemoria_sera` tinyint(1) NOT NULL DEFAULT 0')
 
+  // Le viste di partenza, scelte da ciascuno.
+  await colonna('user_preference', 'vista_turni', "`vista_turni` varchar(10) NOT NULL DEFAULT 'giorni'")
+  await colonna('user_preference', 'filtri_mio', '`filtri_mio` json DEFAULT NULL')
+
   console.log('Fatto.')
   await pool.end()
 }

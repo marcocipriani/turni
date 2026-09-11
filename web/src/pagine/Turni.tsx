@@ -6,7 +6,7 @@
  * una destinazione sola, nessun bivio da capire prima di cliccare.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, type Griglia as DatiGriglia, type Periodo } from '../api'
 import { type StatoBottone, useAzione } from '../azioni'
 import { addDays, lunediDi, oggiISO } from '../date'
@@ -37,6 +37,7 @@ export default function Turni() {
   const { utente } = useSessione()
   const navigate = useNavigate()
   const { id } = useParams()
+  const [query] = useSearchParams()
 
   const [periodi, setPeriodi] = useState<Periodo[] | null>(null)
   const [dati, setDati] = useState<DatiGriglia | null>(null)
@@ -78,6 +79,14 @@ export default function Turni() {
   }, [])
 
   useEffect(() => { void caricaPeriodi() }, [caricaPeriodi])
+
+  /* Chi preferisce la griglia ci atterra entrando da «Turni»; chi preme
+     «Giorni» porta con sé `?vista=giorni` e resta sui giorni. */
+  useEffect(() => {
+    if (id || query.get('vista') || utente?.preferenze?.vistaTurni !== 'griglia' || !periodi) return
+    const r = periodoDiRiferimento(periodi)
+    if (r) navigate(`/turni/${r.id}`, { replace: true })
+  }, [id, query, periodi, utente, navigate])
   useEffect(() => {
     if (!id) { setDati(null); setSelezione(null); return }
     setErrore(null)
@@ -195,7 +204,7 @@ export default function Turni() {
       <Toolbar>
         <div role="radiogroup" aria-label="Come guardare i turni"
              className="inline-flex overflow-hidden rounded-r2 border border-border-controllo">
-          <BottoneVista attivo={!inGriglia} onClick={() => navigate('/turni')}>Giorni</BottoneVista>
+          <BottoneVista attivo={!inGriglia} onClick={() => navigate('/turni?vista=giorni')}>Giorni</BottoneVista>
           <BottoneVista
             attivo={inGriglia}
             disabled={(periodi?.length ?? 0) === 0}
