@@ -1,6 +1,6 @@
-import { Fragment, memo, useMemo, useRef, useState } from 'react'
+import { Fragment, memo, useEffect, useMemo, useRef, useState } from 'react'
 import type { Cella, Griglia as DatiGriglia, Persona } from '../api'
-import { pezziData } from '../date'
+import { oggiISO, pezziData } from '../date'
 import * as I from '../icone'
 import { etichette } from '../persone'
 
@@ -31,6 +31,18 @@ export default function Griglia({ dati, onSeleziona, selezione, raggruppa = true
 }) {
   const [fuoco, setFuoco] = useState({ riga: 0, colonna: 0 })
   const tabella = useRef<HTMLTableElement>(null)
+  const contenitore = useRef<HTMLDivElement>(null)
+
+  /* Un periodo di quattro settimane non sta in uno schermo: si apre dove si è,
+     non al primo lunedì. La colonna dei nomi è appiccicata e copre quello che
+     le passa sotto: si scorre di quanto è larga, così oggi resta visibile. */
+  useEffect(() => {
+    const box = contenitore.current
+    const th = box?.querySelector<HTMLElement>(`th[data-giorno="${oggiISO()}"]`)
+    const nomi = box?.querySelector<HTMLElement>('thead th')
+    if (!box || !th || !nomi) return
+    box.scrollLeft = th.offsetLeft - nomi.offsetWidth
+  }, [dati.periodo.id])
 
   const indice = useMemo(() => {
     const m = new Map<string, Cella>()
@@ -101,7 +113,7 @@ export default function Griglia({ dati, onSeleziona, selezione, raggruppa = true
   }
 
   return (
-    <div className="min-h-0 overflow-auto">
+    <div ref={contenitore} className="min-h-0 overflow-auto">
       <table ref={tabella} className="border-separate border-spacing-0" onKeyDown={tasti}>
         <caption className="solo-lettori-schermo">
           Programmazione dal {dati.periodo.dataInizio} al {dati.periodo.dataFine}.
@@ -111,15 +123,15 @@ export default function Griglia({ dati, onSeleziona, selezione, raggruppa = true
         <thead>
           <tr>
             <th scope="col"
-                className="sticky left-0 top-0 z-[3] min-w-[112px] border-b border-r border-border bg-surface
+                className="sticky left-0 top-0 z-[3] min-w-[80px] sm:min-w-[112px] border-b border-r border-border bg-surface
                            px-2.5 py-1.5 text-left text-xs font-semibold text-ink-muted md:min-w-[168px]">
               Persona
             </th>
             {dati.giorni.map((g) => {
               const { giorno, breve, lunedi } = pezziData(g)
               return (
-                <th key={g} scope="col"
-                    className={`sticky top-0 z-[2] w-[52px] border-b border-r border-border bg-surface px-1 py-1.5
+                <th key={g} scope="col" data-giorno={g}
+                    className={`sticky top-0 z-[2] w-[44px] sm:w-[52px] border-b border-r border-border bg-surface px-1 py-1.5
                                 text-center text-xs font-semibold text-ink-muted
                                 ${lunedi ? 'border-l-2 border-l-border-strong' : ''}`}>
                   <span className="block text-2xs font-normal text-ink-faint">{breve}</span>
@@ -136,15 +148,19 @@ export default function Griglia({ dati, onSeleziona, selezione, raggruppa = true
               {gr.intestato && (
               <tr>
                 <th scope="colgroup" colSpan={dati.giorni.length + 1}
-                    className="sticky left-0 border-y border-border bg-surface-2 px-2.5 py-1 text-left">
-                  <span className="mono text-2xs uppercase tracking-[0.06em] text-ink-muted">
-                    {gr.settore ?? 'Senza settore'}
-                  </span>
-                  <span className="ml-2 text-2xs text-ink-faint">
-                    {gr.persone.length} {gr.persone.length === 1 ? 'persona' : 'persone'}
-                    {gr.presidio && ' · presidio quotidiano'}
-                    {gr.settore === null && ' · non copre presidi'}
-                  </span>
+                    className="border-y border-border bg-surface-2 py-1 text-left">
+                  {/* La cella è larga quanto la tabella e non può restare ferma:
+                      a restare fermo a sinistra, scorrendo, è il suo contenuto. */}
+                  <div className="sticky left-0 w-max px-2.5">
+                    <span className="mono text-2xs uppercase tracking-[0.06em] text-ink-muted">
+                      {gr.settore ?? 'Senza settore'}
+                    </span>
+                    <span className="ml-2 text-2xs text-ink-faint">
+                      {gr.persone.length} {gr.persone.length === 1 ? 'persona' : 'persone'}
+                      {gr.presidio && ' · presidio quotidiano'}
+                      {gr.settore === null && ' · non copre presidi'}
+                    </span>
+                  </div>
                 </th>
               </tr>
               )}
@@ -154,6 +170,7 @@ export default function Griglia({ dati, onSeleziona, selezione, raggruppa = true
                 return (
                   <RigaPersona
                     key={p.id} persona={p} etichetta={nomi.get(p.id) ?? p.cognome} io={p.id === ioId}
+                    breve={`${p.cognome} ${p.nome.slice(0, 1)}.`}
                     giorni={dati.giorni} indice={indice}
                     stanzaBreve={stanzaBreve} scrivaniaNumero={scrivaniaNumero}
                     selezione={selezione} rigaIndice={rigaIndice} fuoco={fuoco}
@@ -192,11 +209,12 @@ export default function Griglia({ dati, onSeleziona, selezione, raggruppa = true
 
 /** Memoizzata: con 500 persone la selezione di una cella non ridisegna tutto. */
 const RigaPersona = memo(function RigaPersona({
-  persona: p, etichetta, io, giorni, indice, stanzaBreve, scrivaniaNumero, selezione, rigaIndice, fuoco,
+  persona: p, etichetta, breve, io, giorni, indice, stanzaBreve, scrivaniaNumero, selezione, rigaIndice, fuoco,
   onSeleziona, onFuoco,
 }: {
   persona: Persona
   etichetta: string
+  breve: string
   io: boolean
   giorni: string[]
   indice: Map<string, Cella>
@@ -214,11 +232,13 @@ const RigaPersona = memo(function RigaPersona({
   return (
     <tr className="h-[30px]">
       <th scope="row"
-          className={`sticky left-0 z-[1] h-[30px] border-b border-r border-border px-2.5 text-left text-[12.5px]
+          className={`sticky left-0 z-[1] h-[30px] border-b border-r border-border px-1.5 sm:px-2.5 text-left text-[12.5px]
                       ${io ? 'font-semibold text-ink' : 'font-normal'} ${fondo}`}
           style={io ? { boxShadow: 'inset 2px 0 0 var(--ink)' } : undefined}>
-        <span className="block max-w-[96px] truncate md:max-w-[150px]">
-          {etichetta}
+        <span className="block max-w-[68px] truncate sm:max-w-[96px] md:max-w-[150px]">
+          {/* Sul telefono la colonna è stretta: «Rossi M.» si legge, «Ross…» no. */}
+          <span className="sm:hidden">{breve}</span>
+          <span className="max-sm:hidden">{etichetta}</span>
           {p.ruolo === 'dirigente' && <span className="ml-1 text-2xs text-ink-faint">dirig.</span>}
           {io && <span className="solo-lettori-schermo"> (sei tu)</span>}
         </span>
@@ -249,7 +269,7 @@ const RigaPersona = memo(function RigaPersona({
               onFocus={() => onFuoco({ riga: rigaIndice, colonna: ci })}
               onClick={() => onSeleziona({ userId: p.id, data: g })}
               aria-pressed={scelta}
-              className={`h-[30px] w-full cursor-pointer px-1 text-center text-[12.5px] leading-none
+              className={`h-[30px] w-full cursor-pointer px-1 text-center text-[11px] sm:text-[12.5px] leading-none
                           transition-colors duration-[120ms] ease-out hover:bg-surface-2 ${testo}`}
             >
               <span className="mono" aria-hidden="true">
