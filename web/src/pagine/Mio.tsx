@@ -37,6 +37,18 @@ export type DatiMio = {
   scambio: { attivo: boolean; oraLimite: string } | null
 }
 
+/**
+ * Le prossime giornate in cui si è in sede con un collega. I colleghi di
+ * `/mio` sono quelli in sede nei giorni in cui ci sono anch'io: basta
+ * cercarlo fra loro, senza altre richieste.
+ */
+export function prossimeInsieme(giorni: GiornoMio[], userId: number, dopo: string, quante = 3): string[] {
+  return giorni
+    .filter((g) => g.data > dopo && g.colleghi.some((c) => c.userId === userId))
+    .slice(0, quante)
+    .map((g) => g.data)
+}
+
 /* ── Filtri: interruttori indipendenti, non una scelta esclusiva ──── */
 
 type Filtro = Stato
@@ -205,7 +217,7 @@ export default function Mio() {
                     </li>
                   )}
                   <Riga
-                    g={g} stanze={stanzaPerId} mioSettore={dati?.settore ?? null}
+                    g={g} giorni={dati?.giorni ?? []} stanze={stanzaPerId} mioSettore={dati?.settore ?? null}
                     settori={nomiSettore} primaDellaSettimana={nuovaSettimana}
                     scambiabile={Boolean(dati?.scambio?.attivo) && g.data >= oggiISO() && g.stato !== 'assenza'}
                     onScambia={() => setDaScambiare(g.data)}
@@ -229,8 +241,8 @@ export default function Mio() {
 
 /* ── Riga: una giornata. Nessuna card: la cronologia è una lista sola ── */
 
-function Riga({ g, stanze, mioSettore, settori, primaDellaSettimana, aperto, onApri, scambiabile, onScambia }: {
-  g: GiornoMio; stanze: Map<number, { etichetta: string; soprannome: string | null }>
+function Riga({ g, giorni, stanze, mioSettore, settori, primaDellaSettimana, aperto, onApri, scambiabile, onScambia }: {
+  g: GiornoMio; giorni: GiornoMio[]; stanze: Map<number, { etichetta: string; soprannome: string | null }>
   mioSettore: { id: number; nome: string } | null
   settori: Map<number, string>
   /** Segue la didascalia di settimana, che porta già il suo taglio marcato. */
@@ -337,11 +349,12 @@ function Riga({ g, stanze, mioSettore, settori, primaDellaSettimana, aperto, onA
       {aperto && (
         <div className="entra border-t border-border bg-bg px-3 py-2 md:px-4">
           {miei.length > 0 && (
-            <Colleghi titolo={mioSettore?.nome ?? 'Il tuo settore'} gente={miei} stanze={stanze} settori={settori} />
+            <Colleghi titolo={mioSettore?.nome ?? 'Il tuo settore'} gente={miei} stanze={stanze} settori={settori}
+                      giorni={giorni} data={g.data} />
           )}
           {altri.length > 0 && (
             <Colleghi titolo={miei.length > 0 || soloIoDelSettore ? 'Altri in sede' : 'In sede'}
-                      gente={altri} stanze={stanze} settori={settori} />
+                      gente={altri} stanze={stanze} settori={settori} giorni={giorni} data={g.data} />
           )}
         </div>
       )}
@@ -349,8 +362,11 @@ function Riga({ g, stanze, mioSettore, settori, primaDellaSettimana, aperto, onA
   )
 }
 
-function Colleghi({ titolo, gente, stanze, settori }: {
+function Colleghi({ titolo, gente, stanze, settori, giorni, data }: {
   titolo: string
+  giorni: GiornoMio[]
+  /** La giornata aperta: le prossime insieme si contano da qui. */
+  data: string
   gente: Collega[]
   stanze: Map<number, { etichetta: string; soprannome: string | null }>
   settori: Map<number, string>
@@ -374,6 +390,7 @@ function Colleghi({ titolo, gente, stanze, settori }: {
               {c.roomId != null ? stanze.get(c.roomId)?.etichetta ?? '—' : '—'}
               {c.scrivania && `/${c.scrivania}`}
             </span>
+            <ProssimeInsieme date={prossimeInsieme(giorni, c.userId, data)} />
           </li>
         ))}
       </ul>
@@ -457,4 +474,16 @@ async function immagine(giorni: GiornoMio[], stanze: Map<number, { etichetta: st
   const a = document.createElement('a')
   a.href = URL.createObjectURL(file); a.download = file.name; a.click()
   setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+}
+
+/** «anche 16, 18 set»: quando si torna a lavorare nella stessa sede. */
+function ProssimeInsieme({ date }: { date: string[] }) {
+  if (date.length === 0) return null
+  const pezzi = date.map(pezziData)
+  // Il mese si scrive una volta sola quando è lo stesso per tutte.
+  const unMese = pezzi.every((x) => x.mese === pezzi[0]!.mese)
+  const testo = unMese
+    ? `${pezzi.map((x) => x.giorno).join(', ')} ${pezzi[0]!.mese}`
+    : pezzi.map((x) => `${x.giorno} ${x.mese}`).join(', ')
+  return <span className="w-full pl-[34px] text-2xs text-ink-faint">di nuovo insieme {testo}</span>
 }
