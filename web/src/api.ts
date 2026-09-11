@@ -54,6 +54,7 @@ export type Utente = {
   ruolo: 'admin' | 'dirigente' | 'dipendente'
   unitId: number | null; sectorId: number | null; unitNome: string | null
   passwordDaCambiare: boolean; organizzatoreDi: number[]
+  preferenze: { vistaTurni: 'giorni' | 'griglia'; filtriMio: ('presenza' | 'smart' | 'assenza')[] }
 }
 
 export type Unita = {

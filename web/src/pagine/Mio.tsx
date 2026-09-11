@@ -93,7 +93,9 @@ export default function Mio() {
   const [scambi, setScambi] = useState<ElencoScambi | null>(null)
   const [errore, setErrore] = useState<string | null>(null)
   const [copiaDel, setCopiaDel] = useState<Date | null>(null)
-  const [attivi, setAttivi] = useState<Set<Filtro>>(new Set<Filtro>(['presenza']))
+  // Si parte dalle chip scelte nelle preferenze; di lì in poi decide chi guarda.
+  const [attivi, setAttivi] = useState<Set<Filtro>>(
+    () => new Set<Filtro>(utente?.preferenze?.filtriMio ?? ['presenza']))
   const [aperto, setAperto] = useState<string | null>(null)
   const [daScambiare, setDaScambiare] = useState<string | null>(null)
 

@@ -80,11 +80,17 @@ auth.get('/me', async (c) => {
   const [u] = await db.select().from(schema.user).where(eq(schema.user.id, a.id)).limit(1)
   if (!u) throw new HttpError(404, 'Utente non trovato')
   const unita = u.unitId ? await db.select().from(schema.unit).where(eq(schema.unit.id, u.unitId)).limit(1) : []
+  const [pref] = await db.select().from(schema.userPreference).where(eq(schema.userPreference.userId, u.id)).limit(1)
   return c.json({
     id: u.id, email: u.email, nome: u.nome, cognome: u.cognome, ruolo: u.ruolo,
     unitId: u.unitId, sectorId: u.sectorId, passwordDaCambiare: u.passwordDaCambiare,
     unitNome: unita[0]?.nome ?? null,
     organizzatoreDi: a.organizzatoreDi,
+    // Viaggiano col profilo: Turni e Mio le leggono prima ancora di caricare.
+    preferenze: {
+      vistaTurni: pref?.vistaTurni === 'griglia' ? 'griglia' : 'giorni',
+      filtriMio: pref?.filtriMio?.length ? pref.filtriMio : ['presenza'],
+    },
   })
 })
 
