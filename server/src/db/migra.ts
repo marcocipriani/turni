@@ -147,6 +147,9 @@ async function main() {
   // La sede della stanza: prima c'era un edificio solo.
   await colonna('room', 'sede', '`sede` varchar(80) DEFAULT NULL')
 
+  // Assenze registrate da chi programma, per conto di un collega.
+  await colonna('absence', 'registrata_da', '`registrata_da` int DEFAULT NULL')
+
   console.log('Fatto.')
   await pool.end()
 }

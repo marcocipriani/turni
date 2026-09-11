@@ -97,6 +97,10 @@ export type Cella = {
   /** Nata da uno scambio fra colleghi: la generazione non l'ha decisa. */
   daScambio?: boolean
   causale: string | null
+  /** Assenza registrata da chi programma: in griglia ha un segno suo. */
+  perConto?: boolean
+  /** Per toglierla dalla griglia: arriva solo a chi può farlo. */
+  assenzaId?: number | null
 }
 
 export type Griglia = {

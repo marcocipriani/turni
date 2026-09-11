@@ -10,6 +10,9 @@ export function descriviCella(p: Persona, iso: string, c: Cella | undefined, sta
   const quando = `${breve} ${giorno} ${meseNome}`
   const chi = `${p.cognome} ${p.nome}`
   if (!c) return `${chi}, ${quando}, non programmato`
+  if (c.stato === 'assenza' && c.perConto) {
+    return `${chi}, ${quando}, assenza registrata dall'organizzazione${c.causale ? `, causale ${c.causale}` : ''}`
+  }
   if (c.stato === 'assenza') return `${chi}, ${quando}, assenza dichiarata${c.causale ? `, causale ${c.causale}` : ''}`
   if (c.stato === 'smart') return `${chi}, ${quando}, da remoto`
   const dove = [stanza && `stanza ${stanza}`, scrivania && `scrivania ${scrivania}`].filter(Boolean).join(', ')
@@ -274,7 +277,7 @@ const RigaPersona = memo(function RigaPersona({
             >
               <span className="mono" aria-hidden="true">
                 {c?.stato === 'presenza' ? (scrivania ? `${stanza}/${scrivania}` : stanza ?? '•')
-                  : c?.stato === 'assenza' ? '×' : '–'}
+                  : c?.stato === 'assenza' ? (c.perConto ? '⊗' : '×') : '–'}
               </span>
               {c?.bloccata && (
                 <span className="ml-0.5 text-ink-faint" aria-hidden="true">{c.daScambio ? '⇄' : '▪'}</span>
@@ -296,6 +299,7 @@ export function Legenda() {
       </li>
       <li className="inline-flex items-center gap-1.5"><I.Remoto size={13} /><span className="mono">–</span>da remoto</li>
       <li className="inline-flex items-center gap-1.5"><I.Croce size={13} /><span className="mono">×</span>assenza dichiarata</li>
+      <li className="inline-flex items-center gap-1.5"><span className="mono">⊗</span>assenza registrata dall'organizzazione</li>
       <li><span className="mr-1.5 text-ink-faint">▪</span>cella bloccata: la generazione non la tocca</li>
       <li><span className="mr-1.5 text-ink-faint">⇄</span>scambio fra colleghi</li>
     </ul>

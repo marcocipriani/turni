@@ -12,7 +12,7 @@ import {
   radice, unitaDiProgrammazione,
 } from '../permissions'
 import { celleIstantanea, confronta, programmazioneNuova } from '../lib/differenze'
-import { giorniIndisponibili } from './absences'
+import { giorniIndisponibili, giorniIndisponibiliDettaglio } from './absences'
 import { personeDellUnita, type PersonaUnita } from './org'
 
 export const periods = new Hono<Env>()
@@ -54,7 +54,8 @@ async function contesto(p: typeof schema.period.$inferSelect, alb: Albero) {
     roomId: s.id, capienza: scrivanie.filter((d) => d.roomId === s.id).length,
   })).filter((s) => s.capienza > 0)
 
-  const indisponibili = await giorniIndisponibili(ids, p.dataInizio, p.dataFine)
+  const indisponibiliDettaglio = await giorniIndisponibiliDettaglio(ids, p.dataInizio, p.dataFine)
+  const indisponibili = new Map([...indisponibiliDettaglio].map(([k, v]) => [k, v.causale]))
 
   const regoleRighe = await db.select().from(schema.recurringRule).where(
     and(eq(schema.recurringRule.unitId, p.unitId), lte(schema.recurringRule.validoDa, p.dataFine),
@@ -79,7 +80,10 @@ async function contesto(p: typeof schema.period.$inferSelect, alb: Albero) {
     ? await db.select().from(schema.userPreference).where(inArray(schema.userPreference.userId, ids))
     : []
 
-  return { persone, giorni, settori, stanzeRighe, scrivanie, stanze, indisponibili, regole, celle, preferenze }
+  return {
+    persone, giorni, settori, stanzeRighe, scrivanie, stanze, indisponibili, indisponibiliDettaglio,
+    regole, celle, preferenze,
+  }
 }
 
 type Contesto = Awaited<ReturnType<typeof contesto>>
@@ -307,6 +311,8 @@ periods.get('/:id/griglia', async (c) => {
         // riceve notifiche, se ne accorge guardando la griglia.
         daScambio: c0?.origine === 'scambio',
         causale,
+        perConto: ctx.indisponibiliDettaglio.get(`${u.id}|${g}`)?.perConto ?? false,
+        assenzaId: ctx.indisponibiliDettaglio.get(`${u.id}|${g}`)?.assenzaId ?? null,
       }
       return mascheraCella(alb, a, grezza, { id: u.id, unitId: u.unitId })
     }),

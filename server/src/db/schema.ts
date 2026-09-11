@@ -181,6 +181,8 @@ export const absence = mysqlTable('absence', {
   dataInizio: date('data_inizio', { mode: 'string' }).notNull(),
   dataFine: date('data_fine', { mode: 'string' }).notNull(),
   causale: varchar('causale', { length: 40 }).notNull(),
+  // Chi l'ha registrata, se non l'interessato: null = dichiarata da sé.
+  registrataDa: int('registrata_da'),
   creatoIl: now(),
 }, (t) => [index('ix_absence_user').on(t.userId, t.dataInizio)])
 
