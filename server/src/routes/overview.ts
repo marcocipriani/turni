@@ -68,15 +68,14 @@ overview.get('/', async (c) => {
    * fra chi lavora da remoto: è la stessa regola di `mascheraCella`, applicata
    * qui prima che i nomi lascino il server, e non una scelta dell'interfaccia.
    */
-  const conCausaleVisibile = persone.filter((p) => puoVedereCausale(alb, a, { id: p.id, unitId: p.unitId }))
-  const assenze = await giorniIndisponibili(conCausaleVisibile.map((p) => p.id), da, aData)
+  const conCausaleVisibile = persone.filter((p) => puoVedereCausale(alb, a, p))
+  const assenze = await giorniIndisponibili(persone.map((p) => p.id), da, aData)
+  const visibili = new Set(conCausaleVisibile.map((p) => p.id))
 
   // Le assenze proprie servono anche fuori dalla programmazione: la propria
   // giornata si segnala pure dove nessun periodo pubblicato la copre.
-  const mieAssenze = await db.select().from(schema.absence).where(
-    and(eq(schema.absence.userId, a.id), lte(schema.absence.dataInizio, aData), gte(schema.absence.dataFine, da)),
-  )
-  const mieiGiorniAssenti = new Set(mieAssenze.flatMap((x) => eachDay(x.dataInizio, x.dataFine)))
+  const mieAssenze = await giorniIndisponibili([a.id], da, aData)
+  const mieiGiorniAssenti = new Set([...mieAssenze.keys()].map((k) => k.split('|')[1]!))
 
   const perPersona = new Map(persone.map((p) => [p.id, p]))
   const capienzaPerStanza = new Map<number, number>()
@@ -109,7 +108,7 @@ overview.get('/', async (c) => {
     // La divisione — e con lei la precedenza dell'assenza sulla cella — sta in
     // `lib/giornata`, dove si può provare senza un archivio davanti.
     const { presenti, remoti, assenti } =
-      dividiGiornata(g, perGiorno.get(g) ?? [], perPersona, assenze, numeroScrivania)
+      dividiGiornata(g, perGiorno.get(g) ?? [], perPersona, assenze, numeroScrivania, visibili)
 
     return {
       data: g,

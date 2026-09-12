@@ -126,8 +126,12 @@ describe('assenze registrate per conto di un collega', () => {
     expect(puoRegistrareAssenzaPer(albero, organizzatoreX, persona(12, 'dipendente', 2))).toBe(true)
     expect(puoRegistrareAssenzaPer(albero, dirigenteX, persona(12, 'dipendente', 2))).toBe(true)
   })
-  it('il dirigente di una figlia è programmato nel padre: lì lo registra chi programma il padre', () => {
-    expect(puoRegistrareAssenzaPer(albero, organizzatoreX, persona(40, 'dirigente', 4))).toBe(true)
+  it('il dirigente di una figlia è programmato nel padre: lì lo registra e lo vede chi programma il padre', () => {
+    const interessato = persona(40, 'dirigente', 4)
+    expect(puoRegistrareAssenzaPer(albero, organizzatoreX, interessato)).toBe(true)
+    expect(puoVedereCausale(albero, organizzatoreX, interessato)).toBe(true)
+    const delegatoFiglia = { ...organizzatoreX, organizzatoreDi: [4] }
+    expect(puoVedereCausale(albero, delegatoFiglia, interessato)).toBe(false)
   })
   it('un collega senza delega no, l\'admin nemmeno', () => {
     expect(puoRegistrareAssenzaPer(albero, dipendenteX, persona(13, 'dipendente', 2))).toBe(false)

@@ -76,6 +76,9 @@ org.post('/unita', async (c) => {
 
   const [dir] = await db.select().from(schema.user).where(eq(schema.user.id, b.data.dirigenteUserId)).limit(1)
   if (!dir) throw nonTrovato('Dirigente designato non trovato')
+  if (!dir.attivo || dir.ruolo !== 'dipendente' || dir.unitId !== b.data.parentId) {
+    throw new HttpError(422, 'Scegli un dipendente attivo della tua unità')
+  }
 
   const [ins] = await db.insert(schema.unit).values({
     parentId: b.data.parentId, nome: b.data.nome, sigla: b.data.sigla ?? null,
@@ -172,6 +175,10 @@ org.post('/unita/:id/assegna-settore', async (c) => {
   const b = z.object({ userId: z.number().int(), sectorId: z.number().int().nullable() })
     .safeParse(await c.req.json())
   if (!b.success) throw new HttpError(422, 'Dati non validi')
+  const [persona] = await db.select().from(schema.user).where(eq(schema.user.id, b.data.userId)).limit(1)
+  if (!persona || !persona.attivo || persona.unitId !== id || persona.ruolo !== 'dipendente') {
+    throw new HttpError(422, 'La persona non è un dipendente attivo di questa unità')
+  }
   if (b.data.sectorId != null) {
     const [s] = await db.select().from(schema.sector).where(eq(schema.sector.id, b.data.sectorId)).limit(1)
     if (!s || s.unitId !== id) throw new HttpError(422, 'Il settore non appartiene a questa unità')

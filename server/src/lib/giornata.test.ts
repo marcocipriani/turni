@@ -13,6 +13,13 @@ const cella = (userId: number, stato: 'presenza' | 'smart', roomId: number | nul
 const G = '2026-09-07'
 
 describe('divisione della giornata', () => {
+  it('maschera anche un’assenza sopraggiunta dopo una presenza pubblicata', () => {
+    const r = dividiGiornata(G, [cella(1, 'presenza', 5, 10)], persone,
+      new Set([`1|${G}`]), scrivanie, new Set())
+    expect(r.presenti).toEqual([])
+    expect(r.assenti).toEqual([])
+    expect(r.remoti.map((p) => p.userId)).toEqual([1])
+  })
   it('separa sede e remoto, e riporta stanza e scrivania di chi c\'è', () => {
     const { presenti, remoti, assenti } = dividiGiornata(
       G, [cella(1, 'presenza', 5, 10), cella(2, 'smart')], persone, new Set(), scrivanie)

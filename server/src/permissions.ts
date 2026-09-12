@@ -100,11 +100,12 @@ export function puoAmministrareUnita(a: Attore, unitId: number): boolean {
  * Chi vede la causale di un'assenza: l'interessato, gli organizzatori della sua
  * unità di programmazione, e il dirigente di qualunque unità che la contenga.
  */
-export function puoVedereCausale(albero: Albero, a: Attore, interessato: { id: number; unitId: number | null }): boolean {
+export function puoVedereCausale(albero: Albero, a: Attore, interessato: { id: number; unitId: number | null; ruolo?: 'admin' | 'dirigente' | 'dipendente' }): boolean {
   if (a.id === interessato.id) return true
   if (a.ruolo === 'admin') return false
   if (interessato.unitId == null) return false
-  if (a.organizzatoreDi.includes(interessato.unitId)) return true
+  const programmata = unitaDiProgrammazione(albero, interessato.ruolo ?? 'dipendente', interessato.unitId)
+  if (programmata != null && a.organizzatoreDi.includes(programmata)) return true
   if (a.ruolo === 'dirigente' && a.unitId != null) return sottoalbero(albero, a.unitId).has(interessato.unitId)
   return false
 }
@@ -134,7 +135,7 @@ export function mascheraCella(
   albero: Albero,
   a: Attore,
   cella: CellaGriglia,
-  interessato: { id: number; unitId: number | null },
+  interessato: { id: number; unitId: number | null; ruolo?: 'admin' | 'dirigente' | 'dipendente' },
 ): CellaGriglia {
   if (puoVedereCausale(albero, a, interessato)) return cella
   return {

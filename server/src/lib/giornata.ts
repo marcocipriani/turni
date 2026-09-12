@@ -2,13 +2,9 @@
  * Come si divide una giornata fra chi è in sede, chi lavora da remoto e chi
  * manca.
  *
- * La regola delicata sta qui dentro, in tre righe: l'assenza dichiarata vince
- * sulla cella, e l'insieme delle assenze che arriva è già stato filtrato da
- * chi chiama con `puoVedereCausale`. Chi non ha titolo a vedere l'assenza di
- * un collega riceve una mappa che quel collega non contiene, e se lo ritrova
- * fra i remoti — che è esattamente ciò che vede in griglia.
- *
- * Non decide niente sui permessi: li applica chi la chiama, una volta sola.
+ * L'assenza dichiarata vince sulla cella. Tutte le assenze partecipano al
+ * calcolo delle presenze; soltanto quelle autorizzate compaiono come tali,
+ * mentre le altre diventano lavoro da remoto senza causale.
  */
 
 export type Anagrafica = {
@@ -31,9 +27,10 @@ export function dividiGiornata(
   data: string,
   celle: CellaGiorno[],
   perPersona: Map<number, Anagrafica>,
-  /** Chiavi `userId|data` delle assenze che chi guarda ha titolo di vedere. */
+  /** Chiavi `userId|data` di tutte le assenze. */
   assenze: ReadonlySet<string> | ReadonlyMap<string, unknown>,
   numeroScrivania: Map<number, string>,
+  assenzeVisibili?: ReadonlySet<number>,
 ): { presenti: Presente[]; remoti: Chi[]; assenti: Chi[] } {
   const presenti: Presente[] = [], remoti: Chi[] = [], assenti: Chi[] = []
 
@@ -44,7 +41,10 @@ export function dividiGiornata(
     const chi: Chi = {
       userId: x.userId, nome: p.nome, cognome: p.cognome, unitId: p.unitId, sectorId: p.sectorId,
     }
-    if (assenze.has(`${x.userId}|${data}`)) assenti.push(chi)
+    if (assenze.has(`${x.userId}|${data}`)) {
+      if (!assenzeVisibili || assenzeVisibili.has(x.userId)) assenti.push(chi)
+      else remoti.push(chi)
+    }
     else if (x.stato === 'presenza') {
       presenti.push({
         ...chi,

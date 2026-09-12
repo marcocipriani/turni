@@ -15,7 +15,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/licenza-MIT-2b2b2b?style=flat-square" alt="Licenza MIT">
-  <img src="https://img.shields.io/badge/test-229-2b2b2b?style=flat-square" alt="229 test automatici">
+  <img src="https://img.shields.io/badge/test-290-2b2b2b?style=flat-square" alt="290 test automatici">
   <img src="https://img.shields.io/badge/WCAG_2.1-AA-2b2b2b?style=flat-square" alt="Nessuna violazione WCAG 2.1 AA">
   <img src="https://img.shields.io/badge/PWA-funziona_offline-2b2b2b?style=flat-square" alt="Applicazione installabile, funziona senza rete">
   <img src="https://img.shields.io/badge/React_19-Hono_su_Node-2b2b2b?style=flat-square" alt="React 19 sul davanti, Hono su Node dietro">
@@ -208,15 +208,16 @@ il layout — e a farlo rispettare c'è un test che legge i fotogrammi chiave.
 ## Verifiche
 
 ```bash
-npm test          # 229 test: motore, permessi, scambi, nomi, contrasti, telefono, movimento
-npm run verifica  # 13 criteri di accettazione contro un'istanza avviata
+npm test          # 290 test: motore, permessi, scambi, nomi, contrasti, telefono, movimento
+npm run verifica  # 12 criteri di accettazione contro un'istanza avviata
 npm run carico    # motore fino a 1000 persone
 npm run build     # controllo dei tipi e build di produzione
 ```
 
-I 229 girano ovunque. Altri sette — caricamento ed esportazione — parlano con
-il database di prova: senza `DATABASE_URL` nel `.env` quei due file si fermano
-prima di partire, e il conto si ferma a 229.
+I 290 girano senza database. La regressione completa delle rotte usa un archivio
+MySQL/MariaDB isolato e si abilita passando `TURNI_TEST_DATABASE_URL`; il test si
+rifiuta di usare un database il cui nome non inizi con `turni_test` o
+`turni_review`.
 
 Le verifiche che parlano con un browser — accessibilità, tempi di
 caricamento, schermate — pilotano Chrome headless dal protocollo di sviluppo,
@@ -241,12 +242,12 @@ Il promemoria della sera lo lancia il cron del pannello di hosting, una volta
 al giorno, domenica compresa:
 
 ```
-0 16 * * * cd ~/turni && npm run promemoria >> ~/turni/promemoria.log 2>&1
+0 16,17 * * * cd ~/turni && npm run promemoria >> ~/turni/promemoria.log 2>&1
 ```
 
-Il cron del server gira in UTC: `0 16` sono le 18 italiane con l'ora legale,
-d'inverno le 17. Per le 18 tutto l'anno si può mettere `0 16,17 * * *`: il
-secondo lancio non manda niente a chi l'ha già ricevuto. Aggiornando da una
+Il cron del server gira in UTC e parte quindi alle 16 e alle 17. Il comando
+invia soltanto quando in `Europe/Rome` sono le 18: così segue automaticamente
+ora legale e ora solare, senza duplicare i promemoria. Aggiornando da una
 versione precedente, `npm run migra` aggiunge le colonne nuove.
 
 ## Documentazione

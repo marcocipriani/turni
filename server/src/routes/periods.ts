@@ -124,8 +124,19 @@ function validazioni(ctx: Contesto, p: typeof schema.period.$inferSelect) {
                   messaggio: `${x.data}: stanza ${x.etichetta} con ${x.presenti} persone per ${x.capienza} postazioni` })
   }
 
+  const scrivanieOccupate = new Set<string>()
   for (const c of ctx.celle) {
     if (c.stato !== 'presenza') continue
+    if (!ctx.stanze.some((s) => s.roomId === c.roomId)) {
+      avvisi.push({ gravita: 'errore', data: c.data, messaggio: `${c.data}: stanza non disponibile` })
+    }
+    if (c.deskId != null) {
+      const k = `${c.data}|${c.deskId}`
+      if (scrivanieOccupate.has(k) || !ctx.scrivanie.some((d) => d.id === c.deskId && d.roomId === c.roomId)) {
+        avvisi.push({ gravita: 'errore', data: c.data, messaggio: `${c.data}: scrivania occupata due volte o non disponibile` })
+      }
+      scrivanieOccupate.add(k)
+    }
     if (ctx.indisponibili.has(`${c.userId}|${c.data}`)) {
       const u = ctx.persone.find((x) => x.id === c.userId)
       avvisi.push({
@@ -328,7 +339,7 @@ periods.get('/:id/griglia', async (c) => {
         perConto: ctx.indisponibiliDettaglio.get(`${u.id}|${g}`)?.perConto ?? false,
         assenzaId: ctx.indisponibiliDettaglio.get(`${u.id}|${g}`)?.assenzaId ?? null,
       }
-      return mascheraCella(alb, a, grezza, { id: u.id, unitId: u.unitId })
+      return mascheraCella(alb, a, grezza, u)
     }),
   )
 
@@ -371,14 +382,19 @@ async function scriviCelle(p: typeof schema.period.$inferSelect, a: Attore, alb:
   // Il pubblicato non si tocca: lo si rivede nel suo gemello, che i colleghi non vedono.
   if (p.stato === 'pubblicato') throw new HttpError(409, 'Per modificare un periodo pubblicato apri una revisione')
 
-  const persone = new Set((await personeDellUnita(alb, p.unitId)).map((u) => u.id))
+  const ctx = await contesto(p, alb)
+  const persone = new Set(ctx.persone.map((u) => u.id))
   for (const x of celle) {
     if (!persone.has(x.userId)) throw new HttpError(422, 'Persona fuori da questa programmazione')
-    if (x.data < p.dataInizio || x.data > p.dataFine) throw new HttpError(422, 'Giornata fuori dal periodo')
+    if (!ctx.giorni.includes(x.data)) throw new HttpError(422, 'Giornata non lavorativa o fuori dal periodo')
+    if (x.stato === 'presenza') {
+      if (!ctx.stanze.some((s) => s.roomId === x.roomId)) throw new HttpError(422, 'Stanza non disponibile in questa unità')
+      if (x.deskId != null && !ctx.scrivanie.some((d) => d.id === x.deskId && d.roomId === x.roomId)) {
+        throw new HttpError(422, 'Scrivania non disponibile in questa stanza')
+      }
+    }
   }
-  const date = celle.map((x) => x.data).sort()
-  const assenze = await giorniIndisponibili([...new Set(celle.map((x) => x.userId))], date[0]!, date.at(-1)!)
-  if (celle.some((x) => assenze.has(`${x.userId}|${x.data}`))) {
+  if (celle.some((x) => ctx.indisponibili.has(`${x.userId}|${x.data}`))) {
     throw new HttpError(409, 'Su un\'assenza non si programma')
   }
 
@@ -429,7 +445,7 @@ periods.post('/:id/genera', async (c) => {
   const ctx = await contesto(p, alb)
   if (ctx.stanze.length === 0) throw new HttpError(422, 'Nessuna stanza con scrivanie attive: non c\'è capienza da distribuire')
 
-  const bloccate = ctx.celle.filter((x) => x.bloccata).map((x) => ({
+  const bloccate = ctx.celle.filter((x) => x.bloccata && !ctx.indisponibili.has(`${x.userId}|${x.data}`)).map((x) => ({
     userId: x.userId, data: x.data, stato: x.stato, roomId: x.roomId,
   }))
 
@@ -448,10 +464,6 @@ periods.post('/:id/genera', async (c) => {
       .map((x) => [`${x.userId}|${x.data}`, x.roomId!])),
   })
 
-  // Le celle bloccate sopravvivono: si riscrive tutto il resto.
-  await db.delete(schema.assignment).where(
-    and(eq(schema.assignment.periodId, p.id), eq(schema.assignment.bloccata, false)),
-  )
   const bloccateChiavi = new Set(bloccate.map((x) => `${x.userId}|${x.data}`))
   const daInserire = esito.assegnazioni.filter((x) => !bloccateChiavi.has(`${x.userId}|${x.data}`))
 
@@ -459,13 +471,17 @@ periods.post('/:id/genera', async (c) => {
   if (p.assegnaScrivanie) {
     for (const g of ctx.giorni) {
       for (const s of ctx.stanze) {
-        scrivanieLibere.set(`${g}|${s.roomId}`, ctx.scrivanie.filter((d) => d.roomId === s.roomId).map((d) => d.id))
+        scrivanieLibere.set(`${g}|${s.roomId}`, ctx.scrivanie.filter((d) => d.roomId === s.roomId && !ctx.celle.some((c) =>
+          c.data === g && c.deskId === d.id && bloccateChiavi.has(`${c.userId}|${c.data}`))).map((d) => d.id))
       }
     }
   }
 
-  if (daInserire.length) {
-    await db.insert(schema.assignment).values(daInserire.map((x) => {
+  await db.transaction(async (tx) => {
+    // Anche il lucchetto cede a un'assenza: la pubblicazione resta modificabile.
+    const daTogliere = ctx.celle.filter((x) => !bloccateChiavi.has(`${x.userId}|${x.data}`))
+    if (daTogliere.length) await tx.delete(schema.assignment).where(inArray(schema.assignment.id, daTogliere.map((x) => x.id)))
+    if (daInserire.length) await tx.insert(schema.assignment).values(daInserire.map((x) => {
       let deskId: number | null = null
       if (p.assegnaScrivanie && x.stato === 'presenza' && x.roomId != null) {
         deskId = scrivanieLibere.get(`${x.data}|${x.roomId}`)?.shift() ?? null
@@ -475,7 +491,7 @@ periods.post('/:id/genera', async (c) => {
         roomId: x.roomId, deskId, bloccata: false, origine: 'generata' as const,
       }
     }))
-  }
+  })
 
   await traccia({ entita: 'period', entitaId: p.id, azione: 'genera', utente: a.id })
   return c.json({
@@ -617,6 +633,7 @@ periods.post('/:id/respingi', async (c) => {
   const p = await caricaPeriodo(Number(c.req.param('id')))
   const a = c.get('attore')
   if (!puoApprovare(a, p.unitId)) throw vietato('Solo il dirigente approva o respinge')
+  if (p.stato !== 'in_approvazione') throw new HttpError(409, 'Il periodo non è in approvazione')
   const b = z.object({ nota: z.string().min(3).max(500) }).safeParse(await c.req.json())
   if (!b.success) throw new HttpError(422, 'Serve una nota che spieghi il rinvio')
 
@@ -637,6 +654,8 @@ periods.post('/:id/approva', async (c) => {
   const a = c.get('attore'), alb = c.get('albero')
   if (!puoApprovare(a, p.unitId)) throw vietato('Solo il dirigente approva')
   if (p.stato !== 'in_approvazione') throw new HttpError(409, 'Il periodo non è in approvazione')
+  const errori = validazioni(await contesto(p, alb), p).filter((x) => x.gravita === 'errore')
+  if (errori.length) throw new HttpError(409, `Ci sono ${errori.length} conflitti da risolvere prima di pubblicare`)
   if (p.revisioneDi != null) return c.json(await applicaRevisione(p, a.id, alb))
 
   // La prima data di pubblicazione non si riscrive: una revisione aggiorna il
@@ -785,6 +804,9 @@ periods.get('/:id/giornata/:data', async (c) => {
   const p = await caricaPeriodo(Number(c.req.param('id')))
   const a = c.get('attore'), alb = c.get('albero')
   if (!puoLeggereUnita(alb, a, p.unitId)) throw vietato()
+  if (p.stato !== 'pubblicato' && !puoProgrammare(a, p.unitId)) {
+    throw vietato('Questa programmazione non è ancora pubblicata')
+  }
   const data = c.req.param('data')
 
   const persone = await personeDellUnita(alb, p.unitId)
@@ -821,6 +843,7 @@ periods.get('/:id/export.csv', async (c) => {
   const p = await caricaPeriodo(Number(c.req.param('id')))
   const a = c.get('attore'), alb = c.get('albero')
   if (!puoLeggereUnita(alb, a, p.unitId)) throw vietato()
+  if (p.stato !== 'pubblicato' && !puoProgrammare(a, p.unitId)) throw vietato()
 
   const ctx = await contesto(p, alb)
   const stanzePerId = new Map(ctx.stanzeRighe.map((s) => [s.id, s.etichetta]))

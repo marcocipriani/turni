@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, inArray, lte, or } from 'drizzle-orm'
+import { and, asc, eq, gte, inArray, isNull, lte, or } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { type Env, HttpError, nonTrovato, vietato } from '../context'
@@ -46,7 +46,7 @@ export async function giorniIndisponibiliDettaglio(
     and(
       inArray(schema.absenceRule.userId, userIds),
       lte(schema.absenceRule.validoDa, a),
-      or(eq(schema.absenceRule.validoA, null as never), gte(schema.absenceRule.validoA, da)),
+      or(isNull(schema.absenceRule.validoA), gte(schema.absenceRule.validoA, da)),
     ),
   )
   for (const r of regole) {

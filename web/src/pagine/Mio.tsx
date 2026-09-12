@@ -74,7 +74,7 @@ function Filtri({ attivi, onCambia, conteggi }: {
               : 'border-border-controllo bg-bg text-ink-muted hover:bg-surface-2 hover:text-ink'}`}
           >
             <Icona size={14} />{STATI[f].plurale}
-            <span className="mono text-2xs opacity-70">{conteggi[f]}</span>
+            <span className="mono text-2xs">{conteggi[f]}</span>
           </button>
         )
       })}

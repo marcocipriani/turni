@@ -17,3 +17,13 @@ export function daAvvisare<T extends CellaDomani>(celle: T[], o: {
 
 export const testoPromemoria = (stanza: string | null, scrivania: string | null) =>
   stanza ? `Domani in sede · ${stanza}${scrivania ? `/${scrivania}` : ''}` : 'Domani in sede'
+
+/** Il cron UTC gira due volte; solo le 18 di Roma inviano, anche al cambio d'ora. */
+export function seraItaliana(adesso: Date): { oggi: string; invia: boolean } {
+  const parti = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', hourCycle: 'h23',
+  }).formatToParts(adesso)
+  const valore = (tipo: Intl.DateTimeFormatPartTypes) => parti.find((p) => p.type === tipo)!.value
+  return { oggi: `${valore('year')}-${valore('month')}-${valore('day')}`, invia: valore('hour') === '18' }
+}

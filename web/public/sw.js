@@ -45,7 +45,9 @@ async function reteOCopia(richiesta, dispensa, marcaLaData) {
   const cache = await caches.open(dispensa)
   try {
     const risposta = await fetch(richiesta)
-    if (risposta.ok) await cache.put(richiesta, risposta.clone())
+    if (dispensa === DATI && risposta.status === 401) {
+      await caches.delete(DATI)
+    } else if (risposta.ok) await cache.put(richiesta, risposta.clone())
     return risposta
   } catch (errore) {
     const copia = await cache.match(richiesta)

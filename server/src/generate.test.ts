@@ -25,6 +25,15 @@ function base(over: Partial<GenerateInput> = {}): GenerateInput {
 }
 
 describe('calendario', () => {
+  it('una nuova assenza prevale anche sulla presenza bloccata', () => {
+    const data = GIORNI[0]!
+    const r = generate(base({
+      bloccate: [{ userId: 1, data, stato: 'presenza', roomId: 10 }],
+      indisponibili: new Set([`1|${data}`]),
+    }))
+    expect(r.assegnazioni.find((c) => c.userId === 1 && c.data === data))
+      .toMatchObject({ stato: 'smart', roomId: null })
+  })
   it('calcola la Pasqua su anni noti', () => {
     expect(easterSunday(2026)).toBe('2026-04-05')
     expect(easterSunday(2027)).toBe('2027-03-28')

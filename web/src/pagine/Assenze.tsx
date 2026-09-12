@@ -22,6 +22,13 @@ const oggi = () => new Date().toISOString().slice(0, 10)
 
 export default function Assenze() {
   const { ricarica: ricaricaSessione } = useSessione()
+  const [pushAttivo, setPushAttivo] = useState(false)
+  useEffect(() => {
+    if (!('serviceWorker' in navigator) || typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+    void navigator.serviceWorker.getRegistration()
+      .then((r) => r?.pushManager?.getSubscription())
+      .then((s) => setPushAttivo(Boolean(s))).catch(() => setPushAttivo(false))
+  }, [])
   const [causali, setCausali] = useState<Causale[]>([])
   const [dati, setDati] = useState<{ assenze: Assenza[]; regole: Regola[] } | null>(null)
   const [pref, setPref] = useState<Preferenze | null>(null)
@@ -241,7 +248,7 @@ export default function Assenze() {
                     <span className="block text-sm text-ink-faint">
                       Alle 18 del giorno prima di una giornata in sede, con stanza e scrivania.
                       {/* Il promemoria arriva comunque nella campanella: il push è un di più. */}
-                      {typeof Notification !== 'undefined' && Notification.permission !== 'granted'
+                      {!pushAttivo
                         && ' Su questo dispositivo le notifiche push non sono attive: lo troverai nella campanella.'}
                     </span>
                   </span>
