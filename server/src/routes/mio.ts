@@ -5,6 +5,7 @@ import { db, schema } from '../db/index'
 import { eachDay, type ISODate, weekday } from '../lib/dates'
 import { INTESTAZIONE_CALENDARIO, righeCalendario } from '../lib/esportazione'
 import { radice, unitaDiProgrammazione } from '../permissions'
+import { giorniIndisponibili } from './absences'
 
 export const mio = new Hono<Env>()
 
@@ -90,22 +91,24 @@ mio.get('/', async (c) => {
   for (const d of scrivanie) capienza.set(d.roomId, (capienza.get(d.roomId) ?? 0) + 1)
   const stanze = stanzeRighe.map((s) => ({
     id: s.id, etichetta: s.etichetta, soprannome: s.soprannome, piano: s.piano,
-    capienza: capienza.get(s.id) ?? 0,
+    sede: s.sede, capienza: capienza.get(s.id) ?? 0,
   }))
   const numeroScrivania = new Map(scrivanie.map((d) => [d.id, d.numero]))
 
+  const indisponibili = await giorniIndisponibili([a.id, ...new Set(colleghiRighe.map((r) => r.userId))], da, fine)
   const colleghiPerGiorno = new Map<string, typeof colleghiRighe>()
   for (const r of colleghiRighe) {
+    if (indisponibili.has(`${r.userId}|${r.data}`)) continue
     const lista = colleghiPerGiorno.get(r.data) ?? colleghiPerGiorno.set(r.data, []).get(r.data)!
     lista.push(r)
   }
 
   const cellaPerGiorno = new Map(mieCelle.map((x) => [x.data, x]))
   const periodoPerGiorno = new Map(periodi.map((p) => [p.id, p]))
-  const causalePerGiorno = new Map<string, string>()
-  for (const x of mieAssenze) {
-    for (const g of eachDay(x.dataInizio > da ? x.dataInizio : da, x.dataFine)) causalePerGiorno.set(g, x.causale)
-  }
+  const causalePerGiorno = new Map(eachDay(da, fine).flatMap((g) => {
+    const causale = indisponibili.get(`${a.id}|${g}`)
+    return causale ? [[g, causale] as const] : []
+  }))
   const giorniFestivi = new Map(festivi.map((f) => [f.data, f.descrizione]))
 
   const giorni = eachDay(da, fine)
@@ -200,10 +203,9 @@ mio.get('/export.csv', async (c) => {
 
   const stanze = new Map((await db.select().from(schema.room)).map((s) => [s.id, s]))
   const scrivanie = new Map((await db.select().from(schema.desk)).map((d) => [d.id, d.numero]))
-  const causale = new Map<string, string>()
-  for (const x of mieAssenze) {
-    for (const g of eachDay(x.dataInizio > da ? x.dataInizio : da, x.dataFine)) causale.set(g, x.causale)
-  }
+  const fine = [...periodi.map((p) => p.dataFine), ...mieAssenze.map((x) => x.dataFine), da].sort().at(-1)!
+  const indisponibili = await giorniIndisponibili([a.id], da, fine)
+  const causale = new Map([...indisponibili].map(([k, v]) => [k.split('|')[1]!, v]))
 
   const virgolette = (v: string) => `"${v.replace(/"/g, '""')}"`
   const righe = [

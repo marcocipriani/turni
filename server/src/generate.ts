@@ -138,7 +138,9 @@ export function generate(input: GenerateInput): GenerateResult {
   const indice = new Map(giorni.map((d, i) => [d, i]))
 
   const fissata = new Map<string, CellaFissata>()
-  for (const c of bloccate) fissata.set(key(c.userId, c.data), c)
+  for (const c of bloccate) {
+    if (!indisponibili.has(key(c.userId, c.data))) fissata.set(key(c.userId, c.data), c)
+  }
 
   const settimane = new Map<string, ISODate[]>()
   for (const d of giorni) {

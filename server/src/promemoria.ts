@@ -10,13 +10,14 @@
 import 'dotenv/config'
 import { and, eq, gte, inArray, lte } from 'drizzle-orm'
 import { db, pool, schema } from './db/index'
-import { addDays, toISO } from './lib/dates'
+import { addDays } from './lib/dates'
 import { avvisa } from './lib/notify'
-import { daAvvisare, testoPromemoria } from './lib/promemoria'
+import { daAvvisare, seraItaliana, testoPromemoria } from './lib/promemoria'
 import { giorniIndisponibili } from './routes/absences'
 
 async function main() {
-  const oggi = toISO(new Date())
+  const { oggi, invia } = seraItaliana(new Date())
+  if (!process.argv[2] && !invia) return console.log('Attendo le 18 in Europe/Rome.')
   const domani = /^\d{4}-\d{2}-\d{2}$/.test(process.argv[2] ?? '') ? process.argv[2]! : addDays(oggi, 1)
 
   const periodi = await db.select({ id: schema.period.id }).from(schema.period).where(and(

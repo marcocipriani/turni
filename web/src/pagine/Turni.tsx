@@ -55,7 +55,8 @@ export default function Turni() {
   const [soloSettore, setSoloSettore] = useState(false)
   /* Modalità modifica: fuori, la griglia si legge e basta — anche per chi
      programma. Dentro, si trascina e si apre il menu delle celle. */
-  const [modifica, setModifica] = useState(false)
+  const [periodoModifica, setPeriodoModifica] = useState<number | null>(null)
+  const modifica = id != null && periodoModifica === Number(id)
   const [menu, setMenu] = useState<{ sel: { userId: number; data: string }; pos: { x: number; y: number } | null } | null>(null)
   const [assenzaPer, setAssenzaPer] = useState<{ userId: number; data: string } | null>(null)
   const [richiestaAperta, setRichiestaAperta] = useState(false)
@@ -89,9 +90,10 @@ export default function Turni() {
 
   useEffect(() => { void caricaPeriodi() }, [caricaPeriodi])
 
-  // Tornando ai giorni la modifica si spegne; passare dall'originale alla sua
-  // revisione resta dentro la griglia, e la modifica resta accesa.
-  useEffect(() => { if (!id) setModifica(false) }, [id])
+  // La modifica appartiene al periodo aperto, non a qualunque griglia successiva.
+  useEffect(() => {
+    if (Number(id) !== periodoModifica) setPeriodoModifica(null)
+  }, [id])
 
   const pid = dati?.periodo.id
   /** Scrive e ricarica: ogni gesto della modalità modifica passa da qui. */
@@ -206,7 +208,10 @@ export default function Turni() {
                        onClick={() => setRespingiAperto(true)}>Respingi</Comando>
               <Comando variante="primario" titolo="Approva e pubblica" stato={azione.statoDi('pubblica')} disabled={azione.inCorso} icona={<I.Spunta size={15} />}
                        onClick={() => void azione.esegui(async () => {
-                         await api.post(`/periodi/${p.id}/approva`); await caricaGriglia(p.id); await caricaPeriodi()
+                         const r = await api.post<{ id?: number }>(`/periodi/${p.id}/approva`)
+                         setPeriodoModifica(null)
+                         await caricaGriglia(r.id ?? p.id); await caricaPeriodi()
+                         if (r.id != null && r.id !== p.id) navigate(`/turni/${r.id}`, { replace: true })
                        }, 'pubblica')}>Pubblica</Comando>
             </>
           )}
@@ -227,6 +232,7 @@ export default function Turni() {
         </>
       }
     >
+      <div className={inGriglia ? 'flex h-full flex-col [&>[data-barra]]:shrink-0' : undefined}>
       <Toolbar>
         <div role="radiogroup" aria-label="Come guardare i turni"
              className="inline-flex overflow-hidden rounded-r2 border border-border-controllo">
@@ -265,15 +271,15 @@ export default function Turni() {
                    stato={azione.statoDi('modifica')} disabled={azione.inCorso}
                    title={modifica ? 'Esci dalla modalità modifica' : 'Modifica la griglia: trascina, o tasto destro su una cella'}
                    onClick={() => void azione.esegui(async () => {
-                     if (modifica) { setModifica(false); return }
+                     if (modifica) { setPeriodoModifica(null); return }
                      // Il pubblicato non si tocca: si lavora sul suo gemello, che i
                      // colleghi non vedono finché il dirigente non lo approva.
                      if (p.stato === 'pubblicato') {
                        const { id: gid } = await api.post<{ id: number }>(`/periodi/${p.id}/revisione`)
                        await caricaPeriodi()
+                       setPeriodoModifica(gid)
                        navigate(`/turni/${gid}`)
-                     }
-                     setModifica(true)
+                     } else setPeriodoModifica(p.id)
                    }, 'modifica')}>
             <I.Matita size={15} />{modifica ? 'Fine' : 'Modifica'}
           </Bottone>
@@ -398,9 +404,9 @@ export default function Turni() {
       {inGriglia && !dati && !errore && <div className="p-4 md:p-6"><Scheletro righe={6} /></div>}
 
       {inGriglia && dati && p && (
-        <div className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_auto]">
-          <div className="grid min-h-0 grid-rows-[auto_1fr]">
-            <div className="flex flex-col gap-2 px-4 py-2 empty:hidden">
+        <div className="grid min-h-[280px] flex-1 grid-cols-[minmax(0,1fr)_auto]">
+          <div className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)]">
+            <div className="flex max-h-40 flex-col gap-2 overflow-auto px-4 py-2 empty:hidden">
               {/* In ordine di peso: prima quello che blocca la pubblicazione,
                   poi quello che va guardato, per ultimo l'esito di una scelta. */}
               {errori.length > 0 && (
@@ -422,7 +428,7 @@ export default function Turni() {
                                onClick={() => void azione.esegui(async () => {
                                  if (!confirm('Scartare la revisione? Le modifiche fatte qui si perdono.')) return
                                  const r = await api.del<{ originale: number }>(`/periodi/${p.id}`)
-                                 setModifica(false); await caricaPeriodi(); navigate(`/turni/${r.originale}`)
+                                 setPeriodoModifica(null); await caricaPeriodi(); navigate(`/turni/${r.originale}`)
                                }, 'scarta')}>Scarta revisione</Bottone>
                     </span>
                   )}
@@ -508,7 +514,7 @@ export default function Turni() {
           aperta={richiestaAperta} onChiudi={() => setRichiestaAperta(false)}
           onConferma={async (nota) => {
             await api.post(`/periodi/${p.id}/invia`, { nota: nota || undefined })
-            setModifica(false); await caricaGriglia(p.id); await caricaPeriodi()
+            setPeriodoModifica(null); await caricaGriglia(p.id); await caricaPeriodi()
           }}
         />
       )}
@@ -536,6 +542,7 @@ export default function Turni() {
           aperta={cambiamentiAperti} onChiudi={() => setCambiamentiAperti(false)}
         />
       )}
+      </div>
     </Vista>
   )
 }
