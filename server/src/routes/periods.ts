@@ -106,8 +106,15 @@ function validazioni(ctx: Contesto, p: typeof schema.period.$inferSelect) {
   // Capienze e disponibilità attuali non invalidano le giornate già trascorse.
   const oggi = oggiISO()
   const giorni = ctx.giorni.filter((g) => g >= oggi)
+  const programmate = new Set(ctx.celle.map((c) => `${c.userId}|${c.data}`))
 
   for (const g of giorni) {
+    // Senza cella la griglia dice «da remoto»: chi pubblica deve saperlo, ma non blocca.
+    const scoperte = ctx.persone.filter((u) => !programmate.has(`${u.id}|${g}`) && !ctx.indisponibili.has(`${u.id}|${g}`))
+    if (scoperte.length) {
+      avvisi.push({ gravita: 'attenzione', data: g,
+                    messaggio: `${g}: ${scoperte.length} ${scoperte.length === 1 ? 'persona' : 'persone'} senza programmazione, risultano da remoto` })
+    }
     const presenti = ctx.celle.filter((c) => c.data === g && c.stato === 'presenza')
     if (presenti.length > capienza) {
       avvisi.push({ gravita: 'errore', data: g, messaggio: `${g}: ${presenti.length} presenze per ${capienza} postazioni` })

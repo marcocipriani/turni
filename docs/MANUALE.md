@@ -273,15 +273,16 @@ Il tasto della stampante, in alto a destra, apre quattro fogli:
 
 - **Griglia del periodo** — il foglio da bacheca, A4 orizzontale. Parte
   raggruppata per settore (si può spegnere), con un bordo più marcato a ogni
-  lunedì. Il numero della stanza sta in un riquadro, lo smart working è una
-  casetta, e l'assenza è sempre una `×`, chiunque l'abbia registrata. In fondo
-  le postazioni occupate giorno per giorno, una riga per stanza con
-  `occupati/capienza`, e la legenda.
+  lunedì. Sotto il titolo l'elenco delle stanze con piano, posti e media dei
+  posti occupati; accanto a ogni nome le giornate in sede. Il numero della
+  stanza è in grassetto, lo smart working è una casetta leggera e l'assenza è
+  sempre una `×` tenue, chiunque l'abbia registrata. In fondo la legenda.
 - **Giorno per giorno** — una card per giornata, e dentro una card per ogni
   stanza, una per lo **Smart working** e una per gli **Assenti**, ciascuna col
   suo contatore; anche quelle vuote, con lo zero. Nomi per intero, settore e
   scrivania. Una giornata non si spezza fra due pagine.
-- **Il mio calendario** — le tue giornate, da portarsi dietro.
+- **Il mio calendario** — le tue giornate, da portarsi dietro. Le chip
+  scelgono cosa stampare: in sede, da remoto, assenze.
 - **Occupazione delle stanze** — solo per chi organizza.
 
 **Indietro** chiude la stampa e ti riporta alla vista esatta da cui l'hai
@@ -368,6 +369,9 @@ griglia si legge e basta, anche per te.
 In fondo alla griglia c'è l'**occupazione stanza per stanza**. Puoi sforare per
 un momento — sposti prima, sistemi dopo — ma la stanza diventa rossa, compare
 un conflitto da risolvere, e finché resta non si invia.
+
+Una persona senza programmazione in una giornata risulta da remoto. La griglia
+lo segnala fra gli avvisi, ma non blocca l'invio né la pubblicazione.
 
 I controlli valgono da oggi in poi, secondo la data italiana. Le giornate
 passate restano consultabili, senza conflitti né colori di sforamento basati

@@ -11,6 +11,7 @@
  * accompagnata da un'etichetta per i lettori di schermo.
  */
 import * as I from './icone'
+import { vibra } from './tocco'
 
 export type Stato = 'presenza' | 'smart' | 'assenza'
 
@@ -53,6 +54,36 @@ export function SegnoStato({ stato, size = 15 }: { stato: Stato; size?: number }
       <Icona size={size} />
       <span className="solo-lettori-schermo">{etichetta}</span>
     </span>
+  )
+}
+
+/** Filtri per stato: interruttori indipendenti, non una scelta esclusiva. Mio e la sua stampa. */
+export function Filtri({ attivi, onCambia, conteggi }: {
+  attivi: Set<Stato>
+  onCambia: (f: Stato) => void
+  conteggi: Record<Stato, number>
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Cosa mostrare">
+      {(Object.keys(STATI) as Stato[]).map((f) => {
+        const on = attivi.has(f)
+        const Icona = STATI[f].icona
+        return (
+          <button
+            key={f} type="button" onClick={() => { vibra(); onCambia(f) }} aria-pressed={on}
+            /* `whitespace-nowrap`: «In sede» e «Da remoto» sono due parole, e
+               dentro una pillola stretta andavano a capo spezzandosi in mezzo. */
+            className={`inline-flex min-h-[32px] max-sm:min-h-[44px] cursor-pointer items-center gap-1.5 whitespace-nowrap
+                        rounded-full border px-2.5 text-sm transition-colors duration-[120ms] ease-out ${on
+              ? 'border-action bg-action text-action-ink'
+              : 'border-border-controllo bg-bg text-ink-muted hover:bg-surface-2 hover:text-ink'}`}
+          >
+            <Icona size={14} />{STATI[f].plurale}
+            <span className="mono text-2xs">{conteggi[f]}</span>
+          </button>
+        )
+      })}
+    </div>
   )
 }
 

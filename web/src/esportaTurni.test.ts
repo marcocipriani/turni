@@ -60,11 +60,12 @@ describe('impaginazione dei PNG', () => {
     expect(l.giorni[0]!.schede).toHaveLength(5)
   })
 
-  it('Griglia: gruppi, settimane, occupazione e legenda', () => {
+  it('Griglia: gruppi, settimane, nome con giornate in sede, stanze e legenda', () => {
     const l = layoutPngGriglia(griglia, true)
     expect(l.righe.filter((r) => r.tipo === 'gruppo').map((r) => r.titolo)).toEqual(['Segreteria', 'Statistica'])
     expect(l.colonne.map((c) => c.inizioSettimana)).toEqual([false, false, true])
-    expect(l.righe.at(-1)?.tipo).toBe('occupazione-stanza')
+    expect(l.righe.find((r) => r.tipo === 'persona')).toMatchObject({ titolo: 'Verdi X', presenze: 1 })
+    expect(l.stanze).toHaveLength(2)
     expect(l.legenda).toEqual(['stanza = in sede', '⌂ = smart working', '× = assenza'])
   })
 })

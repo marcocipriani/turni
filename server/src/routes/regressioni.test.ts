@@ -108,6 +108,10 @@ describe.skipIf(!url)('regressioni API su MariaDB/MySQL', () => {
     })
     expect(r.status).toBe(201)
     const id = (await risultato(r)).id; periodi.push(id)
+    const vuota = await (await richiesta(dirigente, 'GET', `/periodi/${id}/griglia`)).json() as {
+      avvisi: { gravita: string; messaggio: string }[]
+    }
+    expect(vuota.avvisi.some((a) => a.gravita === 'attenzione' && a.messaggio.includes('senza programmazione'))).toBe(true)
     await db.insert(s.assignment).values(giorni.flatMap((data) =>
       [dirigente, collega, altro].map((userId) => ({
         periodId: id, userId, data, stato: 'presenza' as const, roomId, deskId, origine: 'manuale' as const,

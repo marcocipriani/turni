@@ -13,6 +13,8 @@ export type OccupazioneDocumento = {
   totali: Map<string, number>
   /** `data|roomId` → persone nella stanza */
   stanze: Map<string, number>
+  /** userId → giornate in sede */
+  persone: Map<number, number>
 }
 export type SchedaGiorno = {
   chiave: string
@@ -33,15 +35,33 @@ export function gruppiDocumento(dati: Griglia, raggruppa: boolean): GruppoDocume
 }
 
 export function occupazioneDocumento(dati: Pick<Griglia, 'celle'>): OccupazioneDocumento {
-  const totali = new Map<string, number>(), stanze = new Map<string, number>()
+  const totali = new Map<string, number>(), stanze = new Map<string, number>(), persone = new Map<number, number>()
   for (const c of dati.celle) {
     if (c.stato !== 'presenza') continue
     totali.set(c.data, (totali.get(c.data) ?? 0) + 1)
+    persone.set(c.userId, (persone.get(c.userId) ?? 0) + 1)
     if (c.roomId == null) continue
     const k = `${c.data}|${c.roomId}`
     stanze.set(k, (stanze.get(k) ?? 0) + 1)
   }
-  return { totali, stanze }
+  return { totali, stanze, persone }
+}
+
+/**
+ * Le stanze sotto il titolo, con la media dei posti occupati sulle giornate
+ * programmate: il dettaglio giorno per giorno sta nel foglio delle stanze.
+ */
+export function elencoStanze(dati: Pick<Griglia, 'stanze' | 'celle'>, occupazione = occupazioneDocumento(dati)): string[] {
+  const giornate = new Set(dati.celle.map((c) => c.data))
+  return dati.stanze.filter((s) => s.capienza > 0).map((s) => {
+    let somma = 0
+    for (const g of giornate) somma += occupazione.stanze.get(`${g}|${s.id}`) ?? 0
+    const media = giornate.size ? Math.round((somma / giornate.size) * 10) / 10 : 0
+    return [
+      s.etichetta, s.soprannome, s.piano, `${s.capienza} ${s.capienza === 1 ? 'posto' : 'posti'}`,
+      `media ${media.toLocaleString('it-IT')}/${s.capienza}`,
+    ].filter(Boolean).join(' · ')
+  })
 }
 
 /**

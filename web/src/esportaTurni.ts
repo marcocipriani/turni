@@ -7,10 +7,9 @@
 import type { Griglia } from './api'
 import { esteso, oggiISO, pezziData } from './date'
 import {
-  classeSettimana, gruppiDocumento, occupazioneDocumento, type SchedaGiorno, schedeGiorno, simboloStampa,
+  classeSettimana, elencoStanze, gruppiDocumento, occupazioneDocumento, type SchedaGiorno, schedeGiorno, simboloStampa,
 } from './pagine/documentiTurni'
 import type { DatiGiorni } from './pagine/Giorni'
-import { etichette } from './persone'
 
 /* ── CSV ─────────────────────────────────────────────────────────── */
 
@@ -74,7 +73,7 @@ export const LEGENDA_PNG = ['stanza = in sede', '⌂ = smart working', '× = ass
 
 export type RigaPng =
   | { tipo: 'gruppo'; titolo: string }
-  | { tipo: 'persona' | 'occupazione' | 'occupazione-stanza'; titolo: string; celle: string[] }
+  | { tipo: 'persona'; titolo: string; presenze: number; celle: string[] }
 
 export function layoutPngGiorni(dati: DatiGiorni) {
   return {
@@ -87,31 +86,20 @@ export function layoutPngGiorni(dati: DatiGiorni) {
 
 export function layoutPngGriglia(dati: Griglia, raggruppa: boolean) {
   const celle = new Map(dati.celle.map((c) => [`${c.userId}|${c.data}`, c]))
-  const nomi = etichette(dati.persone)
-  const { totali, stanze } = occupazioneDocumento(dati)
+  const occupazione = occupazioneDocumento(dati)
   const righe: RigaPng[] = []
   for (const g of gruppiDocumento(dati, raggruppa)) {
     if (g.titolo) righe.push({ tipo: 'gruppo', titolo: g.titolo })
     for (const p of g.persone) {
       righe.push({
-        tipo: 'persona', titolo: nomi.get(p.id) ?? p.cognome,
+        tipo: 'persona', titolo: `${p.cognome} ${p.nome}`, presenze: occupazione.persone.get(p.id) ?? 0,
         celle: dati.giorni.map((d) => simboloStampa(celle.get(`${p.id}|${d}`), dati.stanze)),
       })
     }
   }
-  righe.push({
-    tipo: 'occupazione', titolo: `Postazioni occupate su ${dati.stanze.reduce((n, s) => n + s.capienza, 0)}`,
-    celle: dati.giorni.map((d) => String(totali.get(d) ?? 0)),
-  })
-  for (const s of dati.stanze.filter((s) => s.capienza > 0)) {
-    righe.push({
-      tipo: 'occupazione-stanza', titolo: `Stanza ${s.etichetta}`,
-      celle: dati.giorni.map((d) => `${stanze.get(`${d}|${s.id}`) ?? 0}/${s.capienza}`),
-    })
-  }
   return {
     colonne: dati.giorni.map((d, i) => ({ ...pezziData(d), inizioSettimana: classeSettimana(d, i) !== '' })),
-    righe, legenda: LEGENDA_PNG,
+    righe, stanze: elencoStanze(dati, occupazione), legenda: LEGENDA_PNG,
   }
 }
 
@@ -145,36 +133,38 @@ async function tela(L: number, H: number, titolo: string) {
 }
 
 /** La casetta disegnata, non un glifo: nessun font la garantisce. */
-function casa(x: CanvasRenderingContext2D, cx: number, cy: number, r = 6) {
+function casa(x: CanvasRenderingContext2D, cx: number, cy: number, r = 5) {
   x.beginPath()
   x.moveTo(cx - r, cy - r * 0.15); x.lineTo(cx, cy - r); x.lineTo(cx + r, cy - r * 0.15)
   x.moveTo(cx - r * 0.7, cy - r * 0.4); x.lineTo(cx - r * 0.7, cy + r); x.lineTo(cx + r * 0.7, cy + r); x.lineTo(cx + r * 0.7, cy - r * 0.4)
-  x.strokeStyle = C.ink; x.lineWidth = 1.3; x.lineJoin = 'round'; x.stroke()
+  x.strokeStyle = C.faint; x.lineWidth = 1; x.lineJoin = 'round'; x.stroke()
   return r * 2
-}
-
-/** Il numero della stanza nel suo riquadro d'inchiostro, centrato in `cx`. */
-function riquadro(x: CanvasRenderingContext2D, t: string, cx: number, cy: number, max = 60) {
-  x.font = `600 11px ${MONO}`
-  const w = Math.min(x.measureText(t).width + 6, max)
-  x.beginPath(); x.roundRect(cx - w / 2, cy - 8, w, 16, 2)
-  x.strokeStyle = C.ink; x.lineWidth = 1; x.stroke()
-  x.fillStyle = C.ink; x.textAlign = 'center'; x.fillText(t, cx, cy + 0.5, w - 4)
-  return w
 }
 
 export async function pngGriglia(dati: Griglia, raggruppa: boolean, titolo: string) {
   const l = layoutPngGriglia(dati, raggruppa)
   const n = Math.max(1, l.colonne.length)
-  const M = 24, NOMI = 196, TESTA = 80, CAPO = 34, RIGA = 24, GRUPPO = 22, LEGENDA = 46
+  const M = 24, NOMI = 220, CAPO = 34, RIGA = 24, GRUPPO = 22, LEGENDA = 46, STANZA = 16
   const L = Math.max(1200, M + NOMI + n * 54 + M)
   const col = (L - 2 * M - NOMI) / n
+  // Le stanze vanno a capo: si misurano prima di sapere quanto è alta la tela.
+  const misura = document.createElement('canvas').getContext('2d')!
+  misura.font = `400 11px ${MONO}`
+  const righeStanze: string[] = []
+  for (const s of l.stanze) {
+    const unita = righeStanze.length ? `${righeStanze.at(-1)}    ${s}` : ''
+    if (unita && misura.measureText(unita).width <= L - 2 * M) righeStanze[righeStanze.length - 1] = unita
+    else righeStanze.push(s)
+  }
+  const TESTA = righeStanze.length ? 92 + (righeStanze.length - 1) * STANZA : 80
   const H = TESTA + CAPO + l.righe.reduce((h, r) => h + (r.tipo === 'gruppo' ? GRUPPO : RIGA), 0) + LEGENDA + M
   const { canvas, x, testo, linea } = await tela(L, H, titolo)
   const centro = (i: number) => M + NOMI + col * i + col / 2
+  righeStanze.forEach((t, i) => testo(t, M, 76 + i * STANZA, `400 11px ${MONO}`, C.muted, 'left', L - 2 * M))
 
   let y = TESTA
   testo('Persona', M + 6, y + CAPO / 2, `600 12px ${SANS}`, C.muted)
+  testo('in sede', M + NOMI - 8, y + CAPO / 2, `400 10px ${SANS}`, C.faint, 'right')
   l.colonne.forEach((c, i) => {
     testo(c.breve, centro(i), y + 10, `400 10px ${SANS}`, C.faint, 'center')
     testo(String(c.giorno), centro(i), y + 24, `600 12px ${MONO}`, C.ink, 'center')
@@ -189,15 +179,13 @@ export async function pngGriglia(dati: Griglia, raggruppa: boolean, titolo: stri
       y += GRUPPO; linea(M, y, L - M, y)
       continue
     }
-    if (r.tipo === 'occupazione') linea(M, y, L - M, y, C.forte, 2)
     const py = y + RIGA / 2
-    testo(r.titolo, M + 6, py, `${r.tipo === 'occupazione' ? 600 : 400} ${r.tipo === 'persona' ? 12.5 : 11}px ${SANS}`,
-      r.tipo === 'persona' ? C.ink : C.muted, 'left', NOMI - 12)
+    testo(r.titolo, M + 6, py, `400 12.5px ${SANS}`, C.ink, 'left', NOMI - 44)
+    testo(String(r.presenze), M + NOMI - 8, py, `400 11px ${MONO}`, C.muted, 'right')
     r.celle.forEach((s, i) => {
-      if (r.tipo !== 'persona') testo(s, centro(i), py, `${r.tipo === 'occupazione' ? 600 : 400} 11px ${MONO}`, C.muted, 'center', col - 4)
-      else if (s === 'casa') casa(x, centro(i), py)
-      else if (['×', '·', '•'].includes(s)) testo(s, centro(i), py, `400 13px ${MONO}`, C.muted, 'center')
-      else riquadro(x, s, centro(i), py, col - 6)
+      if (s === 'casa') casa(x, centro(i), py)
+      else if (['×', '·', '•'].includes(s)) testo(s, centro(i), py, `400 12px ${MONO}`, C.faint, 'center')
+      else testo(s, centro(i), py, `600 11px ${MONO}`, C.ink, 'center', col - 6)
     })
     y += RIGA
     linea(M, y, L - M, y)
@@ -211,9 +199,9 @@ export async function pngGriglia(dati: Griglia, raggruppa: boolean, titolo: stri
   // I segni disegnati come nelle celle; le parole vengono dal layout.
   y += LEGENDA / 2
   const segni = [
-    (px: number) => { riquadro(x, '101', px + 16, y); return 32 },
-    (px: number) => casa(x, px + 6, y),
-    (px: number) => testo('×', px, y, `400 14px ${MONO}`),
+    (px: number) => testo('101', px, y, `600 11px ${MONO}`),
+    (px: number) => casa(x, px + 5, y),
+    (px: number) => testo('×', px, y, `400 13px ${MONO}`, C.faint),
   ]
   let lx = M
   l.legenda.forEach((voce, i) => {

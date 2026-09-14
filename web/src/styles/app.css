@@ -267,13 +267,10 @@ select option { background-color: var(--bg); color: var(--ink); }
 
 /* ── Documenti ─────────────────────────────────────────────────────
    Fuori dal blocco di stampa: l'anteprima a video è già il foglio. Il bordo
-   del lunedì vince sulle classi di Tailwind della cella; la stanza è un
-   riquadro d'inchiostro, non un colore, perché la carta è in bianco e nero. */
+   del lunedì vince sulle classi di Tailwind della cella; la stanza è
+   inchiostro pieno, non un colore, perché la carta è in bianco e nero. */
 .inizio-settimana { border-left: 2px solid var(--border-strong) !important; }
-.stanza-stampa {
-  display: inline-block; border: 1px solid var(--ink); border-radius: 2px;
-  padding: 0 2px; line-height: 1.25; font-weight: 700; color: var(--ink);
-}
+.stanza-stampa { font-weight: 700; color: var(--ink); }
 
 /* ── Carta ─────────────────────────────────────────────────────────
    La stampa non è la schermata in bianco e nero: è un documento. Sparisce
