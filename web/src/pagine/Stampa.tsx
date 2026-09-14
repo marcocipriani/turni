@@ -10,13 +10,12 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, type Griglia as DatiGriglia, type Periodo } from '../api'
 import { addDays, esteso, oggiISO, pezziData } from '../date'
 import * as I from '../icone'
-import { etichette } from '../persone'
 import { puoProgrammare, useSessione } from '../sessione'
-import { EtichettaStato } from '../stati'
+import { EtichettaStato, Filtri, type Stato } from '../stati'
 import { Bottone, Messaggio, Scheletro } from '../ui'
 import { Vista } from '../Vista'
 import {
-  classeSettimana, gruppiDocumento, occupazioneDocumento, type SchedaGiorno, schedeGiorno, simboloStampa,
+  classeSettimana, elencoStanze, gruppiDocumento, occupazioneDocumento, type SchedaGiorno, schedeGiorno, simboloStampa,
 } from './documentiTurni'
 import type { DatiGiorni } from './Giorni'
 import type { DatiMio } from './Mio'
@@ -165,17 +164,15 @@ function FoglioPeriodo({ id, unita, raggruppa }: { id: number | null; unita: num
     void carica().catch((e) => setErrore(e.message))
   }, [id, unita])
 
-  const nomi = useMemo(() => etichette(dati?.persone ?? []), [dati])
   // Gli stessi blocchi della griglia a video: chi confronta foglio e schermo non rifà la mappa.
   const gruppi = useMemo(() => dati ? gruppiDocumento(dati, raggruppa) : [], [dati, raggruppa])
   const occupazione = useMemo(() => occupazioneDocumento(dati ?? { celle: [] }), [dati])
+  const stanze = useMemo(() => dati ? elencoStanze(dati, occupazione) : [], [dati, occupazione])
 
   if (errore) return <Messaggio tono="errore">{errore}</Messaggio>
   if (!dati) return <Scheletro righe={6} />
 
   const celle = new Map(dati.celle.map((c) => [`${c.userId}|${c.data}`, c]))
-  const capienza = dati.stanze.reduce((s, r) => s + r.capienza, 0)
-  const piede = 'mono border border-border px-1 py-0.5 text-center text-2xs'
 
   return (
     <div>
@@ -184,12 +181,21 @@ function FoglioPeriodo({ id, unita, raggruppa }: { id: number | null; unita: num
         titolo={`Programmazione ${dati.periodo.dataInizio} → ${dati.periodo.dataFine}`}
         sottotitolo={`versione ${dati.periodo.versione} · ${dati.periodo.stato === 'pubblicato' ? 'pubblicata' : dati.periodo.stato}`}
       />
+      {stanze.length > 0 && (
+        <ul aria-label="Stanze" className="mono -mt-2 mb-3 flex flex-wrap gap-x-5 gap-y-0.5 text-2xs text-ink-muted">
+          {stanze.map((s, i) => <li key={i}>{s}</li>)}
+        </ul>
+      )}
 
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr>
-              <th className="border border-border px-1.5 py-1 text-left font-semibold">Persona</th>
+              <th className="border border-border px-1.5 py-1 text-left font-semibold">
+                <span className="flex items-baseline justify-between gap-3">
+                  Persona<span className="text-2xs font-normal text-ink-faint">in sede</span>
+                </span>
+              </th>
               {dati.giorni.map((g, i) => {
                 const { giorno, breve } = pezziData(g)
                 return (
@@ -217,16 +223,23 @@ function FoglioPeriodo({ id, unita, raggruppa }: { id: number | null; unita: num
                 )}
                 {gr.persone.map((p) => (
                   <tr key={p.id}>
-                    <td className="border border-border px-1.5 py-0.5 whitespace-nowrap">{nomi.get(p.id)}</td>
+                    <td className="border border-border px-1.5 py-0.5 whitespace-nowrap">
+                      <span className="flex items-baseline justify-between gap-3">
+                        {p.cognome} {p.nome}
+                        <span className="mono text-2xs text-ink-muted">
+                          {occupazione.persone.get(p.id) ?? 0}<span className="solo-lettori-schermo"> giornate in sede</span>
+                        </span>
+                      </span>
+                    </td>
                     {dati.giorni.map((g, i) => {
                       const c = celle.get(`${p.id}|${g}`)
                       const segno = simboloStampa(c, dati.stanze)
                       return (
                         <td key={g}
                             className={`mono border border-border px-1 py-0.5 text-center text-2xs
-                                        ${c?.stato === 'presenza' ? '' : 'text-ink-muted'} ${classeSettimana(g, i)}`}>
+                                        ${c?.stato === 'presenza' ? '' : 'text-ink-faint'} ${classeSettimana(g, i)}`}>
                           {segno === 'casa'
-                            ? <><I.Remoto size={11} className="inline-block" /><span className="solo-lettori-schermo">Smart working</span></>
+                            ? <><I.Remoto size={10} tratto={1.25} className="inline-block" /><span className="solo-lettori-schermo">Smart working</span></>
                             : c?.stato === 'presenza' ? <span className="stanza-stampa">{segno}</span> : segno}
                         </td>
                       )
@@ -236,28 +249,6 @@ function FoglioPeriodo({ id, unita, raggruppa }: { id: number | null; unita: num
               </Fragment>
             ))}
           </tbody>
-          <tfoot>
-            <tr>
-              <th className="border border-border px-1.5 py-0.5 text-left text-sm font-semibold whitespace-nowrap">
-                Postazioni occupate <span className="mono font-normal">su {capienza}</span>
-              </th>
-              {dati.giorni.map((g, i) => (
-                <td key={g} className={`${piede} font-semibold ${classeSettimana(g, i)}`}>{occupazione.totali.get(g) ?? 0}</td>
-              ))}
-            </tr>
-            {dati.stanze.filter((s) => s.capienza > 0).map((s) => (
-              <tr key={s.id}>
-                <th className="border border-border px-1.5 py-0.5 text-left text-2xs font-normal whitespace-nowrap">
-                  Stanza {s.etichetta}
-                </th>
-                {dati.giorni.map((g, i) => (
-                  <td key={g} className={`${piede} ${classeSettimana(g, i)}`}>
-                    {occupazione.stanze.get(`${g}|${s.id}`) ?? 0}/{s.capienza}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tfoot>
         </table>
       </div>
       <LegendaStampa />
@@ -265,14 +256,16 @@ function FoglioPeriodo({ id, unita, raggruppa }: { id: number | null; unita: num
   )
 }
 
-/** La legenda della carta: una croce sola, la casa, il riquadro della stanza. */
+/**
+ * La legenda della carta: la stanza, la casa, una croce sola. Niente «non
+ * programmato»: la griglia di un periodo ha una cella per ogni persona e giorno.
+ */
 function LegendaStampa() {
   return (
     <ul className="legenda-stampa mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-ink-muted">
       <li><span className="mono stanza-stampa">101</span> in sede, nella stanza</li>
-      <li className="inline-flex items-center gap-1"><I.Remoto size={12} /> smart working</li>
-      <li><span className="mono">×</span> assenza</li>
-      <li><span className="mono">·</span> non programmato</li>
+      <li className="inline-flex items-center gap-1"><I.Remoto size={11} tratto={1.25} className="text-ink-faint" /> smart working</li>
+      <li><span className="mono text-ink-faint">×</span> assenza</li>
     </ul>
   )
 }
@@ -413,22 +406,37 @@ function FoglioMio() {
   const [dati, setDati] = useState<DatiMio | null>(null)
   const [errore, setErrore] = useState<string | null>(null)
   const { utente } = useSessione()
+  // Su carta si parte dal calendario intero; le chip tolgono quello che non serve.
+  const [attivi, setAttivi] = useState<Set<Stato>>(() => new Set(['presenza', 'smart', 'assenza']))
 
   useEffect(() => {
     void api.get<DatiMio>('/mio').then(setDati).catch((e) => setErrore(e.message))
   }, [])
 
   const stanze = useMemo(() => new Map((dati?.stanze ?? []).map((s) => [s.id, s.etichetta])), [dati])
+  const conteggi = useMemo(() => {
+    const c: Record<Stato, number> = { presenza: 0, smart: 0, assenza: 0 }
+    for (const g of dati?.giorni ?? []) c[g.stato]++
+    return c
+  }, [dati])
 
   if (errore) return <Messaggio tono="errore">{errore}</Messaggio>
   if (!dati) return <Scheletro righe={6} />
 
+  // Come in Mio: almeno un filtro resta acceso, un foglio vuoto sembra un errore.
+  const alterna = (f: Stato) => setAttivi((v) => {
+    const n = new Set(v)
+    if (n.has(f)) { if (n.size > 1) n.delete(f) } else n.add(f)
+    return n
+  })
+
   return (
     <div>
       <Orientamento />
+      <div className="non-stampare mb-4"><Filtri attivi={attivi} onCambia={alterna} conteggi={conteggi} /></div>
       <Testata
         titolo={`Calendario di ${utente?.nome ?? ''} ${utente?.cognome ?? ''}`}
-        sottotitolo={`${dati.giorni.filter((g) => g.stato === 'presenza').length} giornate in sede`}
+        sottotitolo={`${conteggi.presenza} giornate in sede`}
       />
 
       <table className="w-full max-w-[80ch] text-base">
@@ -440,7 +448,7 @@ function FoglioMio() {
           </tr>
         </thead>
         <tbody>
-          {dati.giorni.map((g) => (
+          {dati.giorni.filter((g) => attivi.has(g.stato)).map((g) => (
             <tr key={g.data}>
               <td className="border-b border-border py-1 first-letter:uppercase">{esteso(g.data)}</td>
               <td className="border-b border-border py-1">

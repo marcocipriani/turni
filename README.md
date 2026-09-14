@@ -84,8 +84,8 @@ Turni fa quel lavoro sapendo tutte e quattro le cose.
 - **Scambio di turni fra colleghi** senza passare da nessuna approvazione, ma
   solo dove i conti tornano: presidio, postazioni, limiti di lavoro agile.
 - **Stampa** su carta o PDF: griglia del periodo con settimane separate,
-  occupazione e legenda; giorno per giorno a card, stanza per stanza;
-  calendario personale; occupazione delle stanze. Indietro torna alla vista
+  elenco stanze, giornate in sede e legenda; giorno per giorno a card, stanza
+  per stanza; calendario personale filtrabile; occupazione delle stanze. Indietro torna alla vista
   da cui si è partiti.
 - **Esporta ogni vista** — Settimana, Mese e Griglia — in CSV con colonne fisse
   e in PNG: un documento pulito disegnato apposta, non una schermata.

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Cella, Griglia, Persona } from '../api'
 import {
-  classeSettimana, gruppiDocumento, occupazioneDocumento, schedeGiorno, simboloStampa,
+  classeSettimana, elencoStanze, gruppiDocumento, occupazioneDocumento, schedeGiorno, simboloStampa,
 } from './documentiTurni'
 import type { Giorno, Stanza } from './Giorni'
 
@@ -50,6 +50,11 @@ describe('matrice del documento', () => {
     expect(o.totali.get('2026-09-14')).toBe(2)
     expect(o.stanze.get('2026-09-14|5')).toBe(1)
     expect(o.totali.get('2026-09-21')).toBeUndefined()
+    expect(o.persone.get(1)).toBe(1)
+    expect(o.persone.get(3)).toBeUndefined()
+  })
+  it('elenca le stanze con posti e media sulle giornate programmate', () => {
+    expect(elencoStanze(griglia)).toEqual(['1028 · 2 posti · media 0,5/2', '3016 · 3 posti · media 0,5/3'])
   })
   it('raggruppa per settore nell\'ordine dei settori, o lascia un elenco solo', () => {
     expect(gruppiDocumento(griglia, true).map(g => g.titolo)).toEqual(['Segreteria', 'Statistica'])

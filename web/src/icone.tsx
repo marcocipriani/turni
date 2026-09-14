@@ -3,13 +3,13 @@
  * Ereditano il colore dal contesto. Decorative per default: chi le usa da sola
  * come comando mette un'etichetta accessibile sul bottone.
  */
-type Props = { size?: number; className?: string }
+type Props = { size?: number; className?: string; /** Tratto più sottile dove il segno deve pesare meno, come sulla carta. */ tratto?: number }
 
-function Svg({ size = 20, className, children }: Props & { children: React.ReactNode }) {
+function Svg({ size = 20, className, tratto = 1.75, children }: Props & { children: React.ReactNode }) {
   return (
     <svg
       width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"
+      strokeWidth={tratto} strokeLinecap="round" strokeLinejoin="round"
       aria-hidden="true" className={className} style={{ flexShrink: 0 }}
     >
       {children}

@@ -6,8 +6,7 @@ import { salvaPng } from '../esportaTurni'
 import * as I from '../icone'
 import { Avatar, FilaAvatar, perEsteso } from '../persone'
 import { useSessione } from '../sessione'
-import { SegnoStato, STATI, type Stato } from '../stati'
-import { vibra } from '../tocco'
+import { Filtri, SegnoStato, STATI, type Stato } from '../stati'
 import { Bottone, Chip, Messaggio, Scheletro, stileBottone, StatoVuoto, Tag } from '../ui'
 import { Toolbar, Vista } from '../Vista'
 import { AvvisoNovita, quando } from './novita'
@@ -54,35 +53,6 @@ export function prossimeInsieme(giorni: GiornoMio[], userId: number, dopo: strin
 /* ── Filtri: interruttori indipendenti, non una scelta esclusiva ──── */
 
 type Filtro = Stato
-
-function Filtri({ attivi, onCambia, conteggi }: {
-  attivi: Set<Filtro>
-  onCambia: (f: Filtro) => void
-  conteggi: Record<Filtro, number>
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Cosa mostrare">
-      {(Object.keys(STATI) as Filtro[]).map((f) => {
-        const on = attivi.has(f)
-        const Icona = STATI[f].icona
-        return (
-          <button
-            key={f} type="button" onClick={() => { vibra(); onCambia(f) }} aria-pressed={on}
-            /* `whitespace-nowrap`: «In sede» e «Da remoto» sono due parole, e
-               dentro una pillola stretta andavano a capo spezzandosi in mezzo. */
-            className={`inline-flex min-h-[32px] max-sm:min-h-[44px] cursor-pointer items-center gap-1.5 whitespace-nowrap
-                        rounded-full border px-2.5 text-sm transition-colors duration-[120ms] ease-out ${on
-              ? 'border-action bg-action text-action-ink'
-              : 'border-border-controllo bg-bg text-ink-muted hover:bg-surface-2 hover:text-ink'}`}
-          >
-            <Icona size={14} />{STATI[f].plurale}
-            <span className="mono text-2xs">{conteggi[f]}</span>
-          </button>
-        )
-      })}
-    </div>
-  )
-}
 
 /* ── Pagina ───────────────────────────────────────────────────────── */
 
