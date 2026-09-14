@@ -1,26 +1,8 @@
 import { useEffect, useState } from 'react'
 import { api, type Notifica } from '../api'
 import * as I from '../icone'
-import { Bottone, Messaggio, Scheletro, StatoVuoto } from '../ui'
+import { Scheletro, StatoVuoto } from '../ui'
 import { Vista } from '../Vista'
-
-/** Iscrizione push: fallisce in modo leggibile dove non è supportata. */
-async function iscriviPush(): Promise<string> {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    return 'Questo browser non supporta le notifiche push.'
-  }
-  const { chiave } = await api.get<{ chiave: string | null }>('/notifiche/push/chiave')
-  if (!chiave) return 'Le notifiche push non sono configurate sul server: mancano le chiavi VAPID.'
-  if ((await Notification.requestPermission()) !== 'granted') return 'Permesso negato dal browser.'
-
-  const reg = await navigator.serviceWorker.register('/sw.js')
-  const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chiave })
-  const j = sub.toJSON() as { endpoint?: string; keys?: { p256dh: string; auth: string } }
-  await api.post('/notifiche/push/iscrivi', {
-    endpoint: j.endpoint, keys: j.keys, dispositivo: navigator.userAgent.slice(0, 200),
-  })
-  return 'Fatto. Le notifiche arriveranno anche a scheda chiusa.'
-}
 
 const quando = (iso: string) => new Date(iso).toLocaleString('it-IT', {
   day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
@@ -28,7 +10,6 @@ const quando = (iso: string) => new Date(iso).toLocaleString('it-IT', {
 
 export default function Notifiche() {
   const [dati, setDati] = useState<{ notifiche: Notifica[]; daLeggere: number } | null>(null)
-  const [messaggio, setMessaggio] = useState<string | null>(null)
 
   useEffect(() => {
     void api.get<{ notifiche: Notifica[]; daLeggere: number }>('/notifiche').then(async (d) => {
@@ -38,12 +19,9 @@ export default function Notifiche() {
   }, [])
 
   return (
-    <Vista
-      titolo="Notifiche" icona={<I.Campana size={17} />} aiuto="Turni non manda messaggi di posta"
-      azioni={<Bottone onClick={() => void iscriviPush().then(setMessaggio)}>Attiva le push</Bottone>}
-    >
+    // Le push si accendono dal menu utente, accanto al promemoria: un posto solo.
+    <Vista titolo="Notifiche" icona={<I.Campana size={17} />} aiuto="Turni non manda messaggi di posta">
       <div className="flex max-w-[70ch] flex-col gap-4">
-        {messaggio && <Messaggio>{messaggio}</Messaggio>}
         {!dati && <Scheletro righe={4} />}
         {dati?.notifiche.length === 0 && (
           <StatoVuoto testo="Nessuna notifica. Qui arrivano le pubblicazioni, le revisioni e le assenze che toccano una giornata già programmata." />

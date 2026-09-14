@@ -217,18 +217,26 @@ const MESSAGGI = {
   errore: { cornice: 'border-danger border-l-danger bg-danger-wash text-danger-ink', sintesi: 'Da risolvere' },
 } as const
 
-export function Messaggio({ tono = 'info', titolo, chiudibile, children }: {
+export function Messaggio({ tono = 'info', titolo, chiudibile, ricorda, children }: {
   tono?: 'info' | 'errore' | 'attenzione'
   /** La riga che resta visibile quando un errore viene richiuso. */
   titolo?: string
   /** Forza il comando di scarto: l'avviso giallo ce l'ha già di suo. */
   chiudibile?: boolean
+  /** Chiave con cui lo scarto sopravvive al ricarico: scartato una volta, non torna. */
+  ricorda?: string
   children: ReactNode
 }) {
-  // ponytail: lo scarto vive quanto la pagina. Un avviso rimosso torna al
-  // prossimo caricamento, ed è quel che serve: è un «l'ho letto», non una
-  // preferenza. Se un giorno dovrà sopravvivere al ricarico, la chiave sta qui.
-  const [scartato, setScartato] = useState(false)
+  // ponytail: senza `ricorda` lo scarto vive quanto la pagina — è un «l'ho
+  // letto», non una preferenza. Con `ricorda` resta sul dispositivo, non
+  // sull'account: un altro telefono lo mostra una volta ancora.
+  const [scartato, setScartato] = useState(() => {
+    try { return ricorda != null && localStorage.getItem(ricorda) === '1' } catch { return false }
+  })
+  const scarta = () => {
+    setScartato(true)
+    if (ricorda) try { localStorage.setItem(ricorda, '1') } catch { /* navigazione privata: vale per la pagina */ }
+  }
   const [aperto, setAperto] = useState(true)
   const id = useId()
 
@@ -259,7 +267,7 @@ export function Messaggio({ tono = 'info', titolo, chiudibile, children }: {
         </button>
       )}
       {(chiudibile ?? tono === 'attenzione') && (
-        <button type="button" className={comando} onClick={() => setScartato(true)}
+        <button type="button" className={comando} onClick={scarta}
                 title="Scarta" aria-label="Scarta il messaggio">
           <Chiudi size={15} />
         </button>

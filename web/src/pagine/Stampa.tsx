@@ -15,9 +15,13 @@ import { puoProgrammare, useSessione } from '../sessione'
 import { EtichettaStato } from '../stati'
 import { Bottone, Messaggio, Scheletro } from '../ui'
 import { Vista } from '../Vista'
-import { type DatiGiorni, perStanza } from './Giorni'
+import {
+  classeSettimana, gruppiDocumento, occupazioneDocumento, type SchedaGiorno, schedeGiorno, simboloStampa,
+} from './documentiTurni'
+import type { DatiGiorni } from './Giorni'
 import type { DatiMio } from './Mio'
 import { periodoDiRiferimento } from './periodo'
+import { ritornoSicuro } from './stampaRitorno'
 
 type Cosa = 'periodo' | 'giorno' | 'mio' | 'stanze'
 
@@ -51,7 +55,11 @@ export default function Stampa() {
       aiuto="Scegli cosa mettere su carta, poi stampa o salva in PDF"
       azioni={
         <>
-          <Bottone onClick={() => navigate(-1)}>Indietro</Bottone>
+          {/* Non la cronologia: cambiare foglio qui dentro la allunga, e
+              Indietro deve chiudere la stampa sulla vista da cui è partita. */}
+          <Bottone onClick={() => navigate(ritornoSicuro(query.get('ritorno'), scelta === 'mio' ? '/mio' : '/turni'), { replace: true })}>
+            Indietro
+          </Bottone>
           <Bottone variante="primario" onClick={() => window.print()}>
             <I.Stampa size={15} />Stampa
           </Bottone>
@@ -61,7 +69,7 @@ export default function Stampa() {
       <div className="non-stampare flex flex-wrap items-center gap-2 border-b border-border px-4 py-2">
         {disponibili.map((v) => (
           <button
-            key={v} type="button" onClick={() => navigate(`/stampa/${v}?${query}`)}
+            key={v} type="button" onClick={() => navigate(`/stampa/${v}?${query}`, { replace: true })}
             aria-pressed={scelta === v}
             className={`min-h-[32px] cursor-pointer rounded-full border px-3 text-sm transition-colors
                         duration-[120ms] ease-out ${scelta === v
@@ -75,9 +83,9 @@ export default function Stampa() {
         {scelta === 'periodo' && (
           <label className="ml-auto flex cursor-pointer items-center gap-2 text-sm text-ink-muted">
             <input
-              type="checkbox" checked={query.get('gruppi') === '1'}
+              type="checkbox" checked={query.get('gruppi') !== '0'}
               onChange={(e) => {
-                if (e.target.checked) query.set('gruppi', '1'); else query.delete('gruppi')
+                if (e.target.checked) query.delete('gruppi'); else query.set('gruppi', '0')
                 setQuery(query, { replace: true })
               }}
               className="size-4 cursor-pointer accent-[var(--action)]"
@@ -100,7 +108,7 @@ export default function Stampa() {
 
       <div className="p-4 md:p-6">
         {scelta === 'periodo' && (
-          <FoglioPeriodo id={Number(query.get('id')) || null} unita={unita} raggruppa={query.get('gruppi') === '1'} />
+          <FoglioPeriodo id={Number(query.get('id')) || null} unita={unita} raggruppa={query.get('gruppi') !== '0'} />
         )}
         {scelta === 'giorno' && <FoglioGiorni da={query.get('da') ?? oggiISO()} />}
         {scelta === 'stanze' && <FoglioStanze da={query.get('da') ?? oggiISO()} />}
@@ -158,28 +166,16 @@ function FoglioPeriodo({ id, unita, raggruppa }: { id: number | null; unita: num
   }, [id, unita])
 
   const nomi = useMemo(() => etichette(dati?.persone ?? []), [dati])
-  const stanze = useMemo(() => new Map((dati?.stanze ?? []).map((s) => [s.id, s.etichetta])), [dati])
-
-  /**
-   * Gli stessi blocchi della griglia a video, nello stesso ordine: chi confronta
-   * il foglio con lo schermo non deve rifare la mappa mentale ogni volta.
-   * Senza raggruppamento resta un elenco solo, che è come stampava prima.
-   */
-  const gruppi = useMemo(() => {
-    if (!dati) return []
-    if (!raggruppa) return [{ titolo: null as string | null, persone: dati.persone }]
-    const out = dati.settori
-      .map((s) => ({ titolo: s.nome, persone: dati.persone.filter((p) => p.sectorId === s.id) }))
-      .filter((g) => g.persone.length)
-    const senza = dati.persone.filter((p) => !dati.settori.some((s) => s.id === p.sectorId))
-    if (senza.length) out.push({ titolo: 'Senza settore', persone: senza })
-    return out
-  }, [dati, raggruppa])
+  // Gli stessi blocchi della griglia a video: chi confronta foglio e schermo non rifà la mappa.
+  const gruppi = useMemo(() => dati ? gruppiDocumento(dati, raggruppa) : [], [dati, raggruppa])
+  const occupazione = useMemo(() => occupazioneDocumento(dati ?? { celle: [] }), [dati])
 
   if (errore) return <Messaggio tono="errore">{errore}</Messaggio>
   if (!dati) return <Scheletro righe={6} />
 
   const celle = new Map(dati.celle.map((c) => [`${c.userId}|${c.data}`, c]))
+  const capienza = dati.stanze.reduce((s, r) => s + r.capienza, 0)
+  const piede = 'mono border border-border px-1 py-0.5 text-center text-2xs'
 
   return (
     <div>
@@ -194,10 +190,10 @@ function FoglioPeriodo({ id, unita, raggruppa }: { id: number | null; unita: num
           <thead>
             <tr>
               <th className="border border-border px-1.5 py-1 text-left font-semibold">Persona</th>
-              {dati.giorni.map((g) => {
+              {dati.giorni.map((g, i) => {
                 const { giorno, breve } = pezziData(g)
                 return (
-                  <th key={g} className="mono border border-border px-1 py-1 text-center font-normal">
+                  <th key={g} className={`mono border border-border px-1 py-1 text-center font-normal ${classeSettimana(g, i)}`}>
                     <span className="block text-2xs text-ink-faint">{breve}</span>{giorno}
                   </th>
                 )
@@ -222,16 +218,16 @@ function FoglioPeriodo({ id, unita, raggruppa }: { id: number | null; unita: num
                 {gr.persone.map((p) => (
                   <tr key={p.id}>
                     <td className="border border-border px-1.5 py-0.5 whitespace-nowrap">{nomi.get(p.id)}</td>
-                    {dati.giorni.map((g) => {
+                    {dati.giorni.map((g, i) => {
                       const c = celle.get(`${p.id}|${g}`)
-                      const inSede = c?.stato === 'presenza'
+                      const segno = simboloStampa(c, dati.stanze)
                       return (
                         <td key={g}
                             className={`mono border border-border px-1 py-0.5 text-center text-2xs
-                                        ${inSede ? 'font-semibold' : 'text-ink-faint'}`}>
-                          {inSede
-                            ? (c!.roomId != null ? stanze.get(c!.roomId) ?? 'S' : 'S')
-                            : c?.stato === 'assenza' ? '×' : '·'}
+                                        ${c?.stato === 'presenza' ? '' : 'text-ink-muted'} ${classeSettimana(g, i)}`}>
+                          {segno === 'casa'
+                            ? <><I.Remoto size={11} className="inline-block" /><span className="solo-lettori-schermo">Smart working</span></>
+                            : c?.stato === 'presenza' ? <span className="stanza-stampa">{segno}</span> : segno}
                         </td>
                       )
                     })}
@@ -240,9 +236,44 @@ function FoglioPeriodo({ id, unita, raggruppa }: { id: number | null; unita: num
               </Fragment>
             ))}
           </tbody>
+          <tfoot>
+            <tr>
+              <th className="border border-border px-1.5 py-0.5 text-left text-sm font-semibold whitespace-nowrap">
+                Postazioni occupate <span className="mono font-normal">su {capienza}</span>
+              </th>
+              {dati.giorni.map((g, i) => (
+                <td key={g} className={`${piede} font-semibold ${classeSettimana(g, i)}`}>{occupazione.totali.get(g) ?? 0}</td>
+              ))}
+            </tr>
+            {dati.stanze.filter((s) => s.capienza > 0).map((s) => (
+              <tr key={s.id}>
+                <th className="border border-border px-1.5 py-0.5 text-left text-2xs font-normal whitespace-nowrap">
+                  Stanza {s.etichetta}
+                </th>
+                {dati.giorni.map((g, i) => (
+                  <td key={g} className={`${piede} ${classeSettimana(g, i)}`}>
+                    {occupazione.stanze.get(`${g}|${s.id}`) ?? 0}/{s.capienza}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tfoot>
         </table>
       </div>
+      <LegendaStampa />
     </div>
+  )
+}
+
+/** La legenda della carta: una croce sola, la casa, il riquadro della stanza. */
+function LegendaStampa() {
+  return (
+    <ul className="legenda-stampa mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-ink-muted">
+      <li><span className="mono stanza-stampa">101</span> in sede, nella stanza</li>
+      <li className="inline-flex items-center gap-1"><I.Remoto size={12} /> smart working</li>
+      <li><span className="mono">×</span> assenza</li>
+      <li><span className="mono">·</span> non programmato</li>
+    </ul>
   )
 }
 
@@ -257,17 +288,15 @@ function FoglioGiorni({ da }: { da: string }) {
       .then(setDati).catch((e) => setErrore(e.message))
   }, [da])
 
-  const nomi = useMemo(() => etichette(dati?.persone ?? []), [dati])
-
   if (errore) return <Messaggio tono="errore">{errore}</Messaggio>
   if (!dati) return <Scheletro righe={6} />
   const feriali = dati.giorni.filter((g) => g.feriale && !g.festivo)
 
   /**
-   * Una scheda per giornata, non una tabella. Il foglio serve alla reception,
-   * che cerca una persona in una stanza: le stanze sono i blocchi, e la scheda
-   * non si spezza mai a cavallo di due pagine. Chi è da remoto non ha una
-   * scrivania da guardare, quindi sta in fondo, in una riga sola.
+   * Una card per giornata, e dentro una card per stanza, una per lo smart e una
+   * per gli assenti — anche vuote, col loro zero: il foglio serve alla
+   * reception, e un gruppo che manca sembra una dimenticanza. La giornata non
+   * si spezza a cavallo di due pagine.
    */
   return (
     <div>
@@ -275,65 +304,43 @@ function FoglioGiorni({ da }: { da: string }) {
       <Testata titolo="Chi è in sede" sottotitolo={`da ${esteso(da)}`} />
 
       <div className="flex flex-col gap-3">
-        {feriali.map((g) => {
-          const { gruppi, senza } = perStanza(g.presenti, dati.stanze)
-          return (
-            <section key={g.data} className="break-inside-avoid rounded-r2 border border-border-controllo p-2.5">
-              <h3 className="mb-1.5 flex items-baseline justify-between gap-2 border-b border-border pb-1
-                             text-base font-semibold first-letter:uppercase">
-                {esteso(g.data)}
-                <span className="mono shrink-0 text-sm font-normal text-ink-faint">
-                  {g.presenti.length}/{g.capienza} in sede
-                </span>
-              </h3>
-
-              {gruppi.length === 0 && senza.length === 0
-                ? <p className="text-sm text-ink-faint">Nessuno in sede.</p>
-                : (
-                  <div className="grid gap-2 text-sm sm:grid-cols-2 md:grid-cols-3">
-                    {gruppi.map(({ stanza, dentro }) => (
-                      <div key={stanza.id} className="break-inside-avoid">
-                        <p className="border-b border-border pb-px font-semibold">
-                          {stanza.etichetta}
-                          {stanza.soprannome && <span className="font-normal text-ink-muted"> {stanza.soprannome}</span>}
-                          {new Set(dati.stanze.map((s) => s.sede ?? '')).size > 1 && stanza.sede && (
-                            <span className="font-normal text-ink-muted"> · {stanza.sede}</span>
-                          )}
-                          <span className="mono float-right font-normal text-ink-faint">
-                            {dentro.length}/{stanza.capienza}
-                          </span>
-                        </p>
-                        <ul>
-                          {dentro.map((p) => (
-                            <li key={p.userId} className="flex justify-between gap-2 py-px">
-                              <span>{nomi.get(p.userId) ?? p.cognome}</span>
-                              {p.scrivania && <span className="mono text-ink-faint">/{p.scrivania}</span>}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                    {senza.length > 0 && (
-                      <div className="break-inside-avoid">
-                        <p className="border-b border-border pb-px font-semibold">Senza stanza</p>
-                        <ul>
-                          {senza.map((p) => <li key={p.userId} className="py-px">{nomi.get(p.userId) ?? p.cognome}</li>)}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-              {g.remoti.length > 0 && (
-                <p className="mt-1.5 border-t border-border pt-1 text-sm text-ink-muted">
-                  <span className="font-semibold">Da remoto</span>{' '}
-                  {g.remoti.map((p) => nomi.get(p.userId) ?? p.cognome).join(', ')}.
-                </p>
-              )}
-            </section>
-          )
-        })}
+        {feriali.map((g) => (
+          <section key={g.data} className="break-inside-avoid rounded-r2 border border-border-controllo p-2.5">
+            <header className="mb-2 flex items-baseline justify-between gap-2 border-b border-border pb-1
+                               text-base font-semibold first-letter:uppercase">
+              {esteso(g.data)}
+              <span className="mono shrink-0 text-sm font-normal text-ink-muted">{g.presenti.length}/{g.capienza} in sede</span>
+            </header>
+            <div className="grid grid-cols-2 gap-2 min-[720px]:grid-cols-3 print:grid-cols-3">
+              {schedeGiorno(g, dati.stanze, dati.settori).map((s) => <SchedaStampa key={s.chiave} scheda={s} />)}
+            </div>
+          </section>
+        ))}
       </div>
+    </div>
+  )
+}
+
+function SchedaStampa({ scheda }: { scheda: SchedaGiorno }) {
+  return (
+    <div className="break-inside-avoid rounded-r1 border border-border p-1.5 text-sm">
+      <p className="flex items-baseline justify-between gap-2 border-b border-border pb-0.5 font-semibold">
+        {scheda.titolo}<span className="mono font-normal text-ink-muted">{scheda.contatore}</span>
+      </p>
+      {scheda.persone.length === 0
+        ? <p className="py-0.5 text-ink-faint">—</p>
+        : (
+          <ul>
+            {scheda.persone.map((p) => (
+              <li key={p.userId} className="flex items-baseline justify-between gap-2 py-px">
+                <span className="min-w-0">
+                  {p.nome}{p.settore && <span className="text-2xs text-ink-faint"> · {p.settore}</span>}
+                </span>
+                {p.scrivania && <span className="mono shrink-0 text-ink-muted">/{p.scrivania}</span>}
+              </li>
+            ))}
+          </ul>
+        )}
     </div>
   )
 }

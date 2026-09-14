@@ -12,7 +12,6 @@ type Assenza = { id: number; dataInizio: string; dataFine: string; causale: stri
 type Regola = { id: number; giornoSettimana: number; causale: string; validoDa: string; validoA: string | null }
 type Preferenze = {
   giorniPreferiti: number[] | null; giorniDaEvitare: number[] | null; nota: string | null
-  promemoriaSera: boolean
   vistaTurni: 'giorni' | 'griglia'
   filtriMio: Stato[]
 }
@@ -22,13 +21,6 @@ const oggi = () => new Date().toISOString().slice(0, 10)
 
 export default function Assenze() {
   const { ricarica: ricaricaSessione } = useSessione()
-  const [pushAttivo, setPushAttivo] = useState(false)
-  useEffect(() => {
-    if (!('serviceWorker' in navigator) || typeof Notification === 'undefined' || Notification.permission !== 'granted') return
-    void navigator.serviceWorker.getRegistration()
-      .then((r) => r?.pushManager?.getSubscription())
-      .then((s) => setPushAttivo(Boolean(s))).catch(() => setPushAttivo(false))
-  }, [])
   const [causali, setCausali] = useState<Causale[]>([])
   const [dati, setDati] = useState<{ assenze: Assenza[]; regole: Regola[] } | null>(null)
   const [pref, setPref] = useState<Preferenze | null>(null)
@@ -183,7 +175,10 @@ export default function Assenze() {
                       e.preventDefault()
                       void preferenze.esegui(async () => {
                         // Anche la sessione: Turni e Mio leggono lì da dove partire.
-                        await api.put('/assenze/preferenze', pref); await ricarica(); await ricaricaSessione()
+                        // Il promemoria vive nel menu utente: rimandarlo da qui
+                        // riscriverebbe il valore letto all'apertura della pagina.
+                        await api.put('/assenze/preferenze', { ...pref, promemoriaSera: undefined })
+                        await ricarica(); await ricaricaSessione()
                       })
                     }}
                     className="flex flex-col gap-4">
@@ -209,18 +204,6 @@ export default function Assenze() {
                   </fieldset>
                 ))}
                 <fieldset>
-                  <legend className="mb-1.5 text-xs font-medium text-ink-muted">Turni si apre su</legend>
-                  <div className="flex flex-wrap gap-3">
-                    {([['giorni', 'Giorni'], ['griglia', 'Griglia']] as const).map(([v, t]) => (
-                      <label key={v} className="flex cursor-pointer items-center gap-1.5 text-base">
-                        <input type="radio" name="vistaTurni" checked={pref.vistaTurni === v}
-                               onChange={() => setPref({ ...pref, vistaTurni: v })} />
-                        {t}
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
-                <fieldset>
                   <legend className="mb-1.5 text-xs font-medium text-ink-muted">In Mio, all'apertura mostra</legend>
                   <div className="flex flex-wrap gap-3">
                     {(Object.keys(STATI) as Stato[]).map((s) => {
@@ -240,19 +223,6 @@ export default function Assenze() {
                     })}
                   </div>
                 </fieldset>
-                <label className="flex cursor-pointer items-start gap-2 text-base">
-                  <input type="checkbox" className="mt-1" checked={pref.promemoriaSera}
-                         onChange={(e) => setPref({ ...pref, promemoriaSera: e.target.checked })} />
-                  <span>
-                    Promemoria la sera prima
-                    <span className="block text-sm text-ink-faint">
-                      Alle 18 del giorno prima di una giornata in sede, con stanza e scrivania.
-                      {/* Il promemoria arriva comunque nella campanella: il push è un di più. */}
-                      {!pushAttivo
-                        && ' Su questo dispositivo le notifiche push non sono attive: lo troverai nella campanella.'}
-                    </span>
-                  </span>
-                </label>
                 <Campo etichetta="Nota per chi programma">
                   <textarea className={`${inputCls} min-h-[56px] resize-y`} rows={2} value={pref.nota ?? ''}
                             onChange={(e) => setPref({ ...pref, nota: e.target.value })} />

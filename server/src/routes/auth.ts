@@ -90,6 +90,7 @@ auth.get('/me', async (c) => {
     preferenze: {
       vistaTurni: pref?.vistaTurni === 'griglia' ? 'griglia' : 'giorni',
       filtriMio: pref?.filtriMio?.length ? pref.filtriMio : ['presenza'],
+      promemoriaSera: Boolean(pref?.promemoriaSera),
     },
   })
 })

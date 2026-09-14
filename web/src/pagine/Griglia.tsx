@@ -79,7 +79,7 @@ export default function Griglia({
     const nomi = box?.querySelector<HTMLElement>('thead th')
     if (!box || !th || !nomi) return
     box.scrollLeft = th.offsetLeft - nomi.offsetWidth
-  }, [dati.periodo.id])
+  }, [dati.periodo.id, dati.periodo.dataInizio])
 
   const indice = useMemo(() => {
     const m = new Map<string, Cella>()
@@ -119,6 +119,7 @@ export default function Griglia({
   // lo condividono.
   const nomi = useMemo(() => etichette(dati.persone), [dati.persone])
   const capienza = dati.stanze.reduce((s, r) => s + r.capienza, 0)
+  const oggi = oggiISO()
 
   const occupazioneStanza = useMemo(() => {
     const m = new Map<string, number>()
@@ -167,7 +168,7 @@ export default function Griglia({
       <table ref={tabella} className="border-separate border-spacing-0" onKeyDown={tasti}>
         <caption className="solo-lettori-schermo">
           Programmazione dal {dati.periodo.dataInizio} al {dati.periodo.dataFine}.
-          Persone in riga, giornate lavorative in colonna. Muoviti con le frecce direzionali.
+          Persone in riga, giorni in colonna. Muoviti con le frecce direzionali.
         </caption>
 
         <thead>
@@ -233,9 +234,9 @@ export default function Griglia({
           ))}
         </tbody>
 
-        {/* Il piede resta in fondo tutto insieme: righe appiccicate una per una
-            si fermerebbero tutte allo stesso punto, una sopra l'altra. */}
-        <tfoot className="sticky bottom-0 z-[3]">
+        {/* Il fondo opaco copre le righe che scorrono sotto: i colori degli
+            avvisi sono traslucidi e da soli lasciano passare il testo. */}
+        <tfoot className="sticky bottom-0 z-[3] bg-surface">
           <tr>
             <th scope="row"
                 className="sticky left-0 z-[3] border-r border-t border-border-controllo bg-surface px-2.5 py-1.5
@@ -265,7 +266,8 @@ export default function Griglia({
               </th>
               {dati.giorni.map((g) => {
                 const n = occupazioneStanza.get(`${g}|${s.id}`) ?? 0
-                const tono = n > s.capienza ? 'bg-danger-wash text-danger-ink font-semibold'
+                const tono = g < oggi ? 'bg-surface text-ink-faint'
+                  : n > s.capienza ? 'bg-danger-wash text-danger-ink font-semibold'
                   : n === s.capienza ? 'bg-surface text-ink font-semibold' : 'bg-surface text-ink-faint'
                 return (
                   <td key={g} className={`mono border-r border-border px-1 py-1 text-center text-2xs ${tono}`}>
@@ -381,7 +383,7 @@ const RigaPersona = memo(function RigaPersona({
                           transition-colors duration-[120ms] ease-out hover:bg-surface-2 ${testo}`}
             >
               <span className="mono" aria-hidden="true">
-                {c?.stato === 'presenza' ? (scrivania ? `${stanza}/${scrivania}` : stanza ?? '•')
+                {!c ? '·' : c.stato === 'presenza' ? (scrivania ? `${stanza}/${scrivania}` : stanza ?? '•')
                   : c?.stato === 'assenza' ? (c.perConto ? '⊗' : '×') : '–'}
               </span>
               {c?.bloccata && (
@@ -398,17 +400,19 @@ const RigaPersona = memo(function RigaPersona({
   )
 })
 
-export function Legenda() {
+export function Legenda({ assegnaScrivanie = false }: { assegnaScrivanie?: boolean }) {
   return (
     <ul className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-ink-faint">
       <li className="inline-flex items-center gap-1.5">
-        <I.Sede size={13} /><span className="mono font-semibold text-ink">101/3</span>in sede: stanza e scrivania
+        <I.Sede size={13} /><span className="mono font-semibold text-ink">{assegnaScrivanie ? '101/3' : '101'}</span>
+        in sede: {assegnaScrivanie ? 'stanza e scrivania' : 'stanza'}
       </li>
       <li className="inline-flex items-center gap-1.5"><I.Remoto size={13} /><span className="mono">–</span>da remoto</li>
+      <li className="inline-flex items-center gap-1.5"><span className="mono">·</span>non programmato</li>
       <li className="inline-flex items-center gap-1.5"><I.Croce size={13} /><span className="mono">×</span>assenza dichiarata</li>
       <li className="inline-flex items-center gap-1.5"><span className="mono">⊗</span>assenza registrata dall'organizzazione</li>
       <li className="inline-flex items-center gap-1.5">
-        <I.Lucchetto size={11} className="text-ink-faint" />bloccata: la generazione non la tocca, sbloccata torna al generatore
+        <I.Lucchetto size={11} className="text-ink-faint" />bloccata: conservata alla rigenerazione, salvo assenze
       </li>
       <li><span className="mr-1.5 text-ink-faint">⇄</span>scambio fra colleghi</li>
     </ul>

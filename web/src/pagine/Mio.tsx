@@ -1,7 +1,8 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { api, getConEta } from '../api'
 import { descriviSettimana, esteso, lunediDi, oggiISO, pezziData } from '../date'
+import { salvaPng } from '../esportaTurni'
 import * as I from '../icone'
 import { Avatar, FilaAvatar, perEsteso } from '../persone'
 import { useSessione } from '../sessione'
@@ -11,6 +12,7 @@ import { Bottone, Chip, Messaggio, Scheletro, stileBottone, StatoVuoto, Tag } fr
 import { Toolbar, Vista } from '../Vista'
 import { AvvisoNovita, quando } from './novita'
 import { ModaleScambio, type Proposta, Scambi } from './Scambio'
+import { urlStampa } from './stampaRitorno'
 
 export type Collega = {
   userId: number; nome: string; cognome: string; sectorId: number | null
@@ -88,6 +90,7 @@ type ElencoScambi = { inArrivo: Proposta[]; inUscita: Proposta[]; conclusi: Prop
 
 export default function Mio() {
   const navigate = useNavigate()
+  const luogo = useLocation()
   const { utente } = useSessione()
   const [dati, setDati] = useState<DatiMio | null>(null)
   const [scambi, setScambi] = useState<ElencoScambi | null>(null)
@@ -158,7 +161,7 @@ export default function Mio() {
             <I.Immagine size={17} />
           </Bottone>
           <Bottone variante="icona" title="Stampa il tuo calendario" aria-label="Stampa il tuo calendario"
-                   onClick={() => navigate('/stampa/mio')}>
+                   onClick={() => navigate(urlStampa('mio', luogo.pathname + luogo.search))}>
             <I.Stampa size={17} />
           </Bottone>
         </>
@@ -464,18 +467,7 @@ async function immagine(giorni: GiornoMio[], stanze: Map<number, { etichetta: st
     x.fillStyle = C.bordo; x.fillRect(0, y - 1, L, 1)
   })
 
-  const blob = await new Promise<Blob | null>((ok) => canvas.toBlob(ok, 'image/png'))
-  if (!blob) throw new Error('Non sono riuscito a creare l\'immagine.')
-  const file = new File([blob], `turni-${oggi}.png`, { type: 'image/png' })
-
-  if (navigator.canShare?.({ files: [file] })) {
-    // Chiudere il foglio di condivisione non è un errore.
-    await navigator.share({ files: [file] }).catch((e) => { if (e?.name !== 'AbortError') throw e })
-    return
-  }
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(file); a.download = file.name; a.click()
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+  await salvaPng(canvas, `turni-${oggi}.png`)
 }
 
 /** «anche 16, 18 set»: quando si torna a lavorare nella stessa sede. */

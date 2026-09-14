@@ -15,7 +15,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/licenza-MIT-2b2b2b?style=flat-square" alt="Licenza MIT">
-  <img src="https://img.shields.io/badge/test-290-2b2b2b?style=flat-square" alt="290 test automatici">
+  <img src="https://img.shields.io/badge/test-292-2b2b2b?style=flat-square" alt="292 test automatici">
   <img src="https://img.shields.io/badge/WCAG_2.1-AA-2b2b2b?style=flat-square" alt="Nessuna violazione WCAG 2.1 AA">
   <img src="https://img.shields.io/badge/PWA-funziona_offline-2b2b2b?style=flat-square" alt="Applicazione installabile, funziona senza rete">
   <img src="https://img.shields.io/badge/React_19-Hono_su_Node-2b2b2b?style=flat-square" alt="React 19 sul davanti, Hono su Node dietro">
@@ -83,15 +83,21 @@ Turni fa quel lavoro sapendo tutte e quattro le cose.
   tocca nessun altro.
 - **Scambio di turni fra colleghi** senza passare da nessuna approvazione, ma
   solo dove i conti tornano: presidio, postazioni, limiti di lavoro agile.
-- **Stampa** su carta o PDF: griglia del periodo, giorno per giorno, calendario
-  personale, occupazione delle stanze.
+- **Stampa** su carta o PDF: griglia del periodo con settimane separate,
+  occupazione e legenda; giorno per giorno a card, stanza per stanza;
+  calendario personale; occupazione delle stanze. Indietro torna alla vista
+  da cui si è partiti.
+- **Esporta ogni vista** — Settimana, Mese e Griglia — in CSV con colonne fisse
+  e in PNG: un documento pulito disegnato apposta, non una schermata.
 - **Notifiche** in applicazione e push del browser. Nessuna posta elettronica.
-  Per chi lo chiede, un promemoria la sera prima di una giornata in sede.
+  Dal menu utente si accendono le push di quel dispositivo e, per l'account, un
+  promemoria la sera prima di una giornata in sede.
 - **Funziona senza rete**: installata sul telefono, apre le tue giornate e chi
   c'è in sede anche in garage, dicendo a quando risalgono. Delle assenze altrui
   sul telefono non arriva mai una causale, e uscendo si cancella tutto.
-- **Parte da dove preferisci**: ciascuno sceglie se Turni si apre sui giorni o
-  sulla griglia, e quali filtri di Mio partono accesi.
+- **Parte dalla settimana che serve**: Turni si apre sempre su Settimana, e il
+  sabato e la domenica già su quella che viene. Ciascuno sceglie quali filtri
+  di Mio partono accesi.
 - **Fatta per il telefono quanto per il monitor**: scala tipografica propria
   sotto i 640px, bersagli da polpastrello, giorni che si sfogliano col dito e
   vibrazione di conferma dove il sistema la offre.
@@ -208,13 +214,13 @@ il layout — e a farlo rispettare c'è un test che legge i fotogrammi chiave.
 ## Verifiche
 
 ```bash
-npm test          # 290 test: motore, permessi, scambi, nomi, contrasti, telefono, movimento
+npm test          # 292 test: motore, permessi, scambi, nomi, contrasti, telefono, movimento
 npm run verifica  # 12 criteri di accettazione contro un'istanza avviata
 npm run carico    # motore fino a 1000 persone
 npm run build     # controllo dei tipi e build di produzione
 ```
 
-I 290 girano senza database. La regressione completa delle rotte usa un archivio
+I 292 girano senza database. La regressione completa delle rotte usa un archivio
 MySQL/MariaDB isolato e si abilita passando `TURNI_TEST_DATABASE_URL`; il test si
 rifiuta di usare un database il cui nome non inizi con `turni_test` o
 `turni_review`.

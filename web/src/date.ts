@@ -13,7 +13,9 @@ const MESI = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ot
 const MESI_INTERI = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio',
   'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre']
 
-export const oggiISO = () => new Date().toISOString().slice(0, 10)
+export const oggiISO = () => new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit',
+}).format(new Date())
 
 export function addDays(iso: string, n: number) {
   const d = new Date(`${iso}T00:00:00Z`)
