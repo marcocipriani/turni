@@ -27,7 +27,7 @@ export type Stanza = {
   /** L'edificio: le stanze non stanno più tutte sotto lo stesso tetto. */
   sede?: string | null
 }
-type Giorno = {
+export type Giorno = {
   data: string; feriale: boolean; festivo: string | null
   presenti: Presente[]; remoti: Chi[]; assenti: Chi[]
   capienza: number; ioCiSono: boolean; ioAssente: boolean
@@ -230,6 +230,8 @@ export function Giorni({ settimane, da, raggruppa = false, filtro = NESSUN_FILTR
 
   useEffect(() => {
     const a = addDays(da, settimane * 7 - 1)
+    // Mentre arriva il tratto nuovo, chi esporta non deve scaricare quello vecchio.
+    onCaricato?.(null)
     void getConEta<DatiGiorni>(`/panoramica?da=${da}&a=${a}`)
       .then(({ dati: d, copiaDel: c }) => { setDati(d); setCopiaDel(c); setErrore(null); onCaricato?.(d) })
       .catch((e) => setErrore(e.message))
@@ -536,7 +538,7 @@ export function AvvisoStanze({ stanze, riservate }: { stanze: Stanza[]; riservat
   const frasi = fraseStanze(stanze, riservate)
   if (frasi.length === 0) return null
   return (
-    <Messaggio tono="info" chiudibile>
+    <Messaggio tono="info" chiudibile ricorda="turni.avvisoStanze.scartato">
       {frasi.map((f, i) => <p key={i} className={i > 0 ? 'mt-0.5' : undefined}>{f}</p>)}
     </Messaggio>
   )

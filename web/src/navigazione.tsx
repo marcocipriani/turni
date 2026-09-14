@@ -11,6 +11,7 @@ import { NavLink, useLocation } from 'react-router-dom'
 import { api, type Utente } from './api'
 import * as I from './icone'
 import { COPYRIGHT, Marchio } from './Marchio'
+import { descriviErrorePush, impostaPush, leggiPush, type StatoPush } from './notifichePush'
 import { useSessione } from './sessione'
 import { applicaTema, type Tema, temaSalvato } from './tema'
 import { apticoAcceso, apticoDisponibile, impostaAptico, vibra } from './tocco'
@@ -149,8 +150,19 @@ function Campanella() {
 /* ── Menu utente: le cose che si toccano una volta a settimana ────── */
 
 function MenuUtente({ ancoraggio }: { ancoraggio: 'rail' | 'header' }) {
-  const { utente, esci } = useSessione()
+  const { utente, esci, ricarica } = useSessione()
   const [aperto, setAperto] = useState(false)
+  /* Push è di questo dispositivo, il promemoria dell'account: due stati, due
+     attese, e l'errore di uno non spegne l'altro. */
+  const [push, setPush] = useState<StatoPush | null>(null)
+  const [pushInCorso, setPushInCorso] = useState(false)
+  const [errorePush, setErrorePush] = useState<string | null>(null)
+  const [promemoriaInCorso, setPromemoriaInCorso] = useState(false)
+  const [errorePromemoria, setErrorePromemoria] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (aperto) void leggiPush().then(setPush).catch(() => setPush('non-supportate'))
+  }, [aperto])
   const [tema, setTema] = useState<Tema>(temaSalvato)
   const [aptico, setAptico] = useState<'si' | 'no'>(() => apticoAcceso() ? 'si' : 'no')
   const rif = useRef<HTMLDivElement>(null)
@@ -230,6 +242,28 @@ function MenuUtente({ ancoraggio }: { ancoraggio: 'rail' | 'header' }) {
             </div>
           )}
 
+          <div className="border-y border-border py-1">
+            <Interruttore
+              etichetta="Push su questo dispositivo" acceso={push === 'accese'}
+              disabled={pushInCorso || push == null || push === 'non-supportate'}
+              nota={errorePush ?? descriviErrorePush(push)}
+              onCambia={async (v) => {
+                setPushInCorso(true); setErrorePush(null)
+                try { setPush(await impostaPush(v)) } catch (e) { setErrorePush((e as Error).message) } finally { setPushInCorso(false) }
+              }}
+            />
+            <Interruttore
+              etichetta="Promemoria sera prima" acceso={utente.preferenze.promemoriaSera}
+              disabled={promemoriaInCorso}
+              nota={errorePromemoria}
+              onCambia={async (v) => {
+                setPromemoriaInCorso(true); setErrorePromemoria(null)
+                try { await api.patch('/assenze/preferenze', { promemoriaSera: v }); await ricarica() }
+                catch (e) { setErrorePromemoria((e as Error).message) } finally { setPromemoriaInCorso(false) }
+              }}
+            />
+          </div>
+
           <NavLink to="/password" role="menuitem"
                    className="flex items-center gap-2 rounded-r2 px-2 py-1.5 text-base text-ink-muted hover:bg-surface-2 hover:text-ink">
             <I.Lucchetto size={16} /> Cambia password
@@ -241,6 +275,32 @@ function MenuUtente({ ancoraggio }: { ancoraggio: 'rail' | 'header' }) {
           </button>
         </div>
       )}
+    </div>
+  )
+}
+
+/** Tutta la riga è il bersaglio: la pista da sola è troppo piccola per un dito. */
+function Interruttore({ etichetta, acceso, disabled, nota, onCambia }: {
+  etichetta: string; acceso: boolean; disabled: boolean; nota: string | null
+  onCambia: (v: boolean) => void
+}) {
+  return (
+    <div className="px-2 py-1">
+      <button
+        type="button" role="switch" aria-checked={acceso} disabled={disabled}
+        onClick={() => { vibra(); onCambia(!acceso) }}
+        className="flex min-h-[36px] w-full cursor-pointer items-center justify-between gap-2 text-left text-sm
+                   text-ink-muted hover:text-ink disabled:cursor-not-allowed disabled:opacity-60 max-sm:min-h-[44px]"
+      >
+        {etichetta}
+        <span aria-hidden="true"
+              className={`inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors duration-[120ms] ease-out
+                          ${acceso ? 'border-action bg-action' : 'border-border-controllo bg-surface-2'}`}>
+          <span className={`size-3.5 rounded-full transition-transform duration-[120ms] ease-out
+                            ${acceso ? 'translate-x-[17px] bg-action-ink' : 'translate-x-[2px] bg-ink-faint'}`} />
+        </span>
+      </button>
+      {nota && <p role="status" className="text-2xs text-ink-faint">{nota}</p>}
     </div>
   )
 }

@@ -6,20 +6,24 @@
  * una destinazione sola, nessun bivio da capire prima di cliccare.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, type Cella, type Griglia as DatiGriglia, type Periodo } from '../api'
 import { type StatoBottone, useAzione } from '../azioni'
-import { addDays, lunediDi, oggiISO } from '../date'
+import { addDays, oggiISO } from '../date'
+import { csvDaGiorni, csvDaGriglia, pngGiorni, pngGriglia, salvaPng, scaricaCsv } from '../esportaTurni'
 import * as I from '../icone'
 import { puoProgrammare, useSessione } from '../sessione'
 import { APTICO, direzioneSwipe, vibra } from '../tocco'
-import { Bottone, Messaggio, Pill, Scheletro, stileBottone, StatoVuoto } from '../ui'
+import { Bottone, Messaggio, Pill, Scheletro, StatoVuoto } from '../ui'
 import { Drawer, Toolbar, Vista } from '../Vista'
 import { ModaleCambiamenti } from './cambiamenti'
-import { Giorni } from './Giorni'
+import { type DatiGiorni, Giorni } from './Giorni'
 import Griglia, { type CellaModifica, Legenda } from './Griglia'
 import { MenuCella, vociMenu } from './MenuCella'
+import { Mese, spostaMese } from './Mese'
 import { AvvisoNovita, quando } from './novita'
+import { urlStampa } from './stampaRitorno'
+import { inizioSettimanaTurni } from './turniVista'
 import {
   EditorCella, type EsitoGenerazione, EsitoProposta, ModaleAssenzaPerConto, ModaleNota, NuovoPeriodo,
   periodoDiRiferimento, StatoPeriodo,
@@ -39,11 +43,19 @@ const etichettaPeriodo = (p: Periodo) =>
 export default function Turni() {
   const { utente } = useSessione()
   const navigate = useNavigate()
+  const luogo = useLocation()
   const { id } = useParams()
   const [query] = useSearchParams()
+  const inMese = !id && query.get('vista') === 'mese'
+  const meseQuery = query.get('mese') ?? ''
+  const mese = /^\d{4}-(0[1-9]|1[0-2])$/.test(meseQuery) ? meseQuery : oggiISO().slice(0, 7)
+  const [opzioniAperte, setOpzioniAperte] = useState(false)
 
   const [periodi, setPeriodi] = useState<Periodo[] | null>(null)
   const [dati, setDati] = useState<DatiGriglia | null>(null)
+  // I dati che le altre due viste hanno già caricato: le esportazioni partono da lì.
+  const [datiSettimana, setDatiSettimana] = useState<DatiGiorni | null>(null)
+  const [datiMese, setDatiMese] = useState<DatiGriglia | null>(null)
   const [selezione, setSelezione] = useState<{ userId: number; data: string } | null>(null)
   const azione = useAzione()
   const { errore, setErrore } = azione
@@ -60,6 +72,7 @@ export default function Turni() {
   const [menu, setMenu] = useState<{ sel: { userId: number; data: string }; pos: { x: number; y: number } | null } | null>(null)
   const [assenzaPer, setAssenzaPer] = useState<{ userId: number; data: string } | null>(null)
   const [richiestaAperta, setRichiestaAperta] = useState(false)
+  const [menuFile, setMenuFile] = useState(false)
   // Una settimana: è la domanda che si fa entrando — «questa settimana chi
   // c'è» — e a una sola le colonne si allargano invece di scorrere.
   const [settimane, setSettimane] = useState(1)
@@ -71,7 +84,7 @@ export default function Turni() {
      scelta appena fatta nell'altra. */
   const [raggruppaGriglia, setRaggruppaGriglia] = useState(true)
   const [raggruppaGiorni, setRaggruppaGiorni] = useState(false)
-  const [inizio, setInizio] = useState(() => lunediDi(oggiISO()))
+  const [inizio, setInizio] = useState(() => inizioSettimanaTurni(oggiISO()))
 
   const unita = useMemo(() => {
     if (!utente) return null
@@ -107,13 +120,6 @@ export default function Turni() {
   const apriMenu = useCallback((sel: { userId: number; data: string }, pos: { x: number; y: number } | null) =>
     setMenu({ sel, pos }), [])
 
-  /* Chi preferisce la griglia ci atterra entrando da «Turni»; chi preme
-     «Giorni» porta con sé `?vista=giorni` e resta sui giorni. */
-  useEffect(() => {
-    if (id || query.get('vista') || utente?.preferenze?.vistaTurni !== 'griglia' || !periodi) return
-    const r = periodoDiRiferimento(periodi)
-    if (r) navigate(`/turni/${r.id}`, { replace: true })
-  }, [id, query, periodi, utente, navigate])
   useEffect(() => {
     if (!id) { setDati(null); setSelezione(null); return }
     setErrore(null)
@@ -155,11 +161,37 @@ export default function Turni() {
 
   const scrivibile = puoProgrammare(utente, unita)
   const inGriglia = Boolean(id)
+  const inTabella = inGriglia || inMese
 
   const p = dati?.periodo
   const modificabile = dati?.permessi.scrivere ?? false
   // Chi programma non riceve notifiche degli scambi: se ne accorge qui.
   const scambiate = (dati?.celle ?? []).filter((x) => x.daScambio).length
+  const nomeMese = new Date(`${mese}-01T00:00:00Z`).toLocaleDateString('it-IT', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+  const esporta = inMese
+    ? {
+        cosa: 'il mese', pronto: datiMese != null,
+        csv: () => datiMese && scaricaCsv(`turni-mese-${mese}.csv`, csvDaGriglia(datiMese)),
+        png: async () => { if (datiMese) await salvaPng(await pngGriglia(datiMese, raggruppaGriglia, `Mese di ${nomeMese}`), `turni-mese-${mese}.png`) },
+      }
+    : inGriglia
+      ? {
+          cosa: 'la griglia', pronto: p != null,
+          csv: () => dati && scaricaCsv(`turni-griglia-${dati.periodo.dataInizio}_${dati.periodo.dataFine}.csv`, csvDaGriglia(dati)),
+          png: async () => {
+            if (dati) await salvaPng(await pngGriglia(dati, raggruppaGriglia, `Programmazione ${gg(dati.periodo.dataInizio)} → ${gg(dati.periodo.dataFine)}`),
+              `turni-griglia-${dati.periodo.dataInizio}_${dati.periodo.dataFine}.png`)
+          },
+        }
+      : {
+          cosa: 'la settimana', pronto: datiSettimana != null,
+          csv: () => datiSettimana && scaricaCsv(`turni-settimana-${inizio}.csv`, csvDaGiorni(datiSettimana)),
+          png: async () => {
+            if (datiSettimana) await salvaPng(await pngGiorni(datiSettimana, `Chi è in sede · ${finestra(inizio, settimane)}`), `turni-settimana-${inizio}.png`)
+          },
+        }
+  const stampa = inMese ? null : () => navigate(urlStampa(inGriglia && p ? 'periodo' : 'giorno',
+    luogo.pathname + luogo.search, inGriglia && p ? { id: String(p.id) } : { da: inizio }))
   const errori = (dati?.avvisi ?? []).filter((x) => x.gravita === 'errore')
   const attenzioni = (dati?.avvisi ?? []).filter((x) => x.gravita === 'attenzione')
 
@@ -169,7 +201,7 @@ export default function Turni() {
       caricando={azione.inCorso}
       titolo="Turni"
       icona={<I.Griglia size={17} />}
-      aiuto={inGriglia && p
+      aiuto={inMese ? `Mese di ${nomeMese}` : inGriglia && p
         ? `${p.dataInizio} → ${p.dataFine} · ${dati!.persone.length} persone`
         : 'Chi è in sede, e la programmazione per esteso'}
       meta={inGriglia && p
@@ -219,37 +251,51 @@ export default function Turni() {
             <Comando variante="primario" titolo="Nuovo periodo" icona={<I.Piu size={15} />}
                      onClick={() => setNuovoAperto(true)}>Nuovo</Comando>
           )}
-          {inGriglia && p && (
-            <a href={`/api/periodi/${p.id}/export.csv`} title="Scarica il periodo in CSV"
-               aria-label="Scarica il periodo in CSV" className={stileBottone('icona')}>
+          {/* Sempre visibili, spenti finché la vista non ha i suoi dati: il
+              file è quello che si sta guardando, non un'altra richiesta.
+              `contents`: i bottoni restano figli della riga, con il suo gap. */}
+          <span className="contents max-sm:hidden">
+            <Bottone variante="icona" title={`Scarica ${esporta.cosa} in CSV`} aria-label={`Scarica ${esporta.cosa} in CSV`}
+                     disabled={!esporta.pronto} onClick={() => esporta.csv()}>
               <I.Scarica size={17} />
-            </a>
-          )}
-          <Bottone variante="icona" title="Stampa" aria-label="Stampa"
-                   onClick={() => navigate(inGriglia && p ? `/stampa/periodo?id=${p.id}` : '/stampa/giorno')}>
-            <I.Stampa size={17} />
+            </Bottone>
+            <Bottone variante="icona" title={`Scarica ${esporta.cosa} come immagine (PNG)`}
+                     aria-label={`Scarica ${esporta.cosa} come immagine (PNG)`}
+                     disabled={!esporta.pronto} onClick={() => void esporta.png().catch((e) => setErrore(e.message))}>
+              <I.Immagine size={17} />
+            </Bottone>
+            {stampa && <Bottone variante="icona" title="Stampa" aria-label="Stampa" onClick={stampa}>
+              <I.Stampa size={17} />
+            </Bottone>}
+          </span>
+          {/* Sul telefono tre icone rubavano il titolo: una sola, e si sceglie dopo. */}
+          <Bottone variante="icona" className="sm:hidden" title="Scarica o stampa"
+                   aria-label={`Scarica o stampa ${esporta.cosa}`} aria-haspopup="menu"
+                   disabled={!esporta.pronto && !stampa} onClick={() => setMenuFile(true)}>
+            <I.Scarica size={17} />
           </Bottone>
         </>
       }
     >
-      <div className={inGriglia ? 'flex h-full flex-col [&>[data-barra]]:shrink-0' : undefined}>
+      <div className={inTabella ? 'flex h-full flex-col [&>[data-barra]]:shrink-0' : undefined}>
       <Toolbar>
         <div role="radiogroup" aria-label="Come guardare i turni"
              className="inline-flex overflow-hidden rounded-r2 border border-border-controllo">
-          <BottoneVista attivo={!inGriglia} onClick={() => navigate('/turni?vista=giorni')}>Giorni</BottoneVista>
-          <BottoneVista
-            attivo={inGriglia}
-            disabled={(periodi?.length ?? 0) === 0}
+          <BottoneVista attivo={!inTabella} onClick={() => navigate('/turni?vista=settimana')}>Settimana</BottoneVista>
+          <BottoneVista attivo={inMese} onClick={() => navigate(`/turni?vista=mese&mese=${mese}`)}>Mese</BottoneVista>
+          <BottoneVista attivo={inGriglia} disabled={(periodi?.length ?? 0) === 0}
             onClick={() => { const r = periodoDiRiferimento(periodi ?? []); if (r) navigate(`/turni/${r.id}`) }}
           >Griglia</BottoneVista>
         </div>
+        <Bottone className="ml-auto sm:hidden" aria-expanded={opzioniAperte} aria-controls="opzioni-turni"
+                 onClick={() => setOpzioniAperte(v => !v)}>Opzioni</Bottone>
 
         {inGriglia ? (
-          <label className="flex items-center gap-2 text-sm text-ink-muted">
+          <label className="flex items-center gap-2 text-sm text-ink-muted max-sm:basis-full">
             <span className="solo-lettori-schermo">Periodo</span>
             <select
               value={id ?? ''} onChange={(e) => navigate(`/turni/${e.target.value}`)}
-              className="min-h-[32px] cursor-pointer rounded-r2 border border-border-controllo bg-bg px-2 text-sm text-ink"
+              className="min-h-[32px] max-sm:min-h-[44px] cursor-pointer rounded-r2 border border-border-controllo bg-bg px-2 text-sm text-ink"
             >
               {/* Si può arrivare da un collegamento a un periodo che non sta in
                   questo elenco — il dirigente è programmato nell'unità del
@@ -266,6 +312,42 @@ export default function Turni() {
           </label>
         ) : null}
 
+        {inMese && (
+          <div className="flex items-center gap-1 max-sm:basis-full">
+            <Bottone variante="icona" aria-label="Mese precedente" onClick={() => navigate(`/turni?vista=mese&mese=${spostaMese(mese, -1)}`)}>
+              <I.Freccia size={16} className="rotate-180" />
+            </Bottone>
+            <input type="month" aria-label="Mese da visualizzare" value={mese}
+                   onChange={e => { if (e.target.value) navigate(`/turni?vista=mese&mese=${e.target.value}`) }}
+                   className="min-h-[32px] max-sm:min-h-[44px] min-w-0 rounded-r2 border border-border-controllo bg-bg px-2 text-sm text-ink" />
+            <Bottone variante="icona" aria-label="Mese successivo" onClick={() => navigate(`/turni?vista=mese&mese=${spostaMese(mese, 1)}`)}>
+              <I.Freccia size={16} />
+            </Bottone>
+          </div>
+        )}
+        {!inTabella && <div className="flex flex-wrap items-center gap-2 max-sm:basis-full">
+            <div className="inline-flex items-center gap-1">
+              <Bottone variante="icona" title="Indietro" aria-label="Settimane precedenti"
+                       onClick={() => sposta(-1)}>
+                <I.Freccia size={16} className="rotate-180" />
+              </Bottone>
+              <Bottone variante="icona" title="Avanti" aria-label="Settimane successive"
+                       onClick={() => sposta(1)}>
+                <I.Freccia size={16} />
+              </Bottone>
+              {inizio !== inizioSettimanaTurni(oggiISO()) && (
+                <Bottone title="Torna a questa settimana"
+                         onClick={() => { vibra(APTICO.spostamento); setInizio(inizioSettimanaTurni(oggiISO())) }}>
+                  Oggi
+                </Bottone>
+              )}
+            </div>
+
+            <span className="text-sm text-ink-muted">{finestra(inizio, settimane)}</span>
+
+        </div>}
+
+        <div id="opzioni-turni" className={`${opzioniAperte ? 'flex' : 'hidden'} w-full flex-wrap items-center gap-2 sm:flex sm:w-auto sm:flex-1`}>
         {inGriglia && p && modificabile ? (
           <Bottone variante={modifica ? 'primario' : 'normale'} aria-pressed={modifica}
                    stato={azione.statoDi('modifica')} disabled={azione.inCorso}
@@ -285,40 +367,16 @@ export default function Turni() {
           </Bottone>
         ) : null}
 
-        {!inGriglia && (
-          <>
+        {!inTabella && <>
             <div role="radiogroup" aria-label="Quante settimane mostrare"
                  className="inline-flex overflow-hidden rounded-r2 border border-border-controllo">
               {[1, 2, 4].map((n) => (
                 <BottoneVista key={n} attivo={settimane === n} onClick={() => setSettimane(n)}
                               aria-label={n === 1 ? '1 settimana' : `${n} settimane`}>
-                  {/* Per esteso quando c'è spazio. Sotto i 460px i due
-                      interruttori non ci starebbero sulla stessa riga: la
-                      parola si abbrevia, ma non sparisce. */}
-                  <span className="min-[460px]:hidden">{n} sett.</span>
-                  <span className="hidden min-[460px]:inline">{n === 1 ? '1 settimana' : `${n} settimane`}</span>
+                  {n}
                 </BottoneVista>
               ))}
             </div>
-
-            <div className="inline-flex items-center gap-1">
-              <Bottone variante="icona" title="Indietro" aria-label="Settimane precedenti"
-                       onClick={() => sposta(-1)}>
-                <I.Freccia size={16} className="rotate-180" />
-              </Bottone>
-              <Bottone variante="icona" title="Avanti" aria-label="Settimane successive"
-                       onClick={() => sposta(1)}>
-                <I.Freccia size={16} />
-              </Bottone>
-              {inizio !== lunediDi(oggiISO()) && (
-                <Bottone title="Torna a questa settimana"
-                         onClick={() => { vibra(APTICO.spostamento); setInizio(lunediDi(oggiISO())) }}>
-                  Oggi
-                </Bottone>
-              )}
-            </div>
-
-            <span className="text-sm text-ink-muted">{finestra(inizio, settimane)}</span>
 
             <input
               type="search" value={cerca} onChange={(e) => setCerca(e.target.value)}
@@ -333,23 +391,20 @@ export default function Turni() {
                 Solo il mio settore
               </label>
             )}
-          </>
-        )}
-
+        </>}
         {/* Il cognome ordina sempre, in tutte e due le viste: non è una scelta.
             L'unica scelta è se spezzare gli elenchi per settore. */}
         <label className="flex cursor-pointer items-center gap-1.5 text-sm text-ink-muted">
           <input
             type="checkbox" className="size-3.5 cursor-pointer"
-            checked={inGriglia ? raggruppaGriglia : raggruppaGiorni}
-            onChange={(e) => { vibra(); (inGriglia ? setRaggruppaGriglia : setRaggruppaGiorni)(e.target.checked) }}
+            checked={inTabella ? raggruppaGriglia : raggruppaGiorni}
+            onChange={(e) => { vibra(); (inTabella ? setRaggruppaGriglia : setRaggruppaGiorni)(e.target.checked) }}
           />
           Raggruppa per settore
         </label>
 
-        {inGriglia && dati && (
+        {inTabella && (
           <>
-            <span className="hidden lg:block"><Legenda /></span>
             <span className="ml-auto flex items-center gap-3 text-sm">
               {/* Dalla seconda versione in poi la domanda che segue è sempre
                   «cosa è cambiato»: la risposta era già in archivio, e non la
@@ -369,17 +424,18 @@ export default function Turni() {
               )}
               {errori.length > 0 && <Pill tono="errore">{errori.length} da risolvere</Pill>}
               {attenzioni.length > 0 && <Pill tono="attesa">{attenzioni.length} segnalazioni</Pill>}
-              {errori.length === 0 && attenzioni.length === 0 && <Pill tono="ok">Nessun conflitto</Pill>}
+              {inGriglia && errori.length === 0 && attenzioni.length === 0 && <Pill tono="ok">Nessun conflitto</Pill>}
             </span>
           </>
         )}
+        </div>
       </Toolbar>
 
       {errore && <div className="px-4 py-2"><Messaggio tono="errore">{errore}</Messaggio></div>}
 
       <div className="px-4 pt-2 empty:hidden"><AvvisoNovita /></div>
 
-      {!inGriglia && (
+      {!inTabella && (
         <div
           style={{ touchAction: 'pan-y pinch-zoom' }}
           onPointerDown={(e) => {
@@ -396,17 +452,23 @@ export default function Turni() {
             e.preventDefault(); e.stopPropagation()
           }}
         >
-          <Giorni settimane={settimane} da={inizio} raggruppa={raggruppaGiorni}
+          <Giorni settimane={settimane} da={inizio} raggruppa={raggruppaGiorni} onCaricato={setDatiSettimana}
                   filtro={{ testo: cerca, settore: soloSettore ? utente.sectorId : null }} />
         </div>
       )}
 
+      {inMese && <Mese mese={mese} periodi={periodi} raggruppa={raggruppaGriglia} ioId={utente.id}
+                       onApriPeriodo={pid => navigate(`/turni/${pid}`)} onCaricato={setDatiMese} />}
+
       {inGriglia && !dati && !errore && <div className="p-4 md:p-6"><Scheletro righe={6} /></div>}
 
       {inGriglia && dati && p && (
-        <div className="grid min-h-[280px] flex-1 grid-cols-[minmax(0,1fr)_auto]">
-          <div className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)]">
-            <div className="flex max-h-40 flex-col gap-2 overflow-auto px-4 py-2 empty:hidden">
+        <div className="grid min-h-[280px] flex-1 grid-cols-[minmax(0,1fr)_auto] grid-rows-[minmax(0,1fr)]">
+          {/* Colonna flessibile, non griglia: una riga `auto` sotto un `1fr` che
+              trabocca veniva schiacciata, e la legenda usciva dallo schermo. Qui
+              si restringe solo la tabella, che scorre da sé. */}
+          <div className="flex min-h-0 min-w-0 flex-col">
+            <div className="flex max-h-40 shrink-0 flex-col gap-2 overflow-auto px-4 py-2 empty:hidden">
               {/* In ordine di peso: prima quello che blocca la pubblicazione,
                   poi quello che va guardato, per ultimo l'esito di una scelta. */}
               {errori.length > 0 && (
@@ -457,6 +519,8 @@ export default function Turni() {
             <Griglia dati={dati} selezione={selezione} onSeleziona={setSelezione}
                      raggruppa={raggruppaGriglia} ioId={utente.id}
                      modifica={modifica && modificabile} onCambia={scriviCelle} onMenu={apriMenu} />
+            {/* Fuori dalla tabella che scorre: la legenda resta ferma e sempre aperta. */}
+            <div className="shrink-0 border-t border-border px-4 py-2"><Legenda assegnaScrivanie={p.assegnaScrivanie} /></div>
           </div>
 
           {selezione && (
@@ -499,6 +563,23 @@ export default function Turni() {
           />
         )
       })()}
+
+      {menuFile && (
+        <MenuCella
+          titolo={`Scarica o stampa ${esporta.cosa}`} posizione={null}
+          voci={[
+            ...(esporta.pronto ? [{ chiave: 'csv', etichetta: 'CSV, per il foglio di calcolo' }, { chiave: 'png', etichetta: 'Immagine PNG' }] : []),
+            ...(stampa ? [{ chiave: 'stampa', etichetta: 'Stampa o PDF' }] : []),
+          ]}
+          onChiudi={() => setMenuFile(false)}
+          onScegli={(k) => {
+            setMenuFile(false)
+            if (k === 'csv') esporta.csv()
+            else if (k === 'png') void esporta.png().catch((e) => setErrore(e.message))
+            else stampa?.()
+          }}
+        />
+      )}
 
       {dati && p && (
         <ModaleAssenzaPerConto

@@ -100,18 +100,21 @@ elenco di terzi, e un file che gira per posta non è il posto dove metterlo.
 L'immagine è quella che vedi, coi filtri accesi: sul telefono si condivide o si
 salva in galleria.
 
-Dalle **preferenze** (in Assenze) scegli quali filtri partono accesi, e se ogni
-sera prima di una giornata in sede vuoi un **promemoria** con stanza e
-scrivania. Arriva alle 18 nella campanella, e come notifica se le hai attivate.
+Dalle **preferenze** (in Assenze) scegli quali filtri partono accesi. Il
+**promemoria** della sera prima di una giornata in sede, con stanza e
+scrivania, si accende dal tuo menu utente: vedi [Notifiche](#notifiche).
 
 ---
 
 ## Turni — chi c'è, e la programmazione
 
-Due modi di guardare la stessa cosa, con l'interruttore in alto.
+Tre modi di guardare la stessa cosa, con l'interruttore in alto: **Settimana**,
+**Mese** e **Griglia**.
 
-**Giorni** — si apre sulla **settimana in corso**; con l'interruttore in alto si
-passa a due o quattro settimane. Una giornata per colonna, e dentro ciascuna: chi è **in sede**
+**Settimana** — Turni si apre sempre qui, sulla **settimana in corso**; il
+sabato e la domenica, già sulla **settimana successiva**, che è quella che
+interessa. I chip **1**, **2** e **4** mostrano una, due o quattro settimane;
+le frecce le sfogliano e «Oggi» riporta al punto di partenza. Una giornata per colonna, e dentro ciascuna: chi è **in sede**
 diviso stanza per stanza, con quante postazioni di quella stanza sono occupate;
 chi lavora **da remoto**; e in fondo, richiuso, chi è **assente**. È la vista
 per la domanda di tutti i giorni: *chi trovo mercoledì, e in che stanza?*
@@ -120,7 +123,7 @@ L'occupazione è quella del giorno, non una media del periodo.
 Il tuo nome è evidenziato in ogni elenco. Le persone sono **sempre in ordine
 di cognome**, in tutte e due le viste: non è una scelta, è come si cerca un
 nome. L'unica scelta è la casella **Raggruppa per settore**, che spezza gli
-elenchi in blocchi — spenta nei Giorni, accesa nella Griglia, dove il settore
+elenchi in blocchi — spenta in Settimana, accesa in Mese e Griglia, dove il settore
 è il criterio con cui si costruiscono i turni. Su una settimana sola le colonne
 si allargano fino a riempire la scheda; dal telefono le giornate si impilano
 una sotto l'altra, e la pagina si apre sulla giornata di oggi.
@@ -152,7 +155,31 @@ registrata dall'organizzazione. Si sfoglia da tastiera con le frecce; sul
 telefono si apre sulla colonna di oggi. Il menu a tendina sceglie il periodo.
 La tua riga è evidenziata.
 
-Dalle preferenze scegli se **Turni** si apre sui giorni o sulla griglia.
+**Mese** riunisce le programmazioni pubblicate in un solo mese solare, dal
+primo all'ultimo giorno, anche quando un periodo continua nel mese successivo.
+Le frecce e il selettore del mese permettono di sfogliarlo. Il punto `·` indica
+una giornata non programmata; il trattino `–` indica lavoro da remoto.
+Seleziona una cella programmata per aprire il suo periodo e modificarlo.
+
+Sotto Mese e Griglia la **legenda** resta sempre visibile, fuori dalla tabella
+che scorre.
+
+In alto a destra, in tutte e tre le viste, ci sono **CSV** e **immagine**, e
+accanto la stampa. Si accendono appena la vista ha caricato i suoi dati, e
+scaricano quello che stai guardando:
+
+- il **CSV** ha sempre le colonne `data;persona;settore;stato;stanza;scrivania`
+  e solo le giornate programmate dell'intervallo mostrato;
+- l'**immagine** (PNG) è un documento pulito in bianco e nero, non una
+  schermata: Settimana esce a card come la stampa giorno per giorno, Mese e
+  Griglia come la griglia stampata. Sul telefono si condivide o si salva.
+
+I file si chiamano `turni-settimana-AAAA-MM-GG`, `turni-mese-AAAA-MM` e
+`turni-griglia-AAAA-MM-GG_AAAA-MM-GG`.
+
+Sul telefono i comandi secondari sono raccolti in **Opzioni**: modifica,
+raggruppamento e, in Settimana, ricerca e numero di settimane.
+La scelta della vista e delle date resta sempre visibile.
 
 Senza rete Turni mostra l'ultima settimana guardata, e lo dice.
 
@@ -244,10 +271,22 @@ di norma le 10:00. Dopo, il prospetto della giornata è fermo.
 
 Il tasto della stampante, in alto a destra, apre quattro fogli:
 
-- **Griglia del periodo** — il foglio da bacheca, A4 orizzontale.
-- **Giorno per giorno** — una scheda per giornata, divisa per stanza, con chi è da remoto in coda.
+- **Griglia del periodo** — il foglio da bacheca, A4 orizzontale. Parte
+  raggruppata per settore (si può spegnere), con un bordo più marcato a ogni
+  lunedì. Il numero della stanza sta in un riquadro, lo smart working è una
+  casetta, e l'assenza è sempre una `×`, chiunque l'abbia registrata. In fondo
+  le postazioni occupate giorno per giorno, una riga per stanza con
+  `occupati/capienza`, e la legenda.
+- **Giorno per giorno** — una card per giornata, e dentro una card per ogni
+  stanza, una per lo **Smart working** e una per gli **Assenti**, ciascuna col
+  suo contatore; anche quelle vuote, con lo zero. Nomi per intero, settore e
+  scrivania. Una giornata non si spezza fra due pagine.
 - **Il mio calendario** — le tue giornate, da portarsi dietro.
 - **Occupazione delle stanze** — solo per chi organizza.
+
+**Indietro** chiude la stampa e ti riporta alla vista esatta da cui l'hai
+aperta — lo stesso mese, la stessa griglia — anche se nel frattempo hai
+cambiato foglio.
 
 Poi «Stampa». Per ottenere un PDF invece di un foglio, scegli «Salva come PDF»
 nella finestra di stampa del browser; su iPhone, Condividi → Stampa → pizzica
@@ -259,9 +298,18 @@ sull'anteprima.
 
 La campanella in alto porta il centro notifiche, che riceve sempre tutto.
 
-Le notifiche push del browser sono un di più, e si autorizzano dal browser
-stesso. Su iPhone arrivano **solo** se hai installato Turni sulla schermata
-home.
+Nel **menu utente** — il cerchio con le tue iniziali — ci sono due interruttori:
+
+- **Push su questo dispositivo** — le notifiche del browser, anche a scheda
+  chiusa. Valgono **per il dispositivo** su cui lo accendi: telefono e computer
+  si accendono ciascuno per conto suo. Accendendolo il browser chiede il
+  permesso; spegnendolo il dispositivo smette di riceverle. Se il browser non le
+  supporta, se il permesso è stato negato o se il server non è configurato, lo
+  dice lì sotto. Su iPhone arrivano **solo** se hai installato Turni sulla
+  schermata home.
+- **Promemoria sera prima** — alle 18 del giorno prima di una giornata in sede,
+  con stanza e scrivania. Vale **per il tuo account**, su ogni dispositivo:
+  arriva nella campanella, e come push dove le hai accese.
 
 Non esiste posta elettronica: se non apri l'applicazione e non hai autorizzato
 le notifiche, nessun avviso ti raggiunge.
@@ -320,6 +368,14 @@ griglia si legge e basta, anche per te.
 In fondo alla griglia c'è l'**occupazione stanza per stanza**. Puoi sforare per
 un momento — sposti prima, sistemi dopo — ma la stanza diventa rossa, compare
 un conflitto da risolvere, e finché resta non si invia.
+
+I controlli valgono da oggi in poi, secondo la data italiana. Le giornate
+passate restano consultabili, senza conflitti né colori di sforamento basati
+sulle capienze attuali. Le quote della settimana in corso si calcolano
+sull'intera settimana.
+
+La **legenda**, sempre visibile sotto la griglia, spiega i simboli.
+Il numero di scrivania compare solo nei periodi che ne prevedono l'assegnazione.
 
 ### Bloccare una cella
 

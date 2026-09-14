@@ -161,6 +161,12 @@ describe('stampa', () => {
     expect(stampa).toMatch(/height:\s*auto\s*!important/)
     expect(stampa).toMatch(/overflow:\s*visible\s*!important/)
   })
+
+  it('la griglia su carta separa le settimane, incornicia le stanze e tiene i grigi', () => {
+    for (const regola of ['.inizio-settimana', '.stanza-stampa', 'print-color-adjust']) {
+      expect(app, `manca ${regola} nel foglio di stile`).toContain(regola)
+    }
+  })
 })
 
 describe('comandi dell\'header', () => {

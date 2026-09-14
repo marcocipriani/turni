@@ -32,6 +32,7 @@ describe.skipIf(!url)('regressioni API su MariaDB/MySQL', () => {
     const { org } = await import('./org')
     const { mio } = await import('./mio')
     const { overview } = await import('./overview')
+    const { auth } = await import('./auth')
     app = new Hono<Env>()
     app.use('*', async (c, next) => {
       c.set('attore', (await caricaAttore(Number(c.req.header('x-test-user'))))!)
@@ -39,7 +40,7 @@ describe.skipIf(!url)('regressioni API su MariaDB/MySQL', () => {
       await next()
     })
     app.onError((e, c) => c.json({ errore: e.message }, e instanceof HttpError ? e.status : 500))
-    app.route('/periodi', periods).route('/assenze', absences).route('/org', org).route('/mio', mio).route('/panoramica', overview)
+    app.route('/periodi', periods).route('/assenze', absences).route('/org', org).route('/mio', mio).route('/panoramica', overview).route('/auth', auth)
     const [unit] = await db.insert(s.unit).values({ nome: 'Regressione temporanea' })
     unitId = unit.insertId
     for (const [i, ruolo] of (['dirigente', 'dipendente', 'dipendente', 'admin'] as const).entries()) {
@@ -70,6 +71,7 @@ describe.skipIf(!url)('regressioni API su MariaDB/MySQL', () => {
       await db.delete(s.absence).where(inArray(s.absence.userId, utenti))
       await db.delete(s.absenceRule).where(inArray(s.absenceRule.userId, utenti))
       await db.delete(s.auditLog).where(inArray(s.auditLog.utente, utenti))
+      await db.delete(s.userPreference).where(inArray(s.userPreference.userId, utenti))
       await db.delete(s.user).where(inArray(s.user.id, utenti))
     }
     if (stanze.length) {
@@ -78,6 +80,65 @@ describe.skipIf(!url)('regressioni API su MariaDB/MySQL', () => {
     }
     if (unitId) await db.delete(s.unit).where(eq(s.unit.id, unitId))
     await pool.end()
+  })
+
+  it('il promemoria della sera si cambia da solo, senza toccare le altre preferenze', async () => {
+    type Preferenze = { promemoriaSera: boolean; giorniPreferiti: number[]; nota: string | null }
+    const leggi = async (user: number) =>
+      await (await richiesta(user, 'GET', '/assenze/preferenze')).json() as Preferenze
+    await richiesta(collega, 'PUT', '/assenze/preferenze', { giorniPreferiti: [2], nota: 'resta' })
+    expect((await richiesta(collega, 'PATCH', '/assenze/preferenze', { promemoriaSera: true })).status).toBe(200)
+    expect(await leggi(collega)).toMatchObject({ promemoriaSera: true, giorniPreferiti: [2], nota: 'resta' })
+    const me = await (await richiesta(collega, 'GET', '/auth/me')).json() as { preferenze: Preferenze }
+    expect(me.preferenze.promemoriaSera).toBe(true)
+    // Il modulo delle preferenze non lo manda più: salvarlo non deve spegnerlo.
+    await richiesta(collega, 'PUT', '/assenze/preferenze', { giorniPreferiti: [3], nota: 'resta' })
+    expect((await leggi(collega)).promemoriaSera).toBe(true)
+    expect((await richiesta(altro, 'PATCH', '/assenze/preferenze', { promemoriaSera: true })).status).toBe(200)
+    expect((await leggi(altro)).giorniPreferiti).toEqual([])
+    expect((await richiesta(collega, 'PATCH', '/assenze/preferenze', { promemoriaSera: 'sì' })).status).toBe(422)
+    expect((await richiesta(collega, 'PATCH', '/assenze/preferenze', { promemoriaSera: false, nota: 'no' })).status).toBe(422)
+  })
+
+  it('ignora i conflitti passati ma controlla oggi e domani, anche prima di approvare', async () => {
+    const { db, schema: s } = database
+    const giorni = ['2030-09-09', '2030-09-10', '2030-09-11']
+    const r = await richiesta(dirigente, 'POST', '/periodi', {
+      unitId, dataInizio: giorni[0], dataFine: giorni[2],
+    })
+    expect(r.status).toBe(201)
+    const id = (await risultato(r)).id; periodi.push(id)
+    await db.insert(s.assignment).values(giorni.flatMap((data) =>
+      [dirigente, collega, altro].map((userId) => ({
+        periodId: id, userId, data, stato: 'presenza' as const, roomId, deskId, origine: 'manuale' as const,
+      }))))
+    await db.insert(s.absence).values({ userId: collega, dataInizio: giorni[0]!, dataFine: giorni[0]!, causale: 'ferie' })
+    // A Roma è già il 10, mentre UTC è ancora il 9.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2030-09-09T22:30:00Z'))
+    try {
+      const griglia = await (await richiesta(dirigente, 'GET', `/periodi/${id}/griglia`)).json() as {
+        avvisi: { data: string; gravita: string }[]
+      }
+      expect(griglia.avvisi.some((a) => a.data === giorni[0])).toBe(false)
+      for (const giorno of giorni.slice(1)) {
+        expect(griglia.avvisi.some((a) => a.data === giorno && a.gravita === 'errore')).toBe(true)
+      }
+      expect((await richiesta(dirigente, 'POST', `/periodi/${id}/invia`, {})).status).toBe(409)
+      for (const data of giorni.slice(1)) {
+        for (const userId of [dirigente, collega, altro]) {
+          await richiesta(dirigente, 'PUT', `/periodi/${id}/cella`, { userId, data, stato: 'smart' })
+        }
+      }
+      expect((await richiesta(dirigente, 'POST', `/periodi/${id}/invia`, {})).status).toBe(200)
+      expect((await richiesta(dirigente, 'POST', `/periodi/${id}/approva`, {})).status).toBe(200)
+    } finally {
+      vi.useRealTimers()
+      // La prova seguente usa la stessa unità e la giornata iniziale.
+      await db.delete(s.absence).where(eq(s.absence.userId, collega))
+      await db.delete(s.assignment).where(eq(s.assignment.periodId, id))
+      await db.delete(s.period).where(eq(s.period.id, id))
+    }
   })
 
   it('protegge revisioni, assenze, scrivanie, approvazione e confini organizzativi', async () => {

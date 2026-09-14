@@ -1,6 +1,11 @@
 /** Date di calendario come stringhe `YYYY-MM-DD`: nessun fuso, nessuna sorpresa. */
 export type ISODate = string
 
+/** Il giorno corrente dell'ufficio, anche nelle ore in cui UTC è ancora ieri. */
+export const oggiISO = () => new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit',
+}).format(new Date())
+
 export function toISO(d: Date): ISODate {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
 }

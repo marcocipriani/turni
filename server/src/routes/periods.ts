@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { type Env, HttpError, nonTrovato, vietato } from '../context'
 import { db, schema } from '../db/index'
 import { traccia } from '../lib/audit'
-import { type ISODate, weekKey, weekday, workingDays } from '../lib/dates'
+import { type ISODate, oggiISO, weekKey, weekday, workingDays } from '../lib/dates'
 import { avvisa } from '../lib/notify'
 import { generate, type Persona, type Stanza } from '../generate'
 import {
@@ -103,8 +103,11 @@ function personePerMotore(ctx: Contesto): Persona[] {
 function validazioni(ctx: Contesto, p: typeof schema.period.$inferSelect) {
   const avvisi: { gravita: 'errore' | 'attenzione'; messaggio: string; data?: string }[] = []
   const capienza = ctx.stanze.reduce((s, r) => s + r.capienza, 0)
+  // Capienze e disponibilità attuali non invalidano le giornate già trascorse.
+  const oggi = oggiISO()
+  const giorni = ctx.giorni.filter((g) => g >= oggi)
 
-  for (const g of ctx.giorni) {
+  for (const g of giorni) {
     const presenti = ctx.celle.filter((c) => c.data === g && c.stato === 'presenza')
     if (presenti.length > capienza) {
       avvisi.push({ gravita: 'errore', data: g, messaggio: `${g}: ${presenti.length} presenze per ${capienza} postazioni` })
@@ -119,14 +122,14 @@ function validazioni(ctx: Contesto, p: typeof schema.period.$inferSelect) {
   // piena oltre le scrivanie e un'altra vuota.
   const etichette = new Map(ctx.stanzeRighe.map((s) => [s.id, s.etichetta]))
   const conEtichetta = ctx.stanze.map((s) => ({ ...s, etichetta: etichette.get(s.roomId) ?? String(s.roomId) }))
-  for (const x of sforamenti(ctx.celle, conEtichetta, ctx.giorni)) {
+  for (const x of sforamenti(ctx.celle, conEtichetta, giorni)) {
     avvisi.push({ gravita: 'errore', data: x.data,
                   messaggio: `${x.data}: stanza ${x.etichetta} con ${x.presenti} persone per ${x.capienza} postazioni` })
   }
 
   const scrivanieOccupate = new Set<string>()
   for (const c of ctx.celle) {
-    if (c.stato !== 'presenza') continue
+    if (c.stato !== 'presenza' || c.data < oggi) continue
     if (!ctx.stanze.some((s) => s.roomId === c.roomId)) {
       avvisi.push({ gravita: 'errore', data: c.data, messaggio: `${c.data}: stanza non disponibile` })
     }
@@ -158,6 +161,8 @@ function validazioni(ctx: Contesto, p: typeof schema.period.$inferSelect) {
     }
     for (const u of ctx.persone) {
       for (const [sett, quante] of giorniPerSettimana) {
+        // La settimana in corso si conta intera: tagliarla falserebbe le quote.
+        if (sett < weekKey(oggi)) continue
         const inSede = presenze.get(`${u.id}|${sett}`) ?? 0
         const agile = quante - inSede
         if (p.smartMinSettimana != null && agile < p.smartMinSettimana) {

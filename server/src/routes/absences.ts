@@ -169,12 +169,23 @@ absences.put('/preferenze', async (c) => {
   const b = z.object({
     giorniPreferiti: giorni, giorniDaEvitare: giorni,
     nota: z.string().max(500).nullable().default(null),
-    promemoriaSera: z.boolean().default(false),
+    // Si cambia dal menu utente: il modulo non lo manda, e assente non lo tocca.
+    promemoriaSera: z.boolean().optional(),
     vistaTurni: z.enum(['giorni', 'griglia']).default('giorni'),
     filtriMio: z.array(z.enum(['presenza', 'smart', 'assenza'])).min(1).max(3).nullish()
       .transform((v) => v ?? ['presenza' as const]),
   }).safeParse(await c.req.json())
   if (!b.success) throw new HttpError(422, 'Preferenze non valide')
+  await db.insert(schema.userPreference).values({ userId: a.id, ...b.data })
+    .onDuplicateKeyUpdate({ set: b.data })
+  return c.json({ ok: true })
+})
+
+/** Il solo interruttore del menu: una colonna, e il resto delle preferenze resta com'è. */
+absences.patch('/preferenze', async (c) => {
+  const a = c.get('attore')
+  const b = z.object({ promemoriaSera: z.boolean() }).strict().safeParse(await c.req.json())
+  if (!b.success) throw new HttpError(422, 'Preferenza non valida')
   await db.insert(schema.userPreference).values({ userId: a.id, ...b.data })
     .onDuplicateKeyUpdate({ set: b.data })
   return c.json({ ok: true })
