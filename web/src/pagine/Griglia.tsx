@@ -184,9 +184,12 @@ export default function Griglia({
                 <th key={g} scope="col" data-giorno={g}
                     className={`sticky top-0 z-[2] w-[44px] sm:w-[52px] border-b border-r border-border bg-surface px-1 py-1.5
                                 text-center text-xs font-semibold text-ink-muted
-                                ${lunedi ? 'border-l-2 border-l-border-strong' : ''}`}>
+                                ${lunedi ? 'border-l-2 border-l-border-strong' : ''}`}
+                    style={g === oggi ? { boxShadow: 'inset 0 2px 0 var(--ink)' } : undefined}>
                   <span className="block text-2xs font-normal text-ink-faint">{breve}</span>
                   <span className="mono block">{giorno}</span>
+                  {/* Il Badge di Settimana non ci sta in 44px: stessa voce, senza pillola. */}
+                  {g === oggi && <span className="block text-2xs uppercase tracking-[0.04em] text-ink">oggi</span>}
                 </th>
               )
             })}
