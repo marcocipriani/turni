@@ -70,6 +70,15 @@ describe('viewport', () => {
     expect(shell()).toMatch(/overflow:\s*hidden/)
   })
 
+  it('il documento non scorre nemmeno da script', () => {
+    /* `hidden` non basta contro `scrollIntoView`: gli assoluti senza antenato
+       posizionato allungavano il documento, e il salto a oggi di Settimana se
+       lo portava dietro. #root li contiene e non si lascia scorrere. */
+    const radice = app.match(/^#root \{[^}]*\}/m)?.[0] ?? ''
+    expect(radice, '#root deve contenere gli assoluti').toMatch(/position:\s*relative/)
+    expect(radice, '#root deve ritagliare senza diventare scorribile').toMatch(/overflow:\s*clip/)
+  })
+
   it("l'altezza della shell non si muove sotto i piedi", () => {
     // `dvh` cambia insieme alla barra degli indirizzi. Qui il documento non
     // scorre, quindi quella barra non si ritrae mai: resterebbe solo il salto.

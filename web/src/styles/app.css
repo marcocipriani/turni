@@ -30,6 +30,15 @@ html, body, #root {
   overflow: hidden;
   overscroll-behavior: none;
 }
+/* `hidden` ferma il dito, non lo script: `scrollIntoView` e `focus()` scorrono
+   ogni antenato che ha qualcosa oltre il bordo. E qualcosa c'era: gli span
+   `solo-lettori-schermo`, assoluti senza un antenato posizionato, si
+   agganciavano alla finestra e allungavano il documento fino all'ultima
+   giornata. Aprendo Settimana di giovedì, il salto a oggi scorreva anche il
+   documento e si portava via header e barra in basso.
+   Qui gli assoluti trovano il loro contenitore, e `clip` — a differenza di
+   `hidden` — non si lascia scorrere da nessuno. */
+#root { position: relative; overflow: clip; }
 body {
   font-family: var(--font-sans);
   font-size: 14px;
