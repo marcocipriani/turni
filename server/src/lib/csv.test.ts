@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { EMAIL, ISO, leggiCsv, lungo, si } from './csv'
+import { EMAIL, ISO, leggiCsv, lungo, si, virgolette } from './csv'
+
+describe('virgolette', () => {
+  it('raddoppia le virgolette dentro la cella', () => {
+    expect(virgolette('Sala "nord"; 1')).toBe('"Sala ""nord""; 1"')
+  })
+
+  it('disinnesca ciò che il foglio di calcolo eseguirebbe', () => {
+    for (const f of ['=1+1', '+1', '-1', '@SOMMA(A1)', '\t=1', '\r=1']) expect(virgolette(f)).toBe(`" ${f}"`)
+  })
+})
 
 describe('leggiCsv', () => {
   it('toglie la firma UTF-8 di Excel dalla prima colonna', () => {

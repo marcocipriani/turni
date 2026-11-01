@@ -18,7 +18,10 @@ export async function caricaAttore(userId: number): Promise<Attore | null> {
     .select({ unitId: schema.organizer.unitId })
     .from(schema.organizer)
     .where(eq(schema.organizer.userId, userId))
-  return { id: u.id, ruolo: u.ruolo, unitId: u.unitId, organizzatoreDi: deleghe.map((d) => d.unitId) }
+  return {
+    id: u.id, ruolo: u.ruolo, unitId: u.unitId, organizzatoreDi: deleghe.map((d) => d.unitId),
+    passwordDaCambiare: u.passwordDaCambiare,
+  }
 }
 
 export const attore = (c: Context<Env>) => c.get('attore')

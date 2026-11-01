@@ -6,6 +6,8 @@ import { getCookie } from 'hono/cookie'
 import { compress } from 'hono/compress'
 import { cors } from 'hono/cors'
 import { caricaAlbero, caricaAttore, type Env, HttpError } from './context'
+import { limiteCorpo } from './lib/limite'
+import { bloccatoDaPassword } from './permissions'
 import { absences } from './routes/absences'
 import { auth, utenteDaToken } from './routes/auth'
 import { admin } from './routes/admin'
@@ -53,13 +55,7 @@ app.use('*', async (c, next) => {
   if (PRODUZIONE) c.header('strict-transport-security', 'max-age=15552000; includeSubDomains')
 })
 
-/** Un corpo enorme è o un errore o un tentativo: non lo si legge nemmeno. */
-const CORPO_MASSIMO = 256 * 1024
-app.use('/api/*', async (c, next) => {
-  const lunghezza = Number(c.req.header('content-length') ?? 0)
-  if (lunghezza > CORPO_MASSIMO) throw new HttpError(413, 'Richiesta troppo grande')
-  return next()
-})
+app.use('/api/*', limiteCorpo)
 
 app.onError((err, c) => {
   if (err instanceof HttpError) return c.json({ errore: err.message }, err.status)
@@ -79,6 +75,7 @@ app.use('/api/*', async (c, next) => {
   if (!userId) throw new HttpError(401, 'Sessione assente o scaduta')
   const attore = await caricaAttore(userId)
   if (!attore) throw new HttpError(401, 'Utente non più attivo')
+  if (bloccatoDaPassword(attore, c.req.path)) throw new HttpError(403, 'Prima cambia la password')
   c.set('attore', attore)
   c.set('albero', await caricaAlbero())
   return next()

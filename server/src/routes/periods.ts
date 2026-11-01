@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { type Env, HttpError, nonTrovato, vietato } from '../context'
 import { db, schema } from '../db/index'
 import { traccia } from '../lib/audit'
+import { virgolette } from '../lib/csv'
 import { type ISODate, oggiISO, weekKey, weekday, workingDays } from '../lib/dates'
 import { avvisa } from '../lib/notify'
 import { generate, type Persona, type Stanza } from '../generate'
@@ -866,7 +867,6 @@ periods.get('/:id/export.csv', async (c) => {
   const nomeScrivania = (id: number | null) => (id == null ? '' : scrivaniePerId.get(id) ?? '')
   const nomeSettore = (id: number | null) => (id == null ? '' : settoriPerId.get(id) ?? '')
 
-  const virgolette = (v: string) => `"${v.replace(/"/g, '""')}"`
   const righe = [['cognome', 'nome', 'settore', 'data', 'stato', 'stanza', 'scrivania'].join(';')]
   for (const u of ctx.persone) {
     for (const g of ctx.giorni) {

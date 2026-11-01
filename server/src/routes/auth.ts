@@ -14,6 +14,10 @@ const DURATA_GIORNI = 14
 
 const impronta = (token: string) => createHash('sha256').update(token).digest('hex')
 
+// Per chi non esiste si fa lo stesso lavoro: i tempi di risposta non devono
+// dire ciò che il messaggio unico tace.
+const IMPRONTA_FINTA = hashPassword(randomBytes(32).toString('base64url'))
+
 export async function creaSessione(userId: number, userAgent: string | undefined) {
   const token = randomBytes(32).toString('base64url')
   const scadeIl = new Date(Date.now() + DURATA_GIORNI * 86_400_000)
@@ -51,8 +55,8 @@ auth.post('/login', async (c) => {
   const [u] = await db.select().from(schema.user).where(eq(schema.user.email, email)).limit(1)
   // Messaggio unico: non si rivela se l'indirizzo esista.
   const generico = new HttpError(401, 'Credenziali non valide')
-  if (!u || !u.attivo) { tentativoFallito(email); throw generico }
-  if (!(await verifyPassword(body.data.password, u.passwordHash))) { tentativoFallito(email); throw generico }
+  const giusta = await verifyPassword(body.data.password, u?.attivo ? u.passwordHash : await IMPRONTA_FINTA)
+  if (!u?.attivo || !giusta) { tentativoFallito(email); throw generico }
   tentativoRiuscito(email)
 
   // Occasione buona per togliere di mezzo le sessioni scadute: succede a ogni

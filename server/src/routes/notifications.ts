@@ -3,6 +3,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { type Env, HttpError } from '../context'
 import { db, schema } from '../db/index'
+import { servizioPushNoto } from '../lib/notify'
 
 export const notifications = new Hono<Env>()
 
@@ -27,7 +28,7 @@ notifications.get('/push/chiave', (c) => c.json({ chiave: process.env.VAPID_PUBL
 notifications.post('/push/iscrivi', async (c) => {
   const a = c.get('attore')
   const b = z.object({
-    endpoint: z.string().url(),
+    endpoint: z.string().refine(servizioPushNoto),
     keys: z.object({ p256dh: z.string().min(1), auth: z.string().min(1) }),
     dispositivo: z.string().optional(),
   }).safeParse(await c.req.json())
@@ -40,8 +41,10 @@ notifications.post('/push/iscrivi', async (c) => {
 })
 
 notifications.post('/push/disiscrivi', async (c) => {
+  const a = c.get('attore')
   const b = z.object({ endpoint: z.string().url() }).safeParse(await c.req.json())
   if (!b.success) throw new HttpError(422, 'Endpoint non valido')
-  await db.delete(schema.pushSubscription).where(eq(schema.pushSubscription.endpoint, b.data.endpoint))
+  await db.delete(schema.pushSubscription).where(
+    and(eq(schema.pushSubscription.endpoint, b.data.endpoint), eq(schema.pushSubscription.userId, a.id)))
   return c.json({ ok: true })
 })

@@ -3,7 +3,7 @@ import { Hono } from 'hono'
 import { eq, inArray } from 'drizzle-orm'
 import type { Env } from '../context'
 
-vi.mock('../lib/notify', () => ({ avvisa: vi.fn() }))
+vi.mock('../lib/notify', async (vero) => ({ ...await vero<typeof import('../lib/notify')>(), avvisa: vi.fn() }))
 
 // Opt-in: soltanto un archivio di prova già migrato. Nessuna istanza HTTP serve.
 const url = process.env.TURNI_TEST_DATABASE_URL
@@ -33,6 +33,7 @@ describe.skipIf(!url)('regressioni API su MariaDB/MySQL', () => {
     const { mio } = await import('./mio')
     const { overview } = await import('./overview')
     const { auth } = await import('./auth')
+    const { notifications } = await import('./notifications')
     app = new Hono<Env>()
     app.use('*', async (c, next) => {
       c.set('attore', (await caricaAttore(Number(c.req.header('x-test-user'))))!)
@@ -40,7 +41,7 @@ describe.skipIf(!url)('regressioni API su MariaDB/MySQL', () => {
       await next()
     })
     app.onError((e, c) => c.json({ errore: e.message }, e instanceof HttpError ? e.status : 500))
-    app.route('/periodi', periods).route('/assenze', absences).route('/org', org).route('/mio', mio).route('/panoramica', overview).route('/auth', auth)
+    app.route('/periodi', periods).route('/assenze', absences).route('/org', org).route('/mio', mio).route('/panoramica', overview).route('/auth', auth).route('/notifiche', notifications)
     const [unit] = await db.insert(s.unit).values({ nome: 'Regressione temporanea' })
     unitId = unit.insertId
     for (const [i, ruolo] of (['dirigente', 'dipendente', 'dipendente', 'admin'] as const).entries()) {
@@ -186,5 +187,19 @@ describe.skipIf(!url)('regressioni API su MariaDB/MySQL', () => {
     expect(r.status).toBe(200); expect((await risultato(r)).id).toBe(id)
     expect((await richiesta(dirigente, 'POST', `/org/unita/${unitId}/assegna-settore`, { userId: esterno, sectorId: null })).status).toBe(422)
     expect((await richiesta(dirigente, 'POST', '/org/unita', { parentId: unitId, nome: 'Vietata', dirigenteUserId: esterno })).status).toBe(422)
+  })
+
+  it('il dispositivo iscritto al push lo toglie solo chi lo possiede', async () => {
+    const { db, schema: s } = database
+    const endpoint = 'https://fcm.googleapis.com/fcm/send/regressione'
+    const iscrivi = (e: string) => richiesta(collega, 'POST', '/notifiche/push/iscrivi', { endpoint: e, keys: { p256dh: 'p', auth: 'a' } })
+    const quante = async () => (await db.select().from(s.pushSubscription).where(eq(s.pushSubscription.endpoint, endpoint))).length
+
+    expect((await iscrivi('https://esempio.it/x')).status).toBe(422)
+    expect((await iscrivi(endpoint)).status).toBe(201)
+    await richiesta(altro, 'POST', '/notifiche/push/disiscrivi', { endpoint })
+    expect(await quante()).toBe(1)
+    await richiesta(collega, 'POST', '/notifiche/push/disiscrivi', { endpoint })
+    expect(await quante()).toBe(0)
   })
 })

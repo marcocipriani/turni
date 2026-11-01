@@ -1,5 +1,22 @@
+import { Hono } from 'hono'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { attesaResidua, azzera, tentativoFallito, tentativoRiuscito } from './limite'
+import { attesaResidua, azzera, limiteCorpo, tentativoFallito, tentativoRiuscito } from './limite'
+
+describe('limite del corpo', () => {
+  const app = new Hono().post('/', limiteCorpo, async (c) => c.text(String((await c.req.arrayBuffer()).byteLength)))
+  // Un flusso non ha content-length: è ciò che arriva con Transfer-Encoding: chunked.
+  const chunked = (byte: number) => app.request('/', {
+    method: 'POST', duplex: 'half', body: new Blob([new Uint8Array(byte)]).stream(),
+  } as RequestInit)
+
+  it('ferma un corpo chunked oltre il limite', async () => {
+    expect((await chunked(256 * 1024 + 1)).status).toBe(413)
+  })
+
+  it('lascia passare un corpo chunked nel limite', async () => {
+    expect(await (await chunked(256 * 1024)).text()).toBe(String(256 * 1024))
+  })
+})
 
 describe('freno ai tentativi di accesso', () => {
   beforeEach(azzera)

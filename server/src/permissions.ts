@@ -6,7 +6,15 @@ export type Attore = {
   unitId: number | null
   /** Unità in cui l'utente è stato delegato come organizzatore. */
   organizzatoreDi: number[]
+  passwordDaCambiare?: boolean
 }
+
+/**
+ * Con la password provvisoria si può solo cambiarla. L'interfaccia lo impone già,
+ * ma chi chiama l'API direttamente l'interfaccia non la vede.
+ */
+export const bloccatoDaPassword = (a: Attore, path: string) =>
+  Boolean(a.passwordDaCambiare) && !['/api/auth/me', '/api/auth/password'].includes(path)
 
 /** id unità → id del padre (null se radice). L'albero è piccolo: si tiene in memoria. */
 export type Albero = Map<number, number | null>

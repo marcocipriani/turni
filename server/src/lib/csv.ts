@@ -52,6 +52,12 @@ export function leggiCsv(testo: string): Riga[] {
 }
 
 /** «si», «sì», «x», «1», «true»: tutti i modi in cui si scrive sì in un foglio. */
+/**
+ * Cella per i file che finiscono nel foglio di calcolo. Le virgolette non
+ * fermano una formula: uno spazio davanti sì (vedi esportazione.ts).
+ */
+export const virgolette = (v: string) => `"${v.replace(/^[=+\-@\t\r]/, ' $&').replace(/"/g, '""')}"`
+
 export const si = (v: string | undefined) =>
   ['si', 'sì', 'x', 'true', 'vero', '1'].includes((v ?? '').trim().toLowerCase())
 

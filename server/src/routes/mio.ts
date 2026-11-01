@@ -2,6 +2,7 @@ import { and, eq, gte, inArray, isNull, lte, ne, or } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { type Env, HttpError } from '../context'
 import { db, schema } from '../db/index'
+import { virgolette } from '../lib/csv'
 import { eachDay, type ISODate, weekday } from '../lib/dates'
 import { INTESTAZIONE_CALENDARIO, righeCalendario } from '../lib/esportazione'
 import { radice, unitaDiProgrammazione } from '../permissions'
@@ -207,7 +208,6 @@ mio.get('/export.csv', async (c) => {
   const indisponibili = await giorniIndisponibili([a.id], da, fine)
   const causale = new Map([...indisponibili].map(([k, v]) => [k.split('|')[1]!, v]))
 
-  const virgolette = (v: string) => `"${v.replace(/"/g, '""')}"`
   const righe = [
     INTESTAZIONE_CALENDARIO.join(';'),
     ...righeCalendario(celle, causale, stanze, scrivanie).map((r) => r.map(virgolette).join(';')),

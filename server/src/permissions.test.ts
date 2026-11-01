@@ -1,9 +1,24 @@
 import { describe, expect, it } from 'vitest'
 import {
-  type Albero, type Attore, mascheraCella, puoAmministrareUnita, puoApprovare,
+  type Albero, type Attore, bloccatoDaPassword, mascheraCella, puoAmministrareUnita, puoApprovare,
   puoLeggereUnita, puoProgrammare, puoRegistrareAssenzaPer, puoVedereCausale, radice, sottoalbero,
   unitaDiProgrammazione,
 } from './permissions'
+
+describe('password provvisoria', () => {
+  const a: Attore = { id: 1, ruolo: 'dipendente', unitId: 2, organizzatoreDi: [] }
+
+  it('con la password provvisoria si può solo cambiarla', () => {
+    const provvisoria = { ...a, passwordDaCambiare: true }
+    expect(bloccatoDaPassword(provvisoria, '/api/org/albero')).toBe(true)
+    expect(bloccatoDaPassword(provvisoria, '/api/auth/me')).toBe(false)
+    expect(bloccatoDaPassword(provvisoria, '/api/auth/password')).toBe(false)
+  })
+
+  it('con la password definitiva non blocca niente', () => {
+    expect(bloccatoDaPassword(a, '/api/org/albero')).toBe(false)
+  })
+})
 
 //  1 Dipartimento
 //  ├── 2 Ufficio X

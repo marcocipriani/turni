@@ -1,3 +1,5 @@
+import { bodyLimit } from 'hono/body-limit'
+
 /**
  * Freno ai tentativi di accesso ripetuti.
  *
@@ -6,6 +8,16 @@
  * bruta dura minuti, non riavvii. Una tabella costerebbe una scrittura per
  * ogni tentativo fallito, cioè esattamente il carico che l'attacco vuole.
  */
+
+/**
+ * Un corpo enorme è o un errore o un tentativo: non lo si legge nemmeno. Si
+ * contano i byte, non content-length: chi manda a pezzi non lo dichiara.
+ */
+export const limiteCorpo = bodyLimit({
+  maxSize: 256 * 1024,
+  onError: (c) => c.json({ errore: 'Richiesta troppo grande' }, 413),
+})
+
 const FINESTRA = 15 * 60_000
 const SOGLIA = 8
 
