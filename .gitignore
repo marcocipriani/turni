@@ -13,4 +13,8 @@ rilascio/
 # reali, istruzioni e credenziali. Non esce da questa macchina.
 private/
 
+# Le pianificazioni sono dati reali di persone vere, e il repository è pubblico:
+# stanno in private/materiali, mai qui.
+*.xlsx
+
 server/dist/

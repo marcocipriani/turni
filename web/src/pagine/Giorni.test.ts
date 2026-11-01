@@ -82,7 +82,7 @@ describe('avviso: le stanze dette a parole', () => {
                   sede: string | null = null): Stanza =>
     ({ id: etichetta.length, etichetta, soprannome, piano, capienza, sede })
 
-  it('scrive la frase dell\'ufficio vero, com\'è in archivio', () => {
+  it('scrive la frase delle stanze e dell\'ufficio riservato', () => {
     const frasi = fraseStanze(
       [
         stanza('101', 'Sala nord', 'Primo piano', 5),
